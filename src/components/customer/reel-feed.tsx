@@ -1,0 +1,419 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Bookmark, ChevronLeft, Eye, Heart, Loader2, MapPin, Play, Send, Volume2, VolumeX, RotateCcw } from "lucide-react";
+import type { PublicReel } from "@/server/feed";
+import { formatMoney } from "@/lib/money";
+import { cn, compactNumber } from "@/lib/utils";
+import { VerifiedBadge, RatingPill } from "@/components/ui/misc";
+import { useToast } from "@/components/ui/toast";
+import { ItemSheet } from "./item-sheet";
+import { api, track } from "./track";
+
+export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean };
+
+type Props = {
+  initial: FeedReel[];
+  initialCursor: number | null;
+  minViewMs: number;
+  /** When set, the feed is a fixed list (e.g. a restaurant's reels) and shows a back button. */
+  fixed?: boolean;
+  startIndex?: number;
+  excludeIds?: string[];
+  backHref?: string;
+};
+
+export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref }: Props) {
+  const router = useRouter();
+  const [reels, setReels] = useState<FeedReel[]>(initial);
+  const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [active, setActive] = useState(startIndex);
+  const [muted, setMuted] = useState(true);
+  const [sheet, setSheet] = useState<{ itemId: string; reelId: string } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
+
+  // Jump to deep-linked index once
+  useEffect(() => {
+    if (startIndex > 0 && containerRef.current) {
+      const el = containerRef.current.children[startIndex] as HTMLElement | undefined;
+      el?.scrollIntoView({ behavior: "instant" as ScrollBehavior });
+    }
+    track("homepage_opened");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Track which slide is visible
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && e.intersectionRatio >= 0.6) setActive(Number((e.target as HTMLElement).dataset.index));
+        }
+      },
+      { root, threshold: [0.6] },
+    );
+    Array.from(root.children).forEach((c) => io.observe(c));
+    return () => io.disconnect();
+  }, [reels.length]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || cursor === null) return;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ cursor: String(cursor) });
+      if (excludeIds.length) params.set("exclude", excludeIds.join(","));
+      const res = await fetch(`/api/feed?${params}`);
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as { reels: FeedReel[]; nextCursor: number | null };
+      setReels((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...data.reels.filter((r) => !seen.has(r.id))];
+      });
+      setCursor(data.nextCursor);
+    } catch {
+      toast("Couldn't load more reels. Check your connection.", "error");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [cursor, loadingMore, excludeIds, toast]);
+
+  useEffect(() => {
+    if (active >= reels.length - 3) void loadMore();
+  }, [active, reels.length, loadMore]);
+
+  const patch = (id: string, p: Partial<FeedReel>) => setReels((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)));
+
+  async function like(r: FeedReel) {
+    patch(r.id, { liked: !r.liked, likeCount: r.likeCount + (r.liked ? -1 : 1) });
+    try {
+      const res = await api<{ liked: boolean; likeCount: number }>(`/api/reels/${r.id}/like`);
+      patch(r.id, { liked: res.liked, likeCount: res.likeCount });
+    } catch {
+      patch(r.id, { liked: r.liked, likeCount: r.likeCount });
+    }
+  }
+
+  async function save(r: FeedReel) {
+    patch(r.id, { saved: !r.saved });
+    try {
+      const res = await api<{ saved: boolean }>("/api/save", { type: "REEL", refId: r.id });
+      patch(r.id, { saved: res.saved });
+      toast(res.saved ? "Saved" : "Removed from saved");
+    } catch {
+      patch(r.id, { saved: r.saved });
+    }
+  }
+
+  async function share(r: FeedReel) {
+    const url = `${location.origin}/reel/${r.id}`;
+    const title = `${r.item.name} at ${r.restaurant.name}`;
+    track("reel_shared", { reelId: r.id });
+    patch(r.id, { shareCount: r.shareCount + 1 });
+    try {
+      if (navigator.share) await navigator.share({ title, text: `${title} on numnum`, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        toast("Link copied");
+      }
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") {
+        try {
+          await navigator.clipboard.writeText(url);
+          toast("Link copied");
+        } catch {
+          prompt("Copy this link", url);
+        }
+      }
+    }
+  }
+
+  return (
+    <div className="relative bg-black text-white">
+      {(fixed || backHref) && (
+        <button onClick={() => (backHref ? router.push(backHref) : router.back())} className="absolute left-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label="Back">
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+      )}
+      {!fixed && !backHref && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-center bg-gradient-to-b from-black/50 to-transparent pb-8" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
+          <span className="text-lg font-black tracking-tight">numnum</span>
+        </div>
+      )}
+      <button onClick={() => setMuted((m) => !m)} className="absolute right-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={muted ? "Unmute" : "Mute"}>
+        {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+      </button>
+
+      <div ref={containerRef} className="h-feed snap-feed no-scrollbar overflow-y-scroll">
+        {reels.map((r, i) => (
+          <ReelSlide
+            key={r.id}
+            reel={r}
+            index={i}
+            active={i === active}
+            near={Math.abs(i - active) <= 1}
+            preloadFull={i === active || i === active + 1}
+            muted={muted}
+            minViewMs={minViewMs}
+            onLike={() => like(r)}
+            onSave={() => save(r)}
+            onShare={() => share(r)}
+            onOpen={() => setSheet({ itemId: r.item.id, reelId: r.id })}
+          />
+        ))}
+        {reels.length === 0 && (
+          <div className="grid h-feed place-items-center px-8 text-center">
+            <div>
+              <div className="text-5xl">🍔</div>
+              <h2 className="mt-4 text-xl font-bold">No reels yet</h2>
+              <p className="mt-1 text-sm text-white/70">Restaurants are cooking up their first videos. Explore menus in the meantime.</p>
+              <Link href="/restaurants" className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-500 px-5 font-semibold">
+                Browse restaurants
+              </Link>
+            </div>
+          </div>
+        )}
+        {loadingMore && (
+          <div className="grid h-24 snap-start place-items-center">
+            <Loader2 className="h-6 w-6 animate-spin text-white/70" />
+          </div>
+        )}
+      </div>
+      <ItemSheet itemId={sheet?.itemId ?? null} reelId={sheet?.reelId} open={!!sheet} onClose={() => setSheet(null)} />
+    </div>
+  );
+}
+
+function ReelSlide({
+  reel,
+  index,
+  active,
+  near,
+  preloadFull,
+  muted,
+  minViewMs,
+  onLike,
+  onSave,
+  onShare,
+  onOpen,
+}: {
+  reel: FeedReel;
+  index: number;
+  active: boolean;
+  near: boolean;
+  preloadFull: boolean;
+  muted: boolean;
+  minViewMs: number;
+  onLike: () => void;
+  onSave: () => void;
+  onShare: () => void;
+  onOpen: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [paused, setPaused] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [likeAnim, setLikeAnim] = useState(false);
+  const watched = useRef(0);
+  const lastTick = useRef<number | null>(null);
+  const viewSent = useRef(false);
+  const lastTap = useRef(0);
+
+  // Play / pause based on visibility
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (active && !paused) {
+      v.play().catch(() => {
+        // autoplay can be blocked (e.g. low-power mode); show play affordance
+        setPaused(true);
+      });
+    } else {
+      v.pause();
+    }
+    if (!active) {
+      lastTick.current = null;
+    }
+  }, [active, paused, near]);
+
+  useEffect(() => {
+    if (!active) setPaused(false);
+  }, [active]);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = muted;
+  }, [muted]);
+
+  // Qualified view: accumulate actual playing time while visible
+  function onTimeUpdate() {
+    const v = videoRef.current;
+    if (!v || !active || v.paused) {
+      lastTick.current = null;
+      return;
+    }
+    const now = performance.now();
+    if (lastTick.current !== null) watched.current += Math.min(1000, now - lastTick.current);
+    lastTick.current = now;
+    if (!viewSent.current && watched.current >= minViewMs && document.visibilityState === "visible") {
+      viewSent.current = true;
+      void fetch(`/api/reels/${reel.id}/view`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ watchMs: Math.round(watched.current) }), keepalive: true }).catch(() => {});
+    }
+  }
+
+  function onTap() {
+    const now = Date.now();
+    if (now - lastTap.current < 280) {
+      // double tap = like
+      if (!reel.liked) onLike();
+      setLikeAnim(true);
+      setTimeout(() => setLikeAnim(false), 600);
+      lastTap.current = 0;
+      return;
+    }
+    lastTap.current = now;
+    setTimeout(() => {
+      if (lastTap.current === now) setPaused((p) => !p);
+    }, 290);
+  }
+
+  const showVideo = near && reel.videoUrl && !failed;
+
+  return (
+    <section data-index={index} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black" aria-label={`${reel.item.name} by ${reel.restaurant.name}`}>
+      {/* poster always rendered underneath to avoid black frames */}
+      {reel.posterUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={reel.posterUrl} alt="" className="absolute inset-0 h-full w-full object-cover" loading={index < 2 ? "eager" : "lazy"} fetchPriority={index === 0 ? "high" : "auto"} />
+      )}
+      {showVideo && (
+        <video
+          ref={videoRef}
+          className="absolute inset-0 h-full w-full object-cover"
+          src={reel.videoUrl!}
+          poster={reel.posterUrl ?? undefined}
+          muted={muted}
+          loop
+          playsInline
+          preload={preloadFull ? "auto" : "metadata"}
+          onTimeUpdate={onTimeUpdate}
+          onWaiting={() => setBuffering(true)}
+          onPlaying={() => {
+            setBuffering(false);
+            lastTick.current = performance.now();
+          }}
+          onPause={() => (lastTick.current = null)}
+          onError={() => setFailed(true)}
+        />
+      )}
+      <button className="absolute inset-0 z-[1] h-full w-full" onClick={onTap} aria-label={paused ? "Play" : "Pause"} />
+
+      {active && buffering && !paused && (
+        <div className="pointer-events-none absolute inset-0 z-[2] grid place-items-center">
+          <Loader2 className="h-10 w-10 animate-spin text-white/80" />
+        </div>
+      )}
+      {paused && !failed && (
+        <div className="pointer-events-none absolute inset-0 z-[2] grid place-items-center">
+          <Play className="h-16 w-16 fill-white/90 text-white/90 drop-shadow-lg" />
+        </div>
+      )}
+      {failed && (
+        <div className="absolute inset-0 z-[2] grid place-items-center bg-black/40">
+          <button
+            className="flex flex-col items-center gap-2 text-sm font-semibold"
+            onClick={() => {
+              setFailed(false);
+              setBuffering(false);
+            }}
+          >
+            <RotateCcw className="h-8 w-8" />
+            Video unavailable · Tap to retry
+          </button>
+        </div>
+      )}
+      {likeAnim && (
+        <div className="pointer-events-none absolute inset-0 z-[3] grid place-items-center">
+          <Heart className="h-28 w-28 animate-pop fill-brand-500 text-brand-500 drop-shadow-xl" />
+        </div>
+      )}
+
+      {/* gradient for legibility */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-2/3 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+
+      {/* Right action rail */}
+      <div className="absolute bottom-6 right-2 z-10 flex flex-col items-center gap-4">
+        <Link href={`/r/${reel.restaurant.slug}`} className="relative mb-1" aria-label={`Open ${reel.restaurant.name}`}>
+          <span className="block h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-white">
+            {reel.restaurant.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={reel.restaurant.logoUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="grid h-full w-full place-items-center bg-brand-500 text-lg font-black">{reel.restaurant.name[0]}</span>
+            )}
+          </span>
+        </Link>
+        <RailButton onClick={onLike} label={compactNumber(reel.likeCount)} aria={reel.liked ? "Unlike" : "Like"}>
+          <Heart className={cn("h-8 w-8 drop-shadow", reel.liked ? "fill-brand-500 text-brand-500" : "fill-white/10")} />
+        </RailButton>
+        <RailButton onClick={onSave} label={reel.saved ? "Saved" : "Save"} aria={reel.saved ? "Unsave" : "Save"}>
+          <Bookmark className={cn("h-7 w-7 drop-shadow", reel.saved ? "fill-amber-400 text-amber-400" : "fill-white/10")} />
+        </RailButton>
+        <RailButton onClick={onShare} label={reel.shareCount ? compactNumber(reel.shareCount) : "Share"} aria="Share">
+          <Send className="h-7 w-7 drop-shadow" />
+        </RailButton>
+        <div className="flex flex-col items-center text-[11px] font-semibold text-shadow">
+          <Eye className="h-6 w-6 drop-shadow" />
+          {compactNumber(reel.viewCount)}
+        </div>
+      </div>
+
+      {/* Info + order */}
+      <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pr-20">
+        {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">Sponsored</span>}
+        <Link href={`/r/${reel.restaurant.slug}`} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
+          {reel.restaurant.name}
+          {reel.restaurant.verified && <VerifiedBadge />}
+        </Link>
+        {reel.restaurant.location && (
+          <div className="mt-0.5 flex items-center gap-1 text-xs text-white/80 text-shadow">
+            <MapPin className="h-3.5 w-3.5" />
+            {reel.restaurant.location}
+          </div>
+        )}
+        <button onClick={onOpen} className="mt-2 block text-left">
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-extrabold leading-tight text-shadow">{reel.item.name}</span>
+          </div>
+          <div className="mt-1 flex items-center gap-2.5">
+            <span className="tabular text-lg font-extrabold text-brand-300 text-shadow">{formatMoney(reel.item.priceCents, reel.item.currency)}</span>
+            <RatingPill avg={reel.item.ratingAvg} count={reel.item.ratingCount} dark />
+          </div>
+          {(reel.caption || reel.item.description) && <p className="mt-1.5 line-clamp-2 text-sm text-white/85 text-shadow">{reel.caption || reel.item.description}</p>}
+        </button>
+        {reel.restaurant.orderingEnabled && reel.item.available ? (
+          <button onClick={onOpen} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 text-base font-bold shadow-lg shadow-brand-500/40 active:scale-[0.98]">
+            Order · {formatMoney(reel.item.priceCents, reel.item.currency)}
+          </button>
+        ) : (
+          <button onClick={onOpen} className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-white/15 text-sm font-bold backdrop-blur">
+            {reel.item.available ? "View dish" : "Currently unavailable"}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function RailButton({ children, label, onClick, aria }: { children: React.ReactNode; label: string; onClick: () => void; aria: string }) {
+  return (
+    <button onClick={onClick} className="flex flex-col items-center gap-0.5 text-[11px] font-semibold text-shadow active:scale-90" aria-label={aria}>
+      {children}
+      {label}
+    </button>
+  );
+}

@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import sharp from "sharp";
+import sharp, { type Metadata as SharpMetadata } from "sharp";
 import type { MediaKind } from "@prisma/client";
 import { prisma } from "./db";
 import { randomToken, sha256 } from "./crypto";
@@ -23,7 +23,7 @@ export async function processImage(
   opts: { restaurantId: string | null; originalName?: string; uploadedById?: string; kind?: MediaKind; isPrivate?: boolean; maxSize?: number },
 ) {
   if (input.byteLength > MAX_IMAGE_BYTES) throw new MediaError("Image is larger than 15 MB");
-  let meta: sharp.Metadata;
+  let meta: SharpMetadata;
   try {
     meta = await sharp(input).metadata();
   } catch {
@@ -47,13 +47,13 @@ export async function processImage(
   const isPrivate = !!opts.isPrivate;
   const id = randomToken(12);
   const folder = `${kind.toLowerCase()}/${opts.restaurantId ?? "platform"}`;
-  let url: string, thumbUrl: string;
+  let url: string, thumbUrl: string | null;
   let storageKey = `${folder}/${id}.webp`;
 
   if (!isPrivate && driver() === "cloudinary") {
     const up = await uploadCloudinary(main.data, "image", `numnum/${folder}/${id}`);
     url = up.url;
-    thumbUrl = up.thumbUrl;
+    thumbUrl = up.thumbUrl ?? null;
     storageKey = `cloudinary:numnum/${folder}/${id}`;
   } else {
     url = await putLocal(storageKey, main.data, isPrivate);
