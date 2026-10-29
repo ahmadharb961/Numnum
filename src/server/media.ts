@@ -38,6 +38,11 @@ export async function processImage(
   if ((meta.width ?? 0) * (meta.height ?? 0) > 60_000_000) throw new MediaError("Image dimensions are too large");
 
   const checksum = sha256(input);
+  if (opts.restaurantId && !opts.isPrivate && (opts.kind ?? "IMAGE") === "IMAGE") {
+    // identical file already uploaded by this restaurant → reuse it
+    const dup = await prisma.mediaAsset.findFirst({ where: { restaurantId: opts.restaurantId, kind: "IMAGE", checksum } });
+    if (dup) return dup;
+  }
   const maxSize = opts.maxSize ?? 1600;
   const base = sharp(input, { failOn: "error" }).rotate(); // apply EXIF orientation; metadata stripped by default
   const main = await base.clone().resize({ width: maxSize, height: maxSize, fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toBuffer({ resolveWithObject: true });

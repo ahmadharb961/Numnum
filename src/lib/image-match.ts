@@ -46,3 +46,25 @@ export function matchImagesToSkus(files: string[], skus: string[]): MatchResult[
     return { file, status: "matched", sku, index };
   });
 }
+
+const tokens = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+$/, "")
+    .split(/[^a-z0-9؀-ۿ]+/)
+    .filter((t) => t.length > 1);
+
+/** Filename → item-name similarity suggestions. Suggestions are never applied without confirmation. */
+export function suggestByName(file: string, items: { id: string; name: string }[]): { id: string; name: string; score: number } | null {
+  const ft = new Set(tokens(file.split(/[\\/]/).pop() || file));
+  if (!ft.size) return null;
+  let best: { id: string; name: string; score: number } | null = null;
+  for (const it of items) {
+    const it_ = tokens(it.name);
+    if (!it_.length) continue;
+    const overlap = it_.filter((t) => ft.has(t)).length;
+    const score = overlap / Math.max(it_.length, ft.size);
+    if (score > (best?.score ?? 0)) best = { ...it, score };
+  }
+  return best && best.score >= 0.5 ? best : null;
+}
