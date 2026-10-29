@@ -37,7 +37,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             <div className="flex items-center gap-2 font-bold text-[#128C7E]">
               <MessageCircle className="h-5 w-5" /> Did you press Send in WhatsApp?
             </div>
-            <p className="mt-1 text-ink-soft">Your order only reaches {order.restaurantName} once you send the message. If WhatsApp didn't open, use the button below.</p>
+            <p className="mt-1 text-ink-soft">Your order only reaches {order.restaurantName} once you send the message. If WhatsApp didn&apos;t open, use the button below.</p>
           </div>
         )}
         <div className="card p-4">

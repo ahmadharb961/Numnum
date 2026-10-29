@@ -98,7 +98,7 @@ export function ReelUploader({ items, defaultItemId, canPublish }: { items: { id
         <div>
           <div className="label">Linked menu item *</div>
           <ItemPicker items={items} value={itemId} onChange={setItemId} />
-          <p className="mt-1 text-xs text-ink-muted">The reel always shows this item's current name, price and rating, and opens its order screen.</p>
+          <p className="mt-1 text-xs text-ink-muted">The reel always shows this item&apos;s current name, price and rating, and opens its order screen.</p>
         </div>
         <Field label="Caption (optional)">
           <textarea className="input" maxLength={300} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Smashed to order, every time 🔥" />

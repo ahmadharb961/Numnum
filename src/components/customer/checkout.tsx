@@ -223,7 +223,7 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
         </ol>
 
         {infoError && <Alert tone="red">{infoError}</Alert>}
-        {info && !info.orderingEnabled && <Alert tone="amber">{info.displayName} hasn't enabled WhatsApp ordering yet.</Alert>}
+        {info && !info.orderingEnabled && <Alert tone="amber">{info.displayName} hasn&apos;t enabled WhatsApp ordering yet.</Alert>}
 
         {!info && !infoError && (
           <div className="grid place-items-center py-16">
@@ -287,7 +287,7 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
               <div className="label">
                 Google Maps location {info.requireMapsLocation && method === "DELIVERY" ? <span className="text-brand-600">(required)</span> : <span className="font-normal text-ink-muted">(optional)</span>}
               </div>
-              {!consented && d.latitude == null && <p className="mb-2 text-xs text-ink-muted">We only use your location to create a map link for the restaurant. It's sent in your WhatsApp message and not used for anything else.</p>}
+              {!consented && d.latitude == null && <p className="mb-2 text-xs text-ink-muted">We only use your location to create a map link for the restaurant. It&apos;s sent in your WhatsApp message and not used for anything else.</p>}
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={locate} loading={locating} className="shrink-0">
                   <LocateFixed className="h-4 w-4" /> Use my location
@@ -385,13 +385,13 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
             </div>
             {sendError && <Alert tone="red">{sendError}</Alert>}
             <p className="text-xs leading-relaxed text-ink-muted">
-              Tapping the button opens WhatsApp with your order pre-written to {info.displayName}. <b>Press Send in WhatsApp</b> to place it. Your name, phone, address and location are shared with the restaurant. There's no online payment — pay the restaurant directly. See our{" "}
+              Tapping the button opens WhatsApp with your order pre-written to {info.displayName}. <b>Press Send in WhatsApp</b> to place it. Your name, phone, address and location are shared with the restaurant. There&apos;s no online payment — pay the restaurant directly. See our{" "}
               <Link href="/privacy" className="underline">
                 privacy policy
               </Link>
               .
             </p>
-            <Button size="lg" block onClick={send} loading={sending} disabled={!quote || Object.keys(quote.errors).length > 0 || !!below} className="bg-[#25D366] shadow-[#25D366]/30 hover:bg-[#1ebe5b]">
+            <Button size="lg" block onClick={send} loading={sending} disabled={!quote || Object.keys(quote.errors).length > 0 || !!below} variant="whatsapp">
               <MessageCircle className="h-5 w-5" /> Send order via WhatsApp
             </Button>
             {quote && Object.keys(quote.errors).length > 0 && (

@@ -20,7 +20,10 @@ export function SearchControls({ facets }: { facets: Facets }) {
 
   const setParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(sp.toString());
-    for (const [k, v] of Object.entries(patch)) (v === null || v === "" ? next.delete(k) : next.set(k, v));
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === null || v === "") next.delete(k);
+      else next.set(k, v);
+    }
     next.delete("page");
     start(() => router.replace(`${pathname}?${next.toString()}`, { scroll: false }));
   };

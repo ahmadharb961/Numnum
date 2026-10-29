@@ -224,7 +224,7 @@ export function CsvImporter({ currency }: { currency: string }) {
           </div>
           {v.missingFromFile.length > 0 && v.stats.updates > 0 && (
             <Alert tone="blue">
-              {v.missingFromFile.length} existing item(s) aren't in this file. They will <b>not</b> be deleted — you can review them after importing.
+              {v.missingFromFile.length} existing item(s) aren&apos;t in this file. They will <b>not</b> be deleted — you can review them after importing.
             </Alert>
           )}
           <div className="flex flex-wrap gap-3">

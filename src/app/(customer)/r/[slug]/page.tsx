@@ -100,7 +100,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
 
         <div className="mt-4 grid grid-cols-4 gap-2 text-center">
           {[
-            [r.ratingCount ? r.ratingAvg.toFixed(1) : "–", `${r.ratingCount} reviews`],
+            [r.ratingCount ? r.ratingAvg.toFixed(1) : "–", `${r.ratingCount} review${r.ratingCount === 1 ? "" : "s"}`],
             [compactNumber(r.totalReelViews), "reel views"],
             [String(r._count.menuItems), "menu items"],
             [String(r._count.reels), "reels"],

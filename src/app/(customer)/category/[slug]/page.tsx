@@ -7,7 +7,7 @@ import { DishCard, ReelThumb } from "@/components/customer/cards";
 import { PageHeader } from "@/components/customer/page-header";
 import { EmptyState } from "@/components/ui/misc";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const c = await prisma.foodCategory.findUnique({ where: { slug: (await params).slug } });

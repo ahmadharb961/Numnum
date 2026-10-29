@@ -94,7 +94,7 @@ export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: stri
           <Link href="/privacy" className="font-semibold text-brand-600 underline" target="_blank">
             Privacy Policy
           </Link>
-          . I'll review the commission agreement before enabling WhatsApp ordering.
+          . I&apos;ll review the commission agreement before enabling WhatsApp ordering.
         </span>
       </label>
       {fe.terms && <p className="text-xs font-medium text-red-600">{fe.terms}</p>}

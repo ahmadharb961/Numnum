@@ -12,7 +12,7 @@ export function ReopenWhatsApp({ reference }: { reference: string }) {
       size="lg"
       block
       loading={busy}
-      className="bg-[#25D366] hover:bg-[#1ebe5b]"
+      variant="whatsapp"
       onClick={async () => {
         setBusy(true);
         try {

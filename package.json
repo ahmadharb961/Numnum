@@ -12,12 +12,14 @@
     "test": "vitest run",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
-    "billing:run": "tsx scripts/run-billing.ts",
-    "postinstall": "prisma generate"
+    "db:seed": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs prisma/seed.ts",
+    "billing:run": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/run-billing.ts",
+    "postinstall": "prisma generate",
+    "worker": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/worker.ts",
+    "test:e2e": "node e2e/customer.js && node e2e/business.js"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "npm run db:seed"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
