@@ -20,7 +20,7 @@ export default async function BusinessPage() {
   ];
   return (
     <main className="min-h-dvh bg-cream">
-      <header className="container-app flex h-16 items-center justify-between" style={{ paddingTop: "var(--safe-top)" }}>
+      <header className="container-app flex items-center justify-between" style={{ paddingTop: "var(--safe-top)", height: "calc(4rem + var(--safe-top))" }}>
         <Link href="/" className="text-2xl font-black tracking-tight text-brand-600">
           numnum
         </Link>

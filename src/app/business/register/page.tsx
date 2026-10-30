@@ -10,7 +10,7 @@ export default async function RegisterRestaurantPage() {
   const user = await getCurrentUser();
   return (
     <div className="min-h-dvh bg-cream">
-      <header className="container-app flex h-16 items-center gap-1" style={{ paddingTop: "var(--safe-top)" }}>
+      <header className="container-app flex items-center gap-1" style={{ paddingTop: "var(--safe-top)", height: "calc(4rem + var(--safe-top))" }}>
         <BackButton fallback="/business" />
         <Link href="/business" className="text-2xl font-black tracking-tight text-brand-600">
           numnum

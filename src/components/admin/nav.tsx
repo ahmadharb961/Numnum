@@ -54,7 +54,7 @@ export function AdminNav({ counts }: { counts: Record<string, number> }) {
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 bg-ink text-white lg:block">{content}</aside>
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 bg-ink px-4 text-white lg:hidden" style={{ paddingTop: "var(--safe-top)" }}>
+      <header className="sticky top-0 z-30 flex items-center gap-3 bg-ink px-4 text-white lg:hidden" style={{ paddingTop: "var(--safe-top)", height: "calc(3.5rem + var(--safe-top))" }}>
         <button onClick={() => setOpen(true)} className="-ml-2 grid h-10 w-10 place-items-center" aria-label="Open menu">
           <Menu className="h-6 w-6" />
         </button>
@@ -63,8 +63,8 @@ export function AdminNav({ counts }: { counts: Record<string, number> }) {
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-72 bg-ink text-white">
-            <button onClick={() => setOpen(false)} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/10" aria-label="Close menu">
+          <div className="absolute inset-y-0 left-0 w-72 bg-ink text-white" style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}>
+            <button onClick={() => setOpen(false)} className="absolute right-3 grid h-9 w-9 place-items-center rounded-full bg-white/10" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label="Close menu">
               <X className="h-5 w-5" />
             </button>
             {content}

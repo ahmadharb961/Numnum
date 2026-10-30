@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh bg-cream">
-      <header className="container-app flex h-16 items-center" style={{ paddingTop: "var(--safe-top)" }}>
+      <header className="container-app flex items-center" style={{ paddingTop: "var(--safe-top)", height: "calc(4rem + var(--safe-top))" }}>
         <Link href="/" className="text-2xl font-black tracking-tight text-brand-600">
           numnum
         </Link>
