@@ -35,7 +35,11 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   const [active, setActive] = useState(startIndex);
-  const [muted, setMuted] = useState(true);
+  // Sound on by default. Browsers block sound until the visitor first taps the page: then the
+  // reel plays muted ("soundBlocked") and the first tap turns sound on. A manual mute is remembered.
+  const [muted, setMuted] = useState(false);
+  const [soundBlocked, setSoundBlocked] = useState(false);
+  const unlockedAt = useRef(0);
   const [sheet, setSheet] = useState<{ itemId: string; reelId: string } | null>(null);
   const [panel, setPanel] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,6 +54,44 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     track("homepage_opened");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("nn_muted") === "1") setMuted(true);
+    } catch {}
+  }, []);
+
+  const toggleMute = () => {
+    setMuted((m) => {
+      try {
+        localStorage.setItem("nn_muted", m ? "0" : "1");
+      } catch {}
+      return !m;
+    });
+    setSoundBlocked(false);
+  };
+
+  // First tap/click/key after a blocked start: unmute inside the gesture (required on iOS).
+  useEffect(() => {
+    if (!soundBlocked) return;
+    const unlock = () => {
+      const v = document.querySelector<HTMLVideoElement>("section[data-active='true'] video");
+      if (v) {
+        v.muted = false;
+        void v.play().catch(() => {});
+      }
+      unlockedAt.current = Date.now();
+      setSoundBlocked(false);
+      setMuted(false);
+    };
+    const opts = { capture: true, once: true } as const;
+    window.addEventListener("pointerdown", unlock, opts);
+    window.addEventListener("keydown", unlock, opts);
+    return () => {
+      window.removeEventListener("pointerdown", unlock, opts);
+      window.removeEventListener("keydown", unlock, opts);
+    };
+  }, [soundBlocked]);
 
   // Desktop: arrow keys move between reels.
   useEffect(() => {
@@ -168,7 +210,12 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
           </span>
         </div>
       )}
-      <button onClick={() => setMuted((m) => !m)} className={cn("absolute right-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur", panel && "lg:right-[412px]")} style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={muted ? "Unmute" : "Mute"}>
+      {soundBlocked && (
+        <button onClick={toggleMute} className={cn("absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/60 px-3.5 py-2 text-xs font-bold backdrop-blur")} style={{ top: "calc(var(--safe-top) + 64px)" }}>
+          <VolumeX className="h-4 w-4" /> Tap for sound
+        </button>
+      )}
+      <button onClick={toggleMute} className={cn("absolute right-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur", panel && "lg:right-[412px]")} style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={muted ? "Unmute" : "Mute"}>
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
@@ -182,6 +229,16 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
             near={Math.abs(i - active) <= 1}
             preloadFull={i === active || i === active + 1}
             muted={muted}
+            onSoundBlocked={() => {
+              setMuted(true);
+              // Someone who chose mute doesn't need the "Tap for sound" prompt.
+              let prefersMuted = false;
+              try {
+                prefersMuted = localStorage.getItem("nn_muted") === "1";
+              } catch {}
+              if (!prefersMuted) setSoundBlocked(true);
+            }}
+            justUnlocked={() => Date.now() - unlockedAt.current < 700}
             minViewMs={minViewMs}
             onLike={() => like(r)}
             onSave={() => save(r)}
@@ -221,6 +278,8 @@ function ReelSlide({
   near,
   preloadFull,
   muted,
+  onSoundBlocked,
+  justUnlocked,
   minViewMs,
   onLike,
   onSave,
@@ -234,6 +293,8 @@ function ReelSlide({
   near: boolean;
   preloadFull: boolean;
   muted: boolean;
+  onSoundBlocked: () => void;
+  justUnlocked: () => boolean;
   minViewMs: number;
   onLike: () => void;
   onSave: () => void;
@@ -256,7 +317,14 @@ function ReelSlide({
     const v = videoRef.current;
     if (!v) return;
     if (active && !paused) {
-      v.play().catch(() => {
+      v.play().catch((e: Error) => {
+        // Sound before any tap is blocked: play muted instead and let the feed offer sound.
+        if (e.name === "NotAllowedError" && !v.muted) {
+          v.muted = true;
+          onSoundBlocked();
+          v.play().catch(() => setPaused(true));
+          return;
+        }
         // autoplay can be blocked (e.g. low-power mode); show play affordance
         setPaused(true);
       });
@@ -293,6 +361,8 @@ function ReelSlide({
   }
 
   function onTap() {
+    // The tap that just turned sound on shouldn't also pause the reel.
+    if (justUnlocked()) return;
     const now = Date.now();
     if (now - lastTap.current < 280) {
       // double tap = like
@@ -311,7 +381,7 @@ function ReelSlide({
   const showVideo = near && reel.videoUrl && !failed;
 
   return (
-    <section data-index={index} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black lg:flex lg:items-center lg:justify-center lg:bg-[#0f0d0c]" aria-label={`${reel.item.name} by ${reel.restaurant.name}`}>
+    <section data-index={index} data-active={active} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black lg:flex lg:items-center lg:justify-center lg:bg-[#0f0d0c]" aria-label={`${reel.item.name} by ${reel.restaurant.name}`}>
       {/* Desktop: the video plays in a centered 9:16 column. */}
       <div className="relative h-full w-full overflow-hidden lg:aspect-[9/16] lg:h-[calc(100%-2.5rem)] lg:w-auto lg:rounded-3xl">
       {/* poster always rendered underneath to avoid black frames */}
