@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bookmark, ChevronLeft, Eye, Heart, Loader2, MapPin, Play, Send, Volume2, VolumeX, RotateCcw } from "lucide-react";
+import { Bookmark, ChevronLeft, Eye, Heart, Loader2, MapPin, Play, Plus, Send, Volume2, VolumeX, RotateCcw, X } from "lucide-react";
 import type { PublicReel } from "@/server/feed";
 import { formatMoney } from "@/lib/money";
 import { cn, compactNumber } from "@/lib/utils";
@@ -37,6 +37,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   const [active, setActive] = useState(startIndex);
   const [muted, setMuted] = useState(true);
   const [sheet, setSheet] = useState<{ itemId: string; reelId: string } | null>(null);
+  const [panel, setPanel] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
@@ -153,7 +154,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   }
 
   return (
-    <div className="relative bg-black text-white">
+    <div className={cn("relative bg-black text-white transition-[padding] duration-300", panel && "lg:pr-[400px]")}>
       {(fixed || backHref) && (
         <button onClick={() => (backHref ? router.push(backHref) : router.back())} className="absolute left-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label="Back">
           <ChevronLeft className="h-6 w-6" />
@@ -167,7 +168,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
           </span>
         </div>
       )}
-      <button onClick={() => setMuted((m) => !m)} className="absolute right-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={muted ? "Unmute" : "Mute"}>
+      <button onClick={() => setMuted((m) => !m)} className={cn("absolute right-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur", panel && "lg:right-[412px]")} style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={muted ? "Unmute" : "Mute"}>
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
@@ -185,6 +186,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
             onLike={() => like(r)}
             onSave={() => save(r)}
             onShare={() => share(r)}
+            onRestaurant={() => setPanel(true)}
             onOpen={() => setSheet({ itemId: r.item.id, reelId: r.id })}
           />
         ))}
@@ -207,6 +209,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
         )}
       </div>
       <ItemSheet itemId={sheet?.itemId ?? null} reelId={sheet?.reelId} open={!!sheet} onClose={() => setSheet(null)} />
+      {panel && reels[active] && <RestaurantPanel reel={reels[active]} onClose={() => setPanel(false)} onItem={(itemId) => setSheet({ itemId, reelId: reels[active].id })} />}
     </div>
   );
 }
@@ -222,6 +225,7 @@ function ReelSlide({
   onLike,
   onSave,
   onShare,
+  onRestaurant,
   onOpen,
 }: {
   reel: FeedReel;
@@ -234,6 +238,7 @@ function ReelSlide({
   onLike: () => void;
   onSave: () => void;
   onShare: () => void;
+  onRestaurant: () => void;
   onOpen: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -306,8 +311,8 @@ function ReelSlide({
   const showVideo = near && reel.videoUrl && !failed;
 
   return (
-    <section data-index={index} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black lg:flex lg:items-center lg:justify-center lg:gap-8 lg:bg-[#0f0d0c]" aria-label={`${reel.item.name} by ${reel.restaurant.name}`}>
-      {/* Desktop: the video plays in a centered 9:16 column; the restaurant panel sits beside it. */}
+    <section data-index={index} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black lg:flex lg:items-center lg:justify-center lg:bg-[#0f0d0c]" aria-label={`${reel.item.name} by ${reel.restaurant.name}`}>
+      {/* Desktop: the video plays in a centered 9:16 column. */}
       <div className="relative h-full w-full overflow-hidden lg:aspect-[9/16] lg:h-[calc(100%-2.5rem)] lg:w-auto lg:rounded-3xl">
       {/* poster always rendered underneath to avoid black frames */}
       {reel.posterUrl && (
@@ -372,7 +377,7 @@ function ReelSlide({
 
       {/* Right action rail */}
       <div className="absolute bottom-6 right-2 z-10 flex flex-col items-center gap-4">
-        <Link href={`/r/${reel.restaurant.slug}`} className="relative mb-1" aria-label={`Open ${reel.restaurant.name}`}>
+        <Link href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="relative mb-1" aria-label={`Open ${reel.restaurant.name}`}>
           <span className="block h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-white">
             {reel.restaurant.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -400,7 +405,7 @@ function ReelSlide({
       {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pr-20 *:pointer-events-auto">
         {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">Sponsored</span>}
-        <Link href={`/r/${reel.restaurant.slug}`} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
+        <Link href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
           {reel.restaurant.name}
           {reel.restaurant.verified && <VerifiedBadge />}
         </Link>
@@ -433,7 +438,6 @@ function ReelSlide({
         )}
       </div>
       </div>
-      <ReelSidePanel reel={reel} onOpen={onOpen} onSave={onSave} />
     </section>
   );
 }
@@ -447,17 +451,49 @@ function RailButton({ children, label, onClick, aria }: { children: React.ReactN
   );
 }
 
-/** Desktop-only panel next to the video: the restaurant's profile and the dish from the reel. */
-function ReelSidePanel({ reel, onOpen, onSave }: { reel: FeedReel; onOpen: () => void; onSave: () => void }) {
+
+/** On desktop, the restaurant photo/name opens the side panel instead of leaving the reels. */
+function desktopPanel(e: React.MouseEvent, open: () => void) {
+  if (window.matchMedia("(min-width: 1024px)").matches) {
+    e.preventDefault();
+    open();
+  }
+}
+
+type PanelMenu = { description: string | null; openNow: boolean | null; reelCount: number; sections: { id: string; name: string; items: { id: string; name: string; priceCents: number; currency: string; available: boolean; image: string | null }[] }[] };
+
+/** Desktop right-hand panel (like the left sidebar): the current reel's restaurant and its menu. */
+function RestaurantPanel({ reel, onClose, onItem }: { reel: FeedReel; onClose: () => void; onItem: (itemId: string) => void }) {
   const r = reel.restaurant;
+  const [menu, setMenu] = useState<PanelMenu | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setMenu(null);
+    fetch(`/api/restaurants/${r.id}/menu`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((m) => !cancelled && setMenu(m))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [r.id]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <aside className="hidden w-[360px] shrink-0 overflow-hidden rounded-3xl bg-white text-ink shadow-2xl lg:block">
-      <Link href={`/r/${r.slug}`} className="relative block aspect-[16/9] bg-gradient-to-br from-brand-100 to-brand-300">
+    <aside className="fixed inset-y-0 right-0 z-40 hidden w-[400px] animate-fade-in flex-col border-l border-black/5 bg-white text-ink lg:flex" aria-label={`${r.name} menu`}>
+      <div className="relative aspect-[16/9] shrink-0 bg-gradient-to-br from-brand-100 to-brand-300">
         {r.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={r.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+          <img src={r.coverUrl} alt="" className="h-full w-full object-cover" />
         )}
-        <span className="absolute bottom-3 left-3 h-16 w-16 overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg">
+        <button onClick={onClose} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur hover:bg-black/60" aria-label="Close">
+          <X className="h-5 w-5" />
+        </button>
+        <span className="absolute bottom-3 left-4 h-16 w-16 overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg">
           {r.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={r.logoUrl} alt="" className="h-full w-full object-cover" />
@@ -465,47 +501,68 @@ function ReelSidePanel({ reel, onOpen, onSave }: { reel: FeedReel; onOpen: () =>
             <span className="grid h-full place-items-center bg-brand-500 text-2xl font-black text-white">{r.name[0]}</span>
           )}
         </span>
-      </Link>
-      <div className="p-5">
-        <Link href={`/r/${r.slug}`} className="flex items-center gap-1.5 text-xl font-extrabold hover:underline">
-          {r.name}
-          {r.verified && <VerifiedBadge />}
-        </Link>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
-          <RatingPill avg={r.ratingAvg} count={r.ratingCount} />
-          {r.cuisine && <span>{r.cuisine}</span>}
-          {r.location && (
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5" />
-              {r.location}
-            </span>
+      </div>
+      <div className="no-scrollbar flex-1 overflow-y-auto">
+        <div className="px-5 pb-4 pt-4">
+          <div className="flex items-center gap-1.5 text-xl font-extrabold">
+            {r.name}
+            {r.verified && <VerifiedBadge />}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
+            <RatingPill avg={r.ratingAvg} count={r.ratingCount} />
+            {r.cuisine && <span>{r.cuisine}</span>}
+            {r.location && (
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5" />
+                {r.location}
+              </span>
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 text-sm">
+            {menu?.openNow != null && <span className={cn("font-semibold", menu.openNow ? "text-emerald-700" : "text-ink-muted")}>{menu.openNow ? "Open now" : "Closed"}</span>}
+            {r.deliversToYou === true && <span className="font-semibold text-emerald-700">Delivers to you{r.distanceKm != null ? ` · ${formatKm(r.distanceKm)}` : ""}</span>}
+            {r.deliversToYou === false && <span className="text-ink-muted">Pickup only for your location</span>}
+            {r.avgPrepMinutes > 0 && <span className="text-ink-muted">{r.avgPrepMinutes}–{r.avgPrepMinutes + 15} mins</span>}
+          </div>
+          {menu?.description && <p className="mt-3 text-sm text-ink-soft">{menu.description}</p>}
+          <Link href={`/r/${r.slug}`} className="mt-4 flex h-10 items-center justify-center rounded-xl border border-black/10 text-sm font-bold hover:bg-black/5">
+            Open restaurant page
+          </Link>
+        </div>
+        <div className="border-t border-black/5 px-5 pb-8 pt-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Menu</h3>
+          {!menu && (
+            <div className="grid h-32 place-items-center">
+              <Loader2 className="h-6 w-6 animate-spin text-ink-muted" />
+            </div>
           )}
-        </div>
-        <div className="mt-2 text-sm">
-          {r.deliversToYou === true && <span className="font-semibold text-emerald-700">Delivers to you{r.distanceKm != null ? ` · ${formatKm(r.distanceKm)}` : ""}</span>}
-          {r.deliversToYou === false && <span className="font-semibold text-ink-muted">Pickup only for your location{r.distanceKm != null ? ` · ${formatKm(r.distanceKm)}` : ""}</span>}
-          {r.deliversToYou === null && r.avgPrepMinutes > 0 && <span className="text-ink-muted">Ready in about {r.avgPrepMinutes}–{r.avgPrepMinutes + 15} mins</span>}
-        </div>
-        <Link href={`/r/${r.slug}`} className="mt-4 flex h-11 items-center justify-center rounded-xl border border-black/10 text-sm font-bold hover:bg-black/5">
-          View menu & reels
-        </Link>
-
-        <div className="mt-5 border-t border-black/5 pt-4">
-          <div className="text-xs font-bold uppercase tracking-wider text-ink-muted">In this reel</div>
-          <div className="mt-1.5 text-lg font-bold">{reel.item.name}</div>
-          <div className="mt-0.5 flex items-center gap-2.5">
-            <span className="tabular text-lg font-extrabold text-brand-600">{formatMoney(reel.item.priceCents, reel.item.currency)}</span>
-            <RatingPill avg={reel.item.ratingAvg} count={reel.item.ratingCount} />
-          </div>
-          {reel.item.description && <p className="mt-1.5 line-clamp-3 text-sm text-ink-muted">{reel.item.description}</p>}
-          <div className="mt-4 flex gap-2">
-            <button onClick={onOpen} disabled={!r.orderingEnabled || !reel.item.available} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-brand-500 font-bold text-white shadow-lg shadow-brand-500/30 hover:bg-brand-600 disabled:bg-black/10 disabled:text-ink-muted disabled:shadow-none">
-              {r.orderingEnabled && reel.item.available ? `Order · ${formatMoney(reel.item.priceCents, reel.item.currency)}` : "Currently unavailable"}
-            </button>
-            <button onClick={onSave} className="grid h-12 w-12 place-items-center rounded-xl border border-black/10 hover:bg-black/5" aria-label={reel.saved ? "Unsave" : "Save"}>
-              <Bookmark className={cn("h-5 w-5", reel.saved && "fill-amber-400 text-amber-400")} />
-            </button>
-          </div>
+          {menu?.sections.map((s) => (
+            <section key={s.id} className="mt-4">
+              <h4 className="mb-2 font-extrabold">{s.name}</h4>
+              <div className="space-y-1">
+                {s.items.map((i) => (
+                  <button key={i.id} onClick={() => onItem(i.id)} disabled={!i.available} className={cn("flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-black/5 disabled:opacity-50", i.id === reel.item.id && "bg-brand-50 ring-1 ring-brand-200")}>
+                    <span className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-black/5">
+                      {i.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={i.image} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold">{i.name}</span>
+                      <span className="tabular text-sm font-extrabold text-brand-600">{formatMoney(i.priceCents, i.currency)}</span>
+                      {i.id === reel.item.id && <span className="ml-2 text-xs font-semibold text-brand-600">In this reel</span>}
+                    </span>
+                    {i.available && (
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-500 text-white">
+                        <Plus className="h-4 w-4" />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       </div>
     </aside>

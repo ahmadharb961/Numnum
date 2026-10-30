@@ -23,7 +23,7 @@ import { DEMOS, PALETTES, type Demo } from "./demo-data";
 const CATEGORIES = [
   ["burgers", "Burgers", "برغر", "🍔"],
   ["pizza", "Pizza", "بيتزا", "🍕"],
-  ["lebanese", "Lebanese", "لبناني", "🇱🇧"],
+  ["lebanese", "Lebanese", "لبناني", "🫓"],
   ["shawarma", "Shawarma", "شاورما", "🌯"],
   ["sandwiches", "Sandwiches", "سندويشات", "🥪"],
   ["sushi", "Sushi", "سوشي", "🍣"],
@@ -40,6 +40,8 @@ async function seedBase() {
   for (const [i, [slug, name, nameAr, emoji]] of CATEGORIES.entries()) {
     await prisma.foodCategory.upsert({ where: { slug }, create: { slug, name, nameAr, emoji, sortOrder: i }, update: {} });
   }
+  // Flag emoji don't render on Windows (shows "LB"): replace the old default.
+  await prisma.foodCategory.updateMany({ where: { slug: "lebanese", emoji: "🇱🇧" }, data: { emoji: "🫓" } });
   // Hosting panels sometimes keep pasted quotes or spaces around values: strip them.
   const env = (v?: string) => (v ?? "").trim().replace(/^(["'])(.*)\1$/, "$2");
   const email = (env(process.env.ADMIN_EMAIL) || (process.env.SEED_DEMO === "true" ? "admin@numnum.app" : "")).toLowerCase();
