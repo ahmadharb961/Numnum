@@ -23,8 +23,9 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
   useEffect(() => {
     const onScroll = () => setStuck((barRef.current?.getBoundingClientRect().top ?? 1) <= 0);
     onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    // Capture phase: also catches the in-app scroll container used by the installed app.
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener("scroll", onScroll, { capture: true });
   }, []);
 
   return (

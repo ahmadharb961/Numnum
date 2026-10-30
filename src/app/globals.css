@@ -29,13 +29,26 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* iOS 26 home-screen apps (viewport-fit=cover + translucent status bar) lay out pages shorter
-   than the screen by the status bar height while the page is shorter than the screen, so fixed
-   bottom bars stop above the edge (WebKit bug 301108). A minimum height makes iOS use the full
-   screen; the min() cap avoids extra scroll where the top inset is 0. */
+/* Installed home-screen app (iOS 26 WebKit bugs):
+   - pages are laid out shorter than the screen by the status bar height, so fixed bottom bars
+     stop above the edge (WebKit bug 301108): size the document to the full screen; the min()
+     cap avoids extra height where the top inset is 0;
+   - when the document itself scrolls, WebKit re-anchors fixed elements late and the bottom nav
+     drifts up the screen: the document never scrolls here, pages scroll inside .app-scroll. */
 @media (display-mode: standalone) {
   html {
-    min-height: min(100lvh, calc(100% + env(safe-area-inset-top)));
+    height: min(100lvh, calc(100% + env(safe-area-inset-top)));
+    overflow: hidden;
+  }
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+  .app-scroll {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

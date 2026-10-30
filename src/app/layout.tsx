@@ -32,7 +32,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" dir="ltr">
       <body>
         <ToastProvider>
-          <CartProvider>{children}</CartProvider>
+          <CartProvider>
+            {/* In the installed app this is the scroll container (see globals.css); elsewhere a plain wrapper. */}
+            <div className="app-scroll">{children}</div>
+          </CartProvider>
         </ToastProvider>
         <ServiceWorker />
         <NavHistory />
