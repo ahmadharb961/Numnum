@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
 import { prisma } from "../src/server/db";
-import { hashPassword } from "../src/server/passwords";
+import { hashPassword, verifyPassword } from "../src/server/passwords";
 import { processImage, storeRawVideo, processVideoAsset } from "../src/server/media";
 import { attachImage } from "../src/server/menu";
 import { createOrder, restaurantOrderAction, customerCancelOrder } from "../src/server/orders";
@@ -38,8 +38,10 @@ async function seedBase() {
   for (const [i, [slug, name, nameAr, emoji]] of CATEGORIES.entries()) {
     await prisma.foodCategory.upsert({ where: { slug }, create: { slug, name, nameAr, emoji, sortOrder: i }, update: {} });
   }
-  const email = process.env.ADMIN_EMAIL || (process.env.SEED_DEMO === "true" ? "admin@numnum.app" : "");
-  const password = process.env.ADMIN_PASSWORD || (process.env.SEED_DEMO === "true" ? "admin1234" : "");
+  // Hosting panels sometimes keep pasted quotes or spaces around values: strip them.
+  const env = (v?: string) => (v ?? "").trim().replace(/^(["'])(.*)\1$/, "$2");
+  const email = (env(process.env.ADMIN_EMAIL) || (process.env.SEED_DEMO === "true" ? "admin@numnum.app" : "")).toLowerCase();
+  const password = env(process.env.ADMIN_PASSWORD) || (process.env.SEED_DEMO === "true" ? "admin1234" : "");
   if (!email || !password) {
     console.log("ADMIN_EMAIL/ADMIN_PASSWORD not set — skipping admin creation");
     return null;
@@ -47,8 +49,14 @@ async function seedBase() {
   const admin = await prisma.user.upsert({
     where: { email },
     create: { email, name: "Platform Admin", passwordHash: await hashPassword(password), roles: { create: [{ role: "ADMIN" }] } },
-    update: {},
+    update: { disabled: false },
   });
+  // ADMIN_PASSWORD is the source of truth: changing it and redeploying resets the admin password.
+  if (!(await verifyPassword(password, admin.passwordHash))) {
+    await prisma.user.update({ where: { id: admin.id }, data: { passwordHash: await hashPassword(password) } });
+    await prisma.session.deleteMany({ where: { userId: admin.id } });
+    console.log("Admin password updated from ADMIN_PASSWORD");
+  }
   await prisma.userRole.upsert({ where: { userId_role: { userId: admin.id, role: "ADMIN" } }, create: { userId: admin.id, role: "ADMIN" }, update: {} });
   console.log(`Admin: ${email}`);
   return admin;

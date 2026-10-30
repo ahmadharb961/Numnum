@@ -55,7 +55,7 @@ You already have Stream from Hireel. Reuse the same **Account ID** and the same 
 | `SESSION_SECRET` | long random password, 40+ characters |
 | `CRON_SECRET` | another long random password |
 | `ADMIN_EMAIL` | your admin login email |
-| `ADMIN_PASSWORD` | your admin password (12+ characters) |
+| `ADMIN_PASSWORD` | your admin password (12+ characters). Changing it and redeploying resets the admin password |
 | `CLOUDFLARE_ACCOUNT_ID` | from Part 4 |
 | `CLOUDFLARE_STREAM_API_TOKEN` | from Part 4 |
 | `SMTP_HOST` | `smtp.hostinger.com` |

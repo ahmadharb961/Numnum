@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { loginAction, registerCustomerAction, registerRestaurantAction, type FormState } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,17 @@ import { Alert, Field } from "@/components/ui/misc";
 
 export function LoginForm({ next }: { next?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(loginAction, undefined);
+  const insecure = useInsecureOrigin();
   return (
     <form action={action} className="space-y-4">
+      {insecure && (
+        <Alert tone="amber">
+          This page isn&apos;t secure, so you can&apos;t stay logged in.{" "}
+          <a href={insecure} className="font-semibold underline">
+            Open the secure (https) page
+          </a>
+        </Alert>
+      )}
       {state?.error && <Alert tone="red">{state.error}</Alert>}
       <input type="hidden" name="next" value={next ?? ""} />
       <Field label="Email" htmlFor="email">
@@ -103,4 +112,14 @@ export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: stri
       </Button>
     </form>
   );
+}
+
+/** Login cookies are https-only in production; on plain http, return the https URL to switch to. */
+function useInsecureOrigin() {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const { protocol, hostname, href } = window.location;
+    if (protocol === "http:" && hostname !== "localhost" && hostname !== "127.0.0.1") setUrl(href.replace(/^http:/, "https:"));
+  }, []);
+  return url;
 }
