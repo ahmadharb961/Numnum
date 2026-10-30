@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, BellOff, CheckCircle2, Share } from "lucide-react";
+import { Bell, BellOff, CheckCircle2 } from "lucide-react";
 import { pushState, resyncDevice, turnOn, type PushState } from "@/lib/push-client";
 import { Button } from "@/components/ui/button";
+import { InstallSheet } from "./install-sheet";
 
 /** "Get order updates on your phone": lets a signed-in customer turn on push notifications. */
 export function NotifyPrompt({ compact }: { compact?: boolean }) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
+  const [guide, setGuide] = useState(false);
 
   useEffect(() => {
     void pushState().then((s) => {
@@ -48,9 +50,13 @@ export function NotifyPrompt({ compact }: { compact?: boolean }) {
           </>
         )}
         {state === "ios-needs-install" && (
-          <p className="mt-0.5 text-ink-muted">
-            On iPhone, tap <Share className="inline h-4 w-4 align-text-bottom" /> Share → <b>Add to Home Screen</b>, then open numnum from your home screen and turn notifications on.
-          </p>
+          <>
+            <p className="mt-0.5 text-ink-muted">On iPhone, add numnum to your home screen first, then turn notifications on from there.</p>
+            <Button size="sm" className="mt-2" onClick={() => setGuide(true)}>
+              Show me how
+            </Button>
+            <InstallSheet open={guide} onClose={() => setGuide(false)} />
+          </>
         )}
         {state === "blocked" && <p className="mt-0.5 text-ink-muted">Notifications are blocked for numnum. Allow them in your phone or browser settings, then reopen this page.</p>}
       </div>

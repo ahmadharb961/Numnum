@@ -4,6 +4,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { CartProvider } from "@/components/customer/cart";
 import { ServiceWorker } from "@/components/sw-register";
 import { NavHistory } from "@/components/back-button";
+import { InstallPromptListener } from "@/components/install-guide";
 
 const appUrl = process.env.APP_URL || "http://localhost:3000";
 
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </ToastProvider>
         <ServiceWorker />
         <NavHistory />
+        <InstallPromptListener />
       </body>
     </html>
   );

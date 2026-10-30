@@ -33,11 +33,16 @@ export default {
         "sheet-up": { from: { transform: "translateY(100%)" }, to: { transform: "translateY(0)" } },
         "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
         pop: { "0%": { transform: "scale(1)" }, "50%": { transform: "scale(1.25)" }, "100%": { transform: "scale(1)" } },
+        // A finger tapping a button in the install guides.
+        tap: { "0%, 100%": { transform: "translate(8px, 10px) scale(1)", opacity: "0.9" }, "45%": { transform: "translate(0, 0) scale(1)", opacity: "1" }, "60%": { transform: "translate(0, 0) scale(0.85)" } },
+        "step-in": { from: { opacity: "0", transform: "translateY(6px)" }, to: { opacity: "1", transform: "translateY(0)" } },
       },
       animation: {
         "sheet-up": "sheet-up 280ms cubic-bezier(.2,.8,.2,1)",
         "fade-in": "fade-in 200ms ease-out",
         pop: "pop 300ms ease-out",
+        tap: "tap 1.4s ease-in-out infinite",
+        "step-in": "step-in 300ms ease-out",
       },
     },
   },
