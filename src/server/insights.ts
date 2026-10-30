@@ -53,7 +53,9 @@ export async function restaurantInsights(restaurantId: string, range: InsightsRa
   }
 
   const visits = ev("restaurant_opened");
+  const reelsPerf = await reelsPerformance(restaurantId, range);
   return {
+    reels: reelsPerf,
     restaurant,
     range,
     kpis: {
@@ -82,3 +84,94 @@ export async function restaurantInsights(restaurantId: string, range: InsightsRa
 }
 
 export type Insights = Awaited<ReturnType<typeof restaurantInsights>>;
+
+export type ReelPerf = {
+  id: string;
+  name: string;
+  posterUrl: string | null;
+  visibility: string;
+  publishedAt: string | null;
+  views: number;
+  uniqueViewers: number;
+  avgWatchSec: number | null;
+  likes: number;
+  shares: number;
+  productOpens: number;
+  addToCarts: number;
+  orders: number;
+  completedOrders: number;
+  revenueCents: number;
+  conversion: number | null; // orders per view
+};
+
+/** Per-reel performance in a date range: views, engagement, funnel and the orders/revenue attributed to it. */
+export async function reelsPerformance(restaurantId: string, range: InsightsRange, onlyReelId?: string): Promise<ReelPerf[]> {
+  const reels = await prisma.reel.findMany({
+    where: { restaurantId, ...(onlyReelId ? { id: onlyReelId } : { visibility: { in: ["PUBLISHED", "UNPUBLISHED"] } }) },
+    select: { id: true, posterUrl: true, visibility: true, publishedAt: true, menuItem: { select: { name: true } } },
+  });
+  if (!reels.length) return [];
+  const ids = reels.map((r) => r.id);
+  const [views, events, likes, attributed] = await Promise.all([
+    prisma.$queryRaw<{ reelId: string; views: bigint; uniq: bigint; watch: number | null }[]>`
+      SELECT "reelId", COUNT(*) AS views, COUNT(DISTINCT "viewerKey") AS uniq, AVG("watchMs")::float AS watch
+      FROM reel_views WHERE "reelId" = ANY(${ids}) AND "createdAt" >= ${range.from} AND "createdAt" < ${range.to} GROUP BY "reelId"`,
+    prisma.analyticsEvent.groupBy({ by: ["reelId", "type"], where: { reelId: { in: ids }, createdAt: { gte: range.from, lt: range.to }, type: { in: ["reel_shared", "product_opened", "add_to_cart"] } }, _count: true }),
+    prisma.reelLike.groupBy({ by: ["reelId"], where: { reelId: { in: ids }, createdAt: { gte: range.from, lt: range.to } }, _count: true }),
+    prisma.$queryRaw<{ reelId: string; orders: bigint; completed: bigint; revenue: bigint | null }[]>`
+      SELECT rid AS "reelId", COUNT(o.id) AS orders, COUNT(o.id) FILTER (WHERE o.status = 'COMPLETED') AS completed, SUM(o."totalCents") FILTER (WHERE o.status = 'COMPLETED') AS revenue
+      FROM analytics_events e CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(e.data->'reelIds', '[]'::jsonb)) AS rid
+      JOIN orders o ON o.id = e."orderId"
+      WHERE e.type = 'order_placed' AND e."restaurantId" = ${restaurantId} AND e."createdAt" >= ${range.from} AND e."createdAt" < ${range.to} AND rid = ANY(${ids})
+      GROUP BY rid`,
+  ]);
+  const ev = (id: string, t: string) => events.find((e) => e.reelId === id && e.type === t)?._count ?? 0;
+  return reels
+    .map((r) => {
+      const v = views.find((x) => x.reelId === r.id);
+      const a = attributed.find((x) => x.reelId === r.id);
+      const nViews = Number(v?.views ?? 0);
+      const orders = Number(a?.orders ?? 0);
+      return {
+        id: r.id,
+        name: r.menuItem.name,
+        posterUrl: r.posterUrl,
+        visibility: r.visibility,
+        publishedAt: r.publishedAt?.toISOString() ?? null,
+        views: nViews,
+        uniqueViewers: Number(v?.uniq ?? 0),
+        avgWatchSec: v?.watch != null ? Math.round(v.watch / 100) / 10 : null,
+        likes: likes.find((l) => l.reelId === r.id)?._count ?? 0,
+        shares: ev(r.id, "reel_shared"),
+        productOpens: ev(r.id, "product_opened"),
+        addToCarts: ev(r.id, "add_to_cart"),
+        orders,
+        completedOrders: Number(a?.completed ?? 0),
+        revenueCents: Number(a?.revenue ?? 0),
+        conversion: nViews ? orders / nViews : null,
+      };
+    })
+    .sort((x, y) => y.views - x.views);
+}
+
+/** One reel: totals for the range, its daily trend, and the restaurant's per-reel average for comparison. */
+export async function reelInsight(restaurantId: string, reelId: string, range: InsightsRange) {
+  const [mine] = await reelsPerformance(restaurantId, range, reelId);
+  const all = await reelsPerformance(restaurantId, range);
+  const avg = (k: keyof ReelPerf) => (all.length ? all.reduce((s, r) => s + (Number(r[k]) || 0), 0) / all.length : 0);
+  const rank = all.findIndex((r) => r.id === reelId) + 1;
+  const daily = await prisma.$queryRaw<{ d: Date; views: bigint }[]>`SELECT date_trunc('day', "createdAt") AS d, COUNT(*) AS views FROM reel_views WHERE "reelId" = ${reelId} AND "createdAt" >= ${range.from} AND "createdAt" < ${range.to} GROUP BY 1`;
+  const dailyEv = await prisma.$queryRaw<{ d: Date; type: string; n: bigint }[]>`SELECT date_trunc('day', "createdAt") AS d, type, COUNT(*) AS n FROM analytics_events WHERE "reelId" = ${reelId} AND type IN ('product_opened', 'add_to_cart') AND "createdAt" >= ${range.from} AND "createdAt" < ${range.to} GROUP BY 1, 2`;
+  const dailyOrders = await prisma.$queryRaw<{ d: Date; n: bigint; revenue: bigint | null }[]>`
+    SELECT date_trunc('day', e."createdAt") AS d, COUNT(o.id) AS n, SUM(o."totalCents") FILTER (WHERE o.status = 'COMPLETED') AS revenue
+    FROM analytics_events e JOIN orders o ON o.id = e."orderId"
+    WHERE e.type = 'order_placed' AND e."restaurantId" = ${restaurantId} AND COALESCE(e.data->'reelIds', '[]'::jsonb) ? ${reelId} AND e."createdAt" >= ${range.from} AND e."createdAt" < ${range.to}
+    GROUP BY 1`;
+  const days: { date: string; views: number; opens: number; addToCarts: number; orders: number; revenueCents: number }[] = [];
+  for (let t = range.from.getTime(); t < range.to.getTime(); t += 86400_000) days.push({ date: dayKey(new Date(t)), views: 0, opens: 0, addToCarts: 0, orders: 0, revenueCents: 0 });
+  const at = (d: Date) => days.find((x) => x.date === dayKey(d));
+  for (const r of daily) { const x = at(r.d); if (x) x.views = Number(r.views); }
+  for (const r of dailyEv) { const x = at(r.d); if (x) { if (r.type === "product_opened") x.opens = Number(r.n); else x.addToCarts = Number(r.n); } }
+  for (const r of dailyOrders) { const x = at(r.d); if (x) { x.orders = Number(r.n); x.revenueCents = Number(r.revenue ?? 0); } }
+  return { reel: mine ?? null, days, rank, reelCount: all.length, average: { views: avg("views"), orders: avg("orders"), likes: avg("likes") } };
+}

@@ -104,6 +104,31 @@ export async function insightsPdf(ins: Insights, platformName: string): Promise<
     y -= 14;
   });
 
+  heading("Reels performance");
+  if (!ins.reels.length) {
+    text("No published reels.", M, y, { color: muted });
+    y -= 14;
+  } else {
+    const rc = [M, M + 190, M + 240, M + 290, M + 335, M + 385, M + 430, W - M];
+    const rhead = () => {
+      ["Reel", "Views", "Unique", "Likes", "Opens", "Carts", "Orders"].forEach((h, i) => text(h, rc[i], y, { f: bold, size: 8.5 }));
+      text("Revenue", rc[7], y, { f: bold, size: 8.5, right: true });
+      y -= 12;
+    };
+    rhead();
+    for (const r of ins.reels) {
+      if (y < M + 14) {
+        page = pdf.addPage([W, H]);
+        y = H - M;
+        rhead();
+      }
+      text(r.name.slice(0, 34), rc[0], y, { size: 8.5 });
+      [r.views, r.uniqueViewers, r.likes, r.productOpens, r.addToCarts, r.orders].forEach((v, i) => text(String(v), rc[i + 1], y, { size: 8.5 }));
+      text(formatMoney(r.revenueCents, cur), rc[7], y, { size: 8.5, right: true });
+      y -= 11;
+    }
+  }
+
   heading("Daily breakdown");
   const cols = [M, M + 90, M + 190, M + 290, W - M];
   const head = () => {

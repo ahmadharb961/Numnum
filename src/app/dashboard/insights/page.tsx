@@ -126,6 +126,60 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         </Section>
       </div>
 
+      <Section title="Reels performance" description="Every reel in this period — tap one for its full report">
+        {ins.reels.length ? (
+          <div className="-mx-4 overflow-x-auto sm:mx-0">
+            <table className="table-app">
+              <thead>
+                <tr>
+                  <th>Reel</th>
+                  <th>Views</th>
+                  <th>Unique</th>
+                  <th>Avg. watch</th>
+                  <th>Likes</th>
+                  <th>Shares</th>
+                  <th>Dish opens</th>
+                  <th>Add to cart</th>
+                  <th>Orders</th>
+                  <th>View → order</th>
+                  <th>Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ins.reels.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      <Link href={`/dashboard/reels/${r.id}?days=${sp.days ?? 30}`} className="flex items-center gap-2 font-semibold text-brand-600">
+                        <span className="h-10 w-7 shrink-0 overflow-hidden rounded bg-black">
+                          {r.posterUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={r.posterUrl} alt="" className="h-full w-full object-cover" />
+                          )}
+                        </span>
+                        <span className="max-w-[160px] truncate">{r.name}</span>
+                        {r.visibility !== "PUBLISHED" && <Badge>{r.visibility.toLowerCase()}</Badge>}
+                      </Link>
+                    </td>
+                    <td className="tabular font-semibold">{compactNumber(r.views)}</td>
+                    <td className="tabular">{compactNumber(r.uniqueViewers)}</td>
+                    <td className="tabular">{r.avgWatchSec != null ? `${r.avgWatchSec}s` : "—"}</td>
+                    <td className="tabular">{compactNumber(r.likes)}</td>
+                    <td className="tabular">{compactNumber(r.shares)}</td>
+                    <td className="tabular">{compactNumber(r.productOpens)}</td>
+                    <td className="tabular">{compactNumber(r.addToCarts)}</td>
+                    <td className="tabular font-semibold">{r.orders}</td>
+                    <td className="tabular">{r.conversion != null ? `${(r.conversion * 100).toFixed(1)}%` : "—"}</td>
+                    <td className="tabular">{formatMoney(r.revenueCents, cur)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState icon={<Film />} title="No published reels yet" />
+        )}
+      </Section>
+
       <Section title="Order history" description={`${ins.orders.length} orders in this period`}>
         {ins.orders.length ? (
           <div className="-mx-4 max-h-[520px] overflow-auto sm:mx-0">

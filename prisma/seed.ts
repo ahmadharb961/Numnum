@@ -314,6 +314,23 @@ async function seedDemo(adminId: string) {
     for (let j = 0; j < n; j++) visits.push({ type: "restaurant_opened", restaurantId: burger.r.id, deviceKey: `demo-visitor-${(day * 7 + j) % 120}`, createdAt: new Date(base - j * 600_000) });
     for (const [ri, r] of burgerReels.entries()) for (let j = 0; j < n * (3 - ri); j++) views.push({ reelId: r.id, viewerKey: `d:demo-${day}-${j}`, watchMs: 4000, createdAt: new Date(base - j * 300_000) });
   }
+  // Reel funnel: dish opens / add-to-cart from each reel, and attribute past orders to reels.
+  const funnelEvents = [];
+  for (let day = 0; day < 30; day++) {
+    for (const [ri, r] of burgerReels.entries()) {
+      const opens = 8 - ri * 2 + (day % 4);
+      for (let j = 0; j < opens; j++) funnelEvents.push({ type: "product_opened", reelId: r.id, restaurantId: burger.r.id, createdAt: new Date(Date.now() - day * 86400_000 - j * 900_000) });
+      for (let j = 0; j < Math.ceil(opens / 3); j++) funnelEvents.push({ type: "add_to_cart", reelId: r.id, restaurantId: burger.r.id, createdAt: new Date(Date.now() - day * 86400_000 - j * 1200_000) });
+    }
+  }
+  await prisma.analyticsEvent.createMany({ data: funnelEvents });
+  const placedEvents = await prisma.analyticsEvent.findMany({ where: { type: "order_placed", restaurantId: burger.r.id } });
+  for (const [i, e] of placedEvents.entries()) {
+    const order = await prisma.order.findUnique({ where: { id: e.orderId! }, select: { createdAt: true } });
+    const reel = burgerReels[i % 5 === 4 ? 2 : i % 2];
+    await prisma.analyticsEvent.update({ where: { id: e.id }, data: { data: { reelIds: [reel.id] }, createdAt: order?.createdAt } });
+    await prisma.reel.update({ where: { id: reel.id }, data: { orderInits: { increment: 1 } } });
+  }
   await prisma.analyticsEvent.createMany({ data: visits });
   await prisma.reelView.createMany({ data: views });
   for (const r of burgerReels) await prisma.reel.update({ where: { id: r.id }, data: { viewCount: await prisma.reelView.count({ where: { reelId: r.id } }) } });
