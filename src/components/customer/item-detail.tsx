@@ -82,9 +82,9 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
   }
 
   return (
-    <div className={navOffset ? "pb-48" : "pb-28"}>
+    <div className={compact ? "" : navOffset ? "pb-48" : "pb-28"}>
       {/* Gallery */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/5">
+      <div className={cn("relative aspect-[4/3] w-full overflow-hidden bg-black/5", compact && "sm:aspect-[16/9]")}>
         {item.images.length ? (
           <>
             <div
@@ -230,7 +230,8 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
               </div>
             );
           })}
-          {canOrder && (
+          {/* General note, unless the restaurant already added its own free-text option. */}
+          {canOrder && !item.groups.some((g) => g.type === "TEXT") && (
             <div>
               <h3 className="mb-2 font-bold">Special instructions</h3>
               <textarea className="input" maxLength={300} placeholder="E.g. no onions, extra crispy" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -247,10 +248,10 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
         )}
       </div>
 
-      {/* Sticky add bar */}
+      {/* Add bar: sticks to the bottom of the sheet when shown in one, else to the bottom of the screen. */}
       <div
-        className="fixed inset-x-0 z-40 mx-auto max-w-screen-sm border-t lg:left-64 border-black/5 bg-white/95 px-4 pt-3 backdrop-blur"
-        style={navOffset ? { bottom: "calc(var(--nav-h) + var(--safe-bottom))", paddingBottom: 12 } : { bottom: 0, paddingBottom: "calc(var(--safe-bottom) + 12px)" }}
+        className={cn("z-40 border-t border-black/5 bg-white/95 px-4 pt-3 backdrop-blur", compact ? "sticky bottom-0 mt-4" : "fixed inset-x-0 mx-auto max-w-screen-sm lg:left-64")}
+        style={compact ? { paddingBottom: 12 } : navOffset ? { bottom: "calc(var(--nav-h) + var(--safe-bottom))", paddingBottom: 12 } : { bottom: 0, paddingBottom: "calc(var(--safe-bottom) + 12px)" }}
       >
         {canOrder ? (
           <div className="flex items-center gap-3">
