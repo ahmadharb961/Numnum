@@ -1,0 +1,50 @@
+# One-click deploy on Render: Dashboard → New → Blueprint → select this repo.
+databases:
+  - name: numnum-db
+    plan: basic-256mb
+    databaseName: numnum
+    user: numnum
+
+services:
+  - type: web
+    name: numnum
+    runtime: docker
+    plan: starter
+    healthCheckPath: /robots.txt
+    disk:
+      name: media
+      mountPath: /data
+      sizeGB: 10
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: numnum-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: APP_URL
+        sync: false # set to your public URL, e.g. https://numnum.onrender.com
+      - key: RUN_SEED
+        value: "true" # creates categories + first admin (and demo data if SEED_DEMO=true); safe to rerun
+      - key: SEED_DEMO
+        value: "false"
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+  - type: cron
+    name: numnum-billing
+    runtime: docker
+    dockerfilePath: ./scripts/cron.Dockerfile
+    schedule: "7 * * * *"
+    envVars:
+      - key: APP_URL
+        sync: false
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: numnum
+          envVarKey: CRON_SECRET

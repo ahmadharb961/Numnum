@@ -70,6 +70,19 @@ Covered: commission math (a $20 order → $2.80 at 14%), exactly-once commission
 
 The E2E scripts cover the full guest order journey to the WhatsApp deep link, a 150-item CSV import, a 150-photo ZIP upload, acknowledgment by order reference, admin payment verification, and an error sweep of every dashboard and admin page.
 
+## Deploy on Render (quickest path)
+
+The repo includes `render.yaml`, a `Dockerfile` (Node 22 + ffmpeg) and `scripts/start.sh` (runs migrations, optional seed, then serves).
+
+1. Merge this branch into your default branch, or select it while creating the Blueprint.
+2. At [render.com](https://render.com): **New → Blueprint**, connect the GitHub repo. Render creates the Postgres database, the web service (with a 10 GB disk for photos and videos) and an hourly billing cron job.
+3. When prompted, fill in `ADMIN_EMAIL` and `ADMIN_PASSWORD` (your admin login), and `APP_URL` (e.g. `https://numnum.onrender.com`, or your own domain later) on both the web service and the cron job.
+4. To load the demo restaurants, set `SEED_DEMO=true` before the first deploy. Leave it `false` for a clean launch.
+5. After the first deploy, open `APP_URL/login`, sign in as admin, and fill in Admin → Settings (Whish recipient details, etc.).
+6. Custom domain: Render service → Settings → Custom Domains, then update `APP_URL`.
+
+Any Docker host works the same way: build the `Dockerfile`, then provide `DATABASE_URL`, `SESSION_SECRET`, `CRON_SECRET` and `APP_URL`, mount a persistent volume at `/data`, and call `/api/cron` hourly.
+
 ## Deployment
 
 1. **Database:** managed PostgreSQL with automated daily backups and point-in-time recovery. Run `npx prisma migrate deploy` on each release.
