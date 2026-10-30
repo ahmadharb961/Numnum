@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, ChevronDown, Clock, MapPin, MessageCircle, Phone } from "lucide-react";
+import { Banknote, Bike, ChevronDown, Clock, MapPin, MessageCircle, Phone } from "lucide-react";
+import { driverWhatsAppUrl } from "@/lib/driver-message";
 import { orderAction } from "@/actions/orders";
 import { formatMoney, formatRate } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
@@ -47,7 +48,7 @@ function minutesAgo(iso: string) {
   return m < 1 ? "just now" : m < 60 ? `${m} min ago` : formatDateTime(iso);
 }
 
-export function OrdersTable({ orders, defaultEta }: { orders: Order[]; defaultEta: number }) {
+export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Order[]; defaultEta: number; restaurantName: string }) {
   // Active orders start open (staff need the address, phone and next step); closed ones start collapsed.
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const toggle = (id: string) => setToggled((t) => {
@@ -189,6 +190,11 @@ export function OrdersTable({ orders, defaultEta }: { orders: Order[]; defaultEt
                         </Button>
                       </div>
                     </>
+                  )}
+                  {delivery && ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status) && (
+                    <a href={driverWhatsAppUrl(o, restaurantName)} target="_blank" rel="noopener noreferrer" className="mb-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] text-sm font-bold text-white hover:bg-[#1ebe5b] sm:w-auto sm:px-5">
+                      <Bike className="h-4 w-4" /> Send to driver on WhatsApp
+                    </a>
                   )}
                   <div className="flex flex-wrap gap-2">
                     {o.status === "ACCEPTED" && (

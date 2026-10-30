@@ -49,6 +49,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       </div>
       <OrdersTable
         defaultEta={ctx.restaurant.avgPrepMinutes}
+        restaurantName={ctx.restaurant.displayName}
         orders={orders.map((o) => ({
           id: o.id,
           reference: o.reference,
