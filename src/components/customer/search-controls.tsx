@@ -29,6 +29,14 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
     start(() => router.replace(`${pathname}?${next.toString()}`, { scroll: false }));
   };
 
+  // Results for all three tabs are already on the page: switch instantly via the URL only.
+  const setTab = (t: string) => {
+    const next = new URLSearchParams(sp.toString());
+    if (t === "dishes") next.delete("type");
+    else next.set("type", t);
+    window.history.replaceState(null, "", `${pathname}?${next.toString()}`);
+  };
+
   useEffect(() => {
     const t = setTimeout(() => {
       if ((sp.get("q") ?? "") !== q) setParams({ q: q || null });
@@ -62,7 +70,7 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
         </div>
         <div className="mt-3 grid grid-cols-3 rounded-xl bg-black/5 p-1 text-sm font-semibold">
           {(["dishes", "reels", "restaurants"] as const).map((t) => (
-            <button key={t} onClick={() => setParams({ type: t === "dishes" ? null : t })} className={cn("h-9 rounded-lg capitalize transition", type === t ? "bg-white shadow-sm" : "text-ink-muted")}>
+            <button key={t} onClick={() => setTab(t)} className={cn("h-9 rounded-lg capitalize transition", type === t ? "bg-white shadow-sm" : "text-ink-muted")}>
               {t}
             </button>
           ))}

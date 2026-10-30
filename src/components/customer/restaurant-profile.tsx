@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Grid3x3, Plus, UtensilsCrossed } from "lucide-react";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -16,36 +16,48 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
   const [tab, setTab] = useState<"menu" | "reels">("menu");
   const [itemId, setItemId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState(sections[0]?.id);
+  // The bar reserves status-bar space only for when it's stuck to the top: that space overlaps
+  // the content above (no gap) and is filled in once stuck.
+  const barRef = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setStuck((barRef.current?.getBoundingClientRect().top ?? 1) <= 0);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <div>
-      <div className="sticky top-0 z-20 border-b border-black/5 bg-cream/95 backdrop-blur-xl" style={{ paddingTop: "var(--safe-top)" }}>
-        <div className="container-app grid grid-cols-2" role="tablist">
-          {(
-            [
-              ["menu", "Menu", UtensilsCrossed],
-              ["reels", "Reels", Grid3x3],
-            ] as const
-          ).map(([k, label, Icon]) => (
-            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn("flex h-12 items-center justify-center gap-2 border-b-2 text-sm font-bold transition", tab === k ? "border-ink text-ink" : "border-transparent text-ink-muted")}>
-              <Icon className="h-4 w-4" /> {label}
-            </button>
-          ))}
-        </div>
-        {tab === "menu" && sections.length > 1 && (
-          <div className="no-scrollbar container-app flex gap-2 overflow-x-auto py-2">
-            {sections.map((s) => (
-              <a
-                key={s.id}
-                href={`#sec-${s.id}`}
-                onClick={() => setActiveSection(s.id)}
-                className={cn("chip h-8 text-xs", activeSection === s.id && "chip-active")}
-              >
-                {s.name}
-              </a>
+      <div ref={barRef} className={cn("pointer-events-none sticky top-0 z-20", stuck && "bg-cream/95 backdrop-blur-xl")} style={{ paddingTop: "var(--safe-top)", marginTop: "calc(0px - var(--safe-top))" }}>
+        <div className="pointer-events-auto border-b border-black/5 bg-cream/95 backdrop-blur-xl">
+          <div className="container-app grid grid-cols-2" role="tablist">
+            {(
+              [
+                ["menu", "Menu", UtensilsCrossed],
+                ["reels", "Reels", Grid3x3],
+              ] as const
+            ).map(([k, label, Icon]) => (
+              <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn("flex h-12 items-center justify-center gap-2 border-b-2 text-sm font-bold transition", tab === k ? "border-ink text-ink" : "border-transparent text-ink-muted")}>
+                <Icon className="h-4 w-4" /> {label}
+              </button>
             ))}
           </div>
-        )}
+          {tab === "menu" && sections.length > 1 && (
+            <div className="no-scrollbar container-app flex gap-2 overflow-x-auto py-2">
+              {sections.map((s) => (
+                <a
+                  key={s.id}
+                  href={`#sec-${s.id}`}
+                  onClick={() => setActiveSection(s.id)}
+                  className={cn("chip h-8 text-xs", activeSection === s.id && "chip-active")}
+                >
+                  {s.name}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {tab === "menu" ? (
