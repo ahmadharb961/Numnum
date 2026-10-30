@@ -31,7 +31,7 @@ export function AdminNav({ counts }: { counts: Record<string, number> }) {
     <div className="flex h-full flex-col">
       <div className="border-b border-white/10 p-4">
         <Link href="/admin" className="flex items-end gap-2 text-brand-400">
-          <Logo className="h-5" /> <span className="text-xs font-bold text-white/60">admin</span>
+          <Logo className="h-9" /> <span className="text-xs font-bold text-white/60">admin</span>
         </Link>
       </div>
       <nav className="flex-1 overflow-y-auto p-3">
@@ -60,7 +60,7 @@ export function AdminNav({ counts }: { counts: Record<string, number> }) {
         <button onClick={() => setOpen(true)} className="-ml-2 grid h-10 w-10 place-items-center" aria-label="Open menu">
           <Menu className="h-6 w-6" />
         </button>
-        <span className="flex items-end gap-1.5 text-brand-400"><Logo className="h-5" /> <span className="text-xs font-bold text-white/60">admin</span></span>
+        <span className="flex items-end gap-1.5 text-brand-400"><Logo className="h-9" /> <span className="text-xs font-bold text-white/60">admin</span></span>
       </header>
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">

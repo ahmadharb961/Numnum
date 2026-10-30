@@ -47,7 +47,7 @@ export function DesktopSidebar({ categories, locationLabel }: { categories: Cate
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-black/5 bg-white lg:flex">
       <div className="px-6 pb-4 pt-6">
         <Link href="/" className="inline-block text-brand-600" aria-label="numnum home">
-          <Logo className="h-7" />
+          <Logo className="h-12" />
         </Link>
         <div className="mt-4">
           <LocationChip label={locationLabel} className="max-w-full border border-black/10 shadow-none" />

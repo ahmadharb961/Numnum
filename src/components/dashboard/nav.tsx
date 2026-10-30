@@ -43,7 +43,7 @@ export function DashboardNav({ restaurantName, slug, role, memberships, currentI
     <div className="flex h-full flex-col">
       <div className="border-b border-black/5 p-4">
         <Link href="/" className="flex items-end gap-2 text-brand-600">
-          <Logo className="h-5" /> <span className="whitespace-nowrap text-xs font-bold text-ink-muted">for restaurants</span>
+          <Logo className="h-9" /> <span className="whitespace-nowrap text-xs font-bold text-ink-muted">for restaurants</span>
         </Link>
         {memberships.length > 1 ? (
           <form action="/dashboard/switch" method="post" className="mt-3">

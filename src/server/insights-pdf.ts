@@ -5,7 +5,7 @@ import { formatMoney } from "@/lib/money";
 import { STATUS_META } from "@/lib/order-status";
 import { drawLogo } from "./pdf-logo";
 
-const safe = (s: string | null | undefined) => (s ?? "").replace(/[^\x20-\x7E -ÿ]/g, "?");
+const safe = (s: string | null | undefined) => (s ?? "").replace(/[\u2013\u2014]/g, "-").replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/[^\x20-\x7E -ÿ]/g, "?");
 
 /** Multi-page A4 insights report: KPIs, daily revenue chart + table, top items, top reels, order history. */
 export async function insightsPdf(ins: Insights, platformName: string): Promise<Uint8Array> {
@@ -35,9 +35,9 @@ export async function insightsPdf(ins: Insights, platformName: string): Promise<
     y -= 14;
   };
 
-  drawLogo(page, M, y + 16, 20, brand);
+  drawLogo(page, M, y + 22, 40, brand);
   text("INSIGHTS REPORT", W - M, y + 3, { size: 11, f: bold, right: true });
-  y -= 18;
+  y -= 36;
   text(ins.restaurant.displayName, M, y, { size: 13, f: bold });
   text(`${ins.range.label} · generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`, W - M, y, { right: true, color: muted });
   y -= 26;

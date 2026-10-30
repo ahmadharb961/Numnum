@@ -77,7 +77,7 @@ function Page({ children, bar, barTop }: { children?: React.ReactNode; bar?: Rea
       {barTop && bar}
       <div className="relative flex-1 overflow-hidden">
         <div className="space-y-1.5 p-3 opacity-60">
-          <Logo className="h-3.5 text-brand-600" />
+          <Logo className="h-6 text-brand-600" />
           <div className="h-12 rounded-lg bg-gradient-to-br from-brand-200 to-brand-100" />
           <div className="h-2 w-2/3 rounded bg-black/10" />
           <div className="h-2 w-1/2 rounded bg-black/10" />

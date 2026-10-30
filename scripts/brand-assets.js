@@ -6,11 +6,10 @@ const { chromium } = require("playwright");
 
 const src = fs.readFileSync(path.join(__dirname, "../src/lib/logo.ts"), "utf8");
 const get = (name) => src.match(new RegExp(`export const ${name} = "([^"]+)"`))[1];
-const NUM = get("NUM_PATH"), STACK = get("STACK_PATH");
-const NUM_W = 913, NUM_H = 273, GAP = 15, ROW_W = NUM_W * 2 + GAP, STACK_W = 913, STACK_H = 548;
+const STACK = get("STACK_PATH");
+const STACK_W = 913, STACK_H = 548;
 const ORANGE = "#ff5412", INK = "#16120f";
 
-const rowSvg = (fill) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ROW_W} ${NUM_H}"><g fill="${fill}"><path d="${NUM}"/><path transform="translate(${NUM_W + GAP} 0)" d="${NUM}"/></g></svg>`;
 const stackSvg = (fill) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${STACK_W} ${STACK_H}"><path fill="${fill}" d="${STACK}"/></svg>`;
 /** Orange square with the white two-line mark; `rx` rounds the corners, `w` is the mark width as a share of the square. */
 const iconSvg = ({ rx = 0, w = 0.66 } = {}) => {
@@ -26,13 +25,10 @@ const out = (p, data) => {
 (async () => {
   const root = path.join(__dirname, "..");
   const files = {
-    "public/logo/numnum-orange.svg": rowSvg(ORANGE),
-    "public/logo/numnum-white.svg": rowSvg("#fff"),
     "public/logo/numnum-stack-orange.svg": stackSvg(ORANGE),
     "public/logo/numnum-stack-white.svg": stackSvg("#fff"),
     "public/icons/icon.svg": iconSvg({ rx: 112 }),
-    "brand/numnum-logo-orange.svg": rowSvg(ORANGE),
-    "brand/numnum-logo-stack-orange.svg": stackSvg(ORANGE),
+    "brand/numnum-logo-orange.svg": stackSvg(ORANGE),
     "brand/numnum-instagram.svg": iconSvg({ w: 0.62 }),
   };
   for (const [p, svg] of Object.entries(files)) out(path.join(root, p), svg);
@@ -49,14 +45,13 @@ const out = (p, data) => {
   await png(iconSvg({ w: 0.64 }), 180, 180, "public/icons/apple-touch-icon.png", false);
   await png(iconSvg({ w: 0.56 }), 512, 512, "public/icons/maskable-512.png", false);
   await png(iconSvg({ rx: 112, w: 0.8 }), 32, 32, "public/favicon.png");
-  // Emails can't show SVG: a PNG at 2× the size it's shown (160 px wide).
-  await png(rowSvg(ORANGE), 320, Math.round((320 * NUM_H) / ROW_W), "public/logo/numnum-email.png");
+  // Emails can't show SVG: a PNG at 2× the size it's shown (96 px wide).
+  await png(stackSvg(ORANGE), 192, Math.round((192 * STACK_H) / STACK_W), "public/logo/numnum-email.png");
   // Downloads for social media and print.
   await png(iconSvg({ w: 0.62 }), 2048, 2048, "brand/numnum-instagram-2048.png", false);
   await png(iconSvg({ rx: 112 }), 1024, 1024, "brand/numnum-app-icon-1024.png");
   for (const [name, fill] of [["orange", ORANGE], ["white", "#fff"], ["black", INK]]) {
-    await png(stackSvg(fill), 2000, Math.round((2000 * STACK_H) / STACK_W), `brand/numnum-logo-stack-${name}.png`);
-    await png(rowSvg(fill), 2400, Math.round((2400 * NUM_H) / ROW_W), `brand/numnum-logo-${name}.png`);
+    await png(stackSvg(fill), 2000, Math.round((2000 * STACK_H) / STACK_W), `brand/numnum-logo-${name}.png`);
   }
   await b.close();
   console.log("brand assets written");

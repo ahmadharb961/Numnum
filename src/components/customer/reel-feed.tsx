@@ -211,7 +211,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
       )}
       {!fixed && !backHref && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-3 pb-8 lg:hidden" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
-          <Logo className="h-[18px] text-white drop-shadow" />
+          <Logo className="h-9 text-white drop-shadow" />
           <span className="pointer-events-auto min-w-0">
             <LocationChip label={locationLabel} dark />
           </span>

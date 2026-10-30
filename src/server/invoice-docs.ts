@@ -10,7 +10,7 @@ type FullInvoice = Invoice & { lines: InvoiceLine[]; payments: Payment[] };
 
 /** WinAnsi-safe text for the standard PDF fonts (Arabic names are transliterated as '?'). */
 function safe(s: string | null | undefined) {
-  return (s ?? "").replace(/[^\x20-\x7E -ÿ]/g, "?");
+  return (s ?? "").replace(/[\u2013\u2014]/g, "-").replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/[^\x20-\x7E -ÿ]/g, "?");
 }
 
 export function statementCsv(inv: FullInvoice) {
@@ -48,7 +48,7 @@ export async function invoicePdf(inv: FullInvoice, platformName: string): Promis
   const snap = inv.restaurantSnapshot as Record<string, string | null>;
   const pay = inv.paymentInstructions as Record<string, string>;
 
-  drawLogo(page, M, y + 18, 22, brand);
+  drawLogo(page, M, y + 22, 40, brand);
   text("COMMISSION INVOICE", W - M, y + 4, { size: 12, f: bold, right: true });
   y -= 18;
   text(`Invoice ${inv.number}`, W - M, y, { right: true, color: muted });

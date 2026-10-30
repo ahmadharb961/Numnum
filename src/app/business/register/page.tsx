@@ -14,7 +14,7 @@ export default async function RegisterRestaurantPage() {
       <header className="container-app flex items-center gap-1" style={{ paddingTop: "var(--safe-top)", height: "calc(4rem + var(--safe-top))" }}>
         <BackButton fallback="/business" />
         <Link href="/business" className="text-brand-600" aria-label="numnum for restaurants">
-          <Logo className="h-7" />
+          <Logo className="h-10" />
         </Link>
       </header>
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-4">

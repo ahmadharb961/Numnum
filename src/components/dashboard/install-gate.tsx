@@ -77,7 +77,7 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-[90] overflow-y-auto bg-cream" style={{ paddingTop: "calc(var(--safe-top) + 24px)", paddingBottom: "calc(var(--safe-bottom) + 24px)" }}>
       <div className="mx-auto max-w-md px-6">
-        <Logo className="h-8 text-brand-600" />
+        <Logo className="h-12 text-brand-600" />
         <ol className="mt-6 flex gap-2 text-xs font-bold">
           <li className={`flex-1 rounded-full px-3 py-1.5 text-center ${step === "install" ? "bg-ink text-white" : "bg-emerald-100 text-emerald-700"}`}>1. Add to home screen</li>
           <li className={`flex-1 rounded-full px-3 py-1.5 text-center ${step === "install" ? "bg-black/5 text-ink-muted" : "bg-ink text-white"}`}>2. Allow notifications</li>

@@ -23,7 +23,7 @@ export default async function BusinessPage() {
     <main className="min-h-dvh bg-cream">
       <header className="container-app flex items-center justify-between" style={{ paddingTop: "var(--safe-top)", height: "calc(4rem + var(--safe-top))" }}>
         <Link href="/" className="text-brand-600" aria-label="numnum home">
-          <Logo className="h-7" />
+          <Logo className="h-10" />
         </Link>
         <Link href={user ? "/dashboard" : "/login?next=/dashboard"} className="text-sm font-semibold">
           {user ? "Dashboard" : "Log in"}
