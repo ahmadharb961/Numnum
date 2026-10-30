@@ -17,7 +17,7 @@ export const reelCardSelect = {
   featured: true,
   publishedAt: true,
   restaurantId: true,
-  restaurant: { select: { id: true, slug: true, displayName: true, logoUrl: true, verificationStatus: true, area: true, city: true, orderingEnabled: true, status: true, latitude: true, longitude: true, deliveryZones: true, deliveryEnabled: true } },
+  restaurant: { select: { id: true, slug: true, displayName: true, logoUrl: true, coverUrl: true, cuisine: true, ratingAvg: true, ratingCount: true, avgPrepMinutes: true, verificationStatus: true, area: true, city: true, orderingEnabled: true, status: true, latitude: true, longitude: true, deliveryZones: true, deliveryEnabled: true } },
   menuItem: { select: { id: true, name: true, description: true, priceCents: true, currency: true, ratingAvg: true, ratingCount: true, available: true, archived: true, foodCategoryId: true } },
 } satisfies Prisma.ReelSelect;
 
@@ -78,6 +78,11 @@ export function toPublicReel(r: ReelCard, location?: LatLng | null) {
       slug: r.restaurant.slug,
       name: r.restaurant.displayName,
       logoUrl: r.restaurant.logoUrl,
+      coverUrl: r.restaurant.coverUrl,
+      cuisine: r.restaurant.cuisine,
+      ratingAvg: r.restaurant.ratingAvg,
+      ratingCount: r.restaurant.ratingCount,
+      avgPrepMinutes: r.restaurant.avgPrepMinutes,
       verified: r.restaurant.verificationStatus === "APPROVED",
       location: [r.restaurant.area, r.restaurant.city].filter(Boolean).join(", "),
       orderingEnabled: r.restaurant.orderingEnabled,

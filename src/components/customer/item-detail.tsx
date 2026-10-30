@@ -249,7 +249,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
 
       {/* Sticky add bar */}
       <div
-        className="fixed inset-x-0 z-40 mx-auto max-w-screen-sm border-t border-black/5 bg-white/95 px-4 pt-3 backdrop-blur"
+        className="fixed inset-x-0 z-40 mx-auto max-w-screen-sm border-t lg:left-64 border-black/5 bg-white/95 px-4 pt-3 backdrop-blur"
         style={navOffset ? { bottom: "calc(var(--nav-h) + var(--safe-bottom))", paddingBottom: 12 } : { bottom: 0, paddingBottom: "calc(var(--safe-bottom) + 12px)" }}
       >
         {canOrder ? (

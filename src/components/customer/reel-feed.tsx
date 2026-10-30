@@ -50,6 +50,21 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Desktop: arrow keys move between reels.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const t = e.target as HTMLElement;
+      if (t.closest("input, textarea, select, [role=dialog]")) return;
+      const root = containerRef.current;
+      if (!root) return;
+      e.preventDefault();
+      root.scrollBy({ top: (e.key === "ArrowDown" ? 1 : -1) * root.clientHeight, behavior: "smooth" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Track which slide is visible
   useEffect(() => {
     const root = containerRef.current;
@@ -145,7 +160,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
         </button>
       )}
       {!fixed && !backHref && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-3 pb-8" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-3 pb-8 lg:hidden" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
           <span className="text-lg font-black tracking-tight">numnum</span>
           <span className="pointer-events-auto min-w-0">
             <LocationChip label={locationLabel} dark />
@@ -291,7 +306,9 @@ function ReelSlide({
   const showVideo = near && reel.videoUrl && !failed;
 
   return (
-    <section data-index={index} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black" aria-label={`${reel.item.name} by ${reel.restaurant.name}`}>
+    <section data-index={index} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black lg:flex lg:items-center lg:justify-center lg:gap-8 lg:bg-[#0f0d0c]" aria-label={`${reel.item.name} by ${reel.restaurant.name}`}>
+      {/* Desktop: the video plays in a centered 9:16 column; the restaurant panel sits beside it. */}
+      <div className="relative h-full w-full overflow-hidden lg:aspect-[9/16] lg:h-[calc(100%-2.5rem)] lg:w-auto lg:rounded-3xl">
       {/* poster always rendered underneath to avoid black frames */}
       {reel.posterUrl && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -415,6 +432,8 @@ function ReelSlide({
           </button>
         )}
       </div>
+      </div>
+      <ReelSidePanel reel={reel} onOpen={onOpen} onSave={onSave} />
     </section>
   );
 }
@@ -425,5 +444,70 @@ function RailButton({ children, label, onClick, aria }: { children: React.ReactN
       {children}
       {label}
     </button>
+  );
+}
+
+/** Desktop-only panel next to the video: the restaurant's profile and the dish from the reel. */
+function ReelSidePanel({ reel, onOpen, onSave }: { reel: FeedReel; onOpen: () => void; onSave: () => void }) {
+  const r = reel.restaurant;
+  return (
+    <aside className="hidden w-[360px] shrink-0 overflow-hidden rounded-3xl bg-white text-ink shadow-2xl lg:block">
+      <Link href={`/r/${r.slug}`} className="relative block aspect-[16/9] bg-gradient-to-br from-brand-100 to-brand-300">
+        {r.coverUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={r.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+        )}
+        <span className="absolute bottom-3 left-3 h-16 w-16 overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg">
+          {r.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={r.logoUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="grid h-full place-items-center bg-brand-500 text-2xl font-black text-white">{r.name[0]}</span>
+          )}
+        </span>
+      </Link>
+      <div className="p-5">
+        <Link href={`/r/${r.slug}`} className="flex items-center gap-1.5 text-xl font-extrabold hover:underline">
+          {r.name}
+          {r.verified && <VerifiedBadge />}
+        </Link>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
+          <RatingPill avg={r.ratingAvg} count={r.ratingCount} />
+          {r.cuisine && <span>{r.cuisine}</span>}
+          {r.location && (
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="h-3.5 w-3.5" />
+              {r.location}
+            </span>
+          )}
+        </div>
+        <div className="mt-2 text-sm">
+          {r.deliversToYou === true && <span className="font-semibold text-emerald-700">Delivers to you{r.distanceKm != null ? ` · ${formatKm(r.distanceKm)}` : ""}</span>}
+          {r.deliversToYou === false && <span className="font-semibold text-ink-muted">Pickup only for your location{r.distanceKm != null ? ` · ${formatKm(r.distanceKm)}` : ""}</span>}
+          {r.deliversToYou === null && r.avgPrepMinutes > 0 && <span className="text-ink-muted">Ready in about {r.avgPrepMinutes}–{r.avgPrepMinutes + 15} mins</span>}
+        </div>
+        <Link href={`/r/${r.slug}`} className="mt-4 flex h-11 items-center justify-center rounded-xl border border-black/10 text-sm font-bold hover:bg-black/5">
+          View menu & reels
+        </Link>
+
+        <div className="mt-5 border-t border-black/5 pt-4">
+          <div className="text-xs font-bold uppercase tracking-wider text-ink-muted">In this reel</div>
+          <div className="mt-1.5 text-lg font-bold">{reel.item.name}</div>
+          <div className="mt-0.5 flex items-center gap-2.5">
+            <span className="tabular text-lg font-extrabold text-brand-600">{formatMoney(reel.item.priceCents, reel.item.currency)}</span>
+            <RatingPill avg={reel.item.ratingAvg} count={reel.item.ratingCount} />
+          </div>
+          {reel.item.description && <p className="mt-1.5 line-clamp-3 text-sm text-ink-muted">{reel.item.description}</p>}
+          <div className="mt-4 flex gap-2">
+            <button onClick={onOpen} disabled={!r.orderingEnabled || !reel.item.available} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-brand-500 font-bold text-white shadow-lg shadow-brand-500/30 hover:bg-brand-600 disabled:bg-black/10 disabled:text-ink-muted disabled:shadow-none">
+              {r.orderingEnabled && reel.item.available ? `Order · ${formatMoney(reel.item.priceCents, reel.item.currency)}` : "Currently unavailable"}
+            </button>
+            <button onClick={onSave} className="grid h-12 w-12 place-items-center rounded-xl border border-black/10 hover:bg-black/5" aria-label={reel.saved ? "Unsave" : "Save"}>
+              <Bookmark className={cn("h-5 w-5", reel.saved && "fill-amber-400 text-amber-400")} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
   );
 }

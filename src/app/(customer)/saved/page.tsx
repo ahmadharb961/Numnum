@@ -35,7 +35,7 @@ export default async function SavedPage() {
   const empty = !reels.length && !items.length && !restaurants.length;
   return (
     <main className="pb-nav">
-      <header className="container-app pb-2" style={{ paddingTop: "calc(var(--safe-top) + 14px)" }}>
+      <header className="container-wide pb-2" style={{ paddingTop: "calc(var(--safe-top) + 14px)" }}>
         <h1 className="text-2xl font-black tracking-tight">Saved</h1>
         {!user && (
           <p className="mt-1 text-sm text-ink-muted">
@@ -55,7 +55,7 @@ export default async function SavedPage() {
           </p>
         )}
       </header>
-      <div className="container-app space-y-6 pt-2">
+      <div className="container-wide space-y-6 pt-2">
         {user && (
           <div className="grid grid-cols-3 gap-2">
             {[
@@ -90,7 +90,7 @@ export default async function SavedPage() {
         {reels.length > 0 && (
           <section>
             <h2 className="mb-2 font-extrabold">Reels</h2>
-            <div className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-2xl">
+            <div className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-2xl lg:grid-cols-5 lg:gap-2">
               {reels.map((r) => (
                 <ReelThumb key={r.id} href={`/reel/${r.id}`} posterUrl={r.posterUrl} views={r.viewCount} />
               ))}
@@ -100,7 +100,7 @@ export default async function SavedPage() {
         {items.length > 0 && (
           <section>
             <h2 className="mb-2 font-extrabold">Dishes</h2>
-            <div className="grid gap-2.5">
+            <div className="grid gap-2.5 lg:grid-cols-2">
               {items.map((i) => (
                 <DishCard key={i.id} item={{ ...i, image: images.get(i.id) ?? null }} />
               ))}
@@ -110,7 +110,7 @@ export default async function SavedPage() {
         {restaurants.length > 0 && (
           <section>
             <h2 className="mb-2 font-extrabold">Restaurants</h2>
-            <div className="grid gap-3">
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
               {restaurants.map((r) => (
                 <RestaurantCard key={r.id} r={r} />
               ))}

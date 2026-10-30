@@ -25,7 +25,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   };
 
   const reelsBody = reels.length ? (
-    <div className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-2xl">
+    <div className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-2xl lg:grid-cols-5 lg:gap-2">
       {reels.map((r) => (
         <ReelThumb key={r.id} href={`/reel/${r.id}`} posterUrl={r.posterUrl} views={r.viewCount} label={r.item.name} />
       ))}
@@ -33,11 +33,11 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   ) : (
     <EmptyState icon={<Search />} title="No reels found" body="Try another search or category." />
   );
-  const restaurantsBody = rs.length ? <div className="grid gap-3">{rs.map((r) => <RestaurantCard key={r.id} r={r} />)}</div> : <EmptyState icon={<Search />} title="No restaurants found" body="Try removing some filters." />;
+  const restaurantsBody = rs.length ? <div className="grid gap-3 lg:grid-cols-2 lg:gap-5 xl:grid-cols-3">{rs.map((r) => <RestaurantCard key={r.id} r={r} />)}</div> : <EmptyState icon={<Search />} title="No restaurants found" body="Try removing some filters." />;
   const dishesBody = res.items.length ? (
     <>
       <p className="mb-2 text-xs font-semibold text-ink-muted">{res.total} dishes</p>
-      <div className="grid gap-2.5">
+      <div className="grid gap-2.5 lg:grid-cols-2 lg:gap-4">
         {res.items.map((i) => (
           <DishCard key={i.id} item={i} />
         ))}
@@ -66,7 +66,7 @@ return (
     <Suspense>
       <SearchControls facets={f} locationLabel={loc?.label ?? null} />
     </Suspense>
-      <div className="container-app pt-2">
+      <div className="container-wide pt-2">
         <Suspense>
           <ExploreResults dishes={dishesBody} reels={reelsBody} restaurants={restaurantsBody} />
         </Suspense>

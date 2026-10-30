@@ -22,7 +22,7 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
   return (
     <main className="pb-nav">
       <header className="sticky top-0 z-30 bg-cream/95 backdrop-blur-xl" style={{ paddingTop: "var(--safe-top)" }}>
-        <div className="container-app pb-2 pt-3">
+        <div className="container-wide pb-2 pt-3">
           <div className="flex items-center justify-between gap-2">
             <h1 className="text-2xl font-black tracking-tight">Restaurants</h1>
             <LocationChip label={loc?.label ?? null} />
@@ -46,7 +46,7 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
           )}
         </div>
       </header>
-      <div className="container-app grid gap-3 pt-2">
+      <div className="container-wide grid gap-3 pt-2 lg:grid-cols-2 lg:gap-5 xl:grid-cols-3">
         {list.length ? list.map(({ r, q }) => <RestaurantCard key={r.id} r={r} delivery={q ? { km: q.km, deliverable: r.deliveryEnabled && q.deliverable, feeCents: q.deliverable ? q.feeCents : null } : null} />) : <EmptyState icon={<Store />} title="No restaurants here yet" body="New restaurants join every week." />}
       </div>
       <div className="container-app mt-8 text-center">

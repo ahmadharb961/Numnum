@@ -59,10 +59,10 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
   };
 
   return (
-    <main className="pb-nav">
+    <main className="profile-desktop pb-nav lg:mx-auto lg:max-w-4xl lg:px-8 lg:pt-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <RestaurantViewTracker restaurantId={r.id} />
-      <div className="relative h-56 bg-gradient-to-br from-brand-200 to-brand-400 sm:h-72">
+      <div className="relative h-56 bg-gradient-to-br from-brand-200 to-brand-400 sm:h-72 lg:overflow-hidden lg:rounded-3xl">
         {r.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={r.coverUrl} alt="" className="h-full w-full object-cover" />

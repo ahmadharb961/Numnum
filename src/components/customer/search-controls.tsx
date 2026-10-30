@@ -49,8 +49,8 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
 
   return (
     <div className="sticky top-0 z-30 bg-cream/95 pb-2 backdrop-blur-xl" style={{ paddingTop: "calc(var(--safe-top) + 10px)" }}>
-      <div className="container-app">
-        <div className="mb-2">
+      <div className="container-wide">
+        <div className="mb-2 lg:hidden">
           <LocationChip label={locationLabel} />
         </div>
         <div className="flex gap-2">

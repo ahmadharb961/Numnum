@@ -28,7 +28,7 @@ export function BottomNav() {
   }, [dark]);
   return (
     <nav
-      className={cn("fixed inset-x-0 bottom-0 z-50 border-t backdrop-blur-xl", dark ? "border-white/10 bg-black/90 text-white" : "border-black/5 bg-white/95 text-ink")}
+      className={cn("fixed inset-x-0 bottom-0 z-50 border-t backdrop-blur-xl lg:hidden", dark ? "border-white/10 bg-black/90 text-white" : "border-black/5 bg-white/95 text-ink")}
       style={{ paddingBottom: "var(--safe-bottom)" }}
       aria-label="Main"
     >

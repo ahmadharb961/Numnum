@@ -11,6 +11,19 @@
   color-scheme: light;
 }
 
+/* Desktop: the sidebar replaces the bottom tab bar. */
+@media (min-width: 1024px) {
+  :root {
+    --nav-h: 0px;
+  }
+  /* Restaurant profile uses one wider centered column. */
+  .profile-desktop .container-app {
+    max-width: none;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
@@ -39,6 +52,10 @@ body {
 @layer components {
   .container-app {
     @apply mx-auto w-full max-w-screen-sm px-4;
+  }
+  /* Lists that use the extra room on desktop (grids of cards). */
+  .container-wide {
+    @apply mx-auto w-full max-w-screen-sm px-4 lg:max-w-6xl lg:px-8;
   }
   .pb-nav {
     padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);

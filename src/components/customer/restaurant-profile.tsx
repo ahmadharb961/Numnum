@@ -66,7 +66,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
           {sections.map((s) => (
             <section key={s.id} id={`sec-${s.id}`} className="scroll-mt-32 pb-4">
               <h2 className="mb-2 text-lg font-extrabold">{s.name}</h2>
-              <div className="grid gap-2.5">
+              <div className="grid gap-2.5 lg:grid-cols-2">
                 {s.items.map((i) => (
                   <div key={i.id} className="card flex gap-3 p-2.5">
                     <button onClick={() => setItemId(i.id)} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-black/5" aria-label={`View ${i.name}`}>
