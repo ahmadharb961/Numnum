@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { ItemSheet } from "./item-sheet";
 import { api, track } from "./track";
 import { HlsVideo } from "@/components/hls-video";
+import { pooledVideo, unlockPooledVideos } from "./video-pool";
 import { LocationChip } from "./location-picker";
 import { formatKm } from "@/lib/geo";
 
@@ -71,26 +72,31 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     setSoundBlocked(false);
   };
 
-  // First tap/click/key after a blocked start: unmute inside the gesture (required on iOS).
+  // First tap/click/key after a blocked start: unmute inside the gesture. iOS only counts
+  // touchend/click (not touchstart/pointerdown) and allows sound per <video> element, so all
+  // pooled elements are unlocked here and every following reel plays with sound.
   useEffect(() => {
     if (!soundBlocked) return;
+    let busy = false;
     const unlock = () => {
-      const v = document.querySelector<HTMLVideoElement>("section[data-active='true'] video");
-      if (v) {
-        v.muted = false;
-        void v.play().catch(() => {});
-      }
+      if (busy) return;
+      busy = true;
       unlockedAt.current = Date.now();
-      setSoundBlocked(false);
-      setMuted(false);
+      const active = document.querySelector<HTMLVideoElement>("section[data-active='true'] video");
+      void unlockPooledVideos(active).then((ok) => {
+        busy = false;
+        if (ok) {
+          setSoundBlocked(false);
+          setMuted(false);
+        } else if (active) {
+          active.muted = true;
+          void active.play().catch(() => {});
+        }
+      });
     };
-    const opts = { capture: true, once: true } as const;
-    window.addEventListener("pointerdown", unlock, opts);
-    window.addEventListener("keydown", unlock, opts);
-    return () => {
-      window.removeEventListener("pointerdown", unlock, opts);
-      window.removeEventListener("keydown", unlock, opts);
-    };
+    const events = ["touchend", "click", "keydown"] as const;
+    events.forEach((ev) => window.addEventListener(ev, unlock, { capture: true }));
+    return () => events.forEach((ev) => window.removeEventListener(ev, unlock, { capture: true }));
   }, [soundBlocked]);
 
   // Desktop: arrow keys move between reels.
@@ -303,6 +309,9 @@ function ReelSlide({
   onOpen: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Pooled <video> elements exist only in the browser: attach after mount (poster shows meanwhile).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [paused, setPaused] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -334,7 +343,7 @@ function ReelSlide({
     if (!active) {
       lastTick.current = null;
     }
-  }, [active, paused, near]);
+  }, [active, paused, near, mounted]);
 
   useEffect(() => {
     if (!active) setPaused(false);
@@ -378,7 +387,7 @@ function ReelSlide({
     }, 290);
   }
 
-  const showVideo = near && reel.videoUrl && !failed;
+  const showVideo = mounted && near && reel.videoUrl && !failed;
 
   return (
     <section data-index={index} data-active={active} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black lg:flex lg:items-center lg:justify-center lg:bg-[#0f0d0c]" aria-label={`${reel.item.name} by ${reel.restaurant.name}`}>
@@ -392,6 +401,7 @@ function ReelSlide({
       {showVideo && (
         <HlsVideo
           ref={videoRef}
+          element={pooledVideo(index)}
           className="absolute inset-0 h-full w-full object-cover"
           src={reel.videoUrl!}
           onFatal={() => setFailed(true)}
