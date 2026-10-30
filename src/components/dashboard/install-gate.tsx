@@ -6,14 +6,39 @@ import { isAndroid, isInstalled, isIos, isMobile, pushState, resyncDevice, turnO
 import { Button } from "@/components/ui/button";
 
 type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+
+const COPY = {
+  restaurant: {
+    app: "numnum Orders",
+    installTitle: "Add numnum to your home screen to receive orders",
+    installBody: "Orders arrive as notifications, like a regular app, even when your phone is locked. This takes 20 seconds.",
+    iosOpen: "and log in",
+    notifyTitle: "Allow notifications for new orders",
+    notifyBody: "so you never miss an order",
+    notifyButton: "Turn on order notifications",
+    blockedBody: "numnum needs notifications to alert you about new orders. Turn them back on, then reopen the app:",
+  },
+  customer: {
+    app: "numnum",
+    installTitle: "Add numnum to your home screen",
+    installBody: "Use numnum like a real app: it opens faster and tells you when your order is accepted, on its way and delivered. This takes 20 seconds.",
+    iosOpen: "",
+    notifyTitle: "Allow notifications",
+    notifyBody: "to get your order updates and the best offers near you",
+    notifyButton: "Turn on notifications",
+    blockedBody: "numnum uses notifications for your order updates. Turn them back on, then reopen the app:",
+  },
+};
 type Step = "loading" | "install" | "notify" | "blocked" | "ok";
 
 /**
- * Restaurants must receive new orders instantly. On phones, the dashboard only opens
- * from the home-screen app with notifications allowed (iPhone only delivers web
- * notifications to home-screen apps). Desktop browsers get a reminder banner instead.
+ * On phones, the app only opens from the home screen with notifications allowed (iPhone only
+ * delivers web notifications to home-screen apps): restaurants must receive new orders
+ * instantly, customers get order updates and offers. Desktop browsers aren't gated; restaurants
+ * get a reminder banner there.
  */
-export function InstallGate({ children }: { children: React.ReactNode }) {
+export function InstallGate({ children, audience = "restaurant" }: { children: React.ReactNode; audience?: "restaurant" | "customer" }) {
+  const t = COPY[audience];
   const [step, setStep] = useState<Step>("loading");
   const [mobile, setMobile] = useState(false);
   const [push, setPush] = useState<PushState>("off");
@@ -63,7 +88,7 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
   if (step === "ok")
     return (
       <>
-        {!mobile && push !== "on" && push !== "unsupported" && (
+        {audience === "restaurant" && !mobile && push !== "on" && push !== "unsupported" && (
           <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-900 lg:ml-[18rem] lg:mr-8">
             <span className="inline-flex items-center gap-2 font-semibold">
               <BellRing className="h-4 w-4" /> {push === "blocked" ? "Notifications are blocked in this browser — allow them in the site settings to hear about new orders." : "Turn on notifications to be alerted about new orders even when this tab is in the background."}
@@ -91,13 +116,13 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
         {step === "install" && (
           <>
             <Smartphone className="mt-8 h-12 w-12 text-brand-500" />
-            <h1 className="mt-3 text-2xl font-extrabold leading-tight">Add numnum to your home screen to receive orders</h1>
-            <p className="mt-2 text-ink-soft">Orders arrive as notifications, like a regular app, even when your phone is locked. This takes 20 seconds.</p>
+            <h1 className="mt-3 text-2xl font-extrabold leading-tight">{t.installTitle}</h1>
+            <p className="mt-2 text-ink-soft">{t.installBody}</p>
             {isIos() ? (
               <ol className="mt-6 space-y-4 text-[15px]">
                 <li className="flex gap-3"><Badge n={1} /> <span className="pt-0.5">Tap <Share className="mx-1 inline h-5 w-5 text-sky-500" /> <b>Share</b> at the bottom of Safari.</span></li>
                 <li className="flex gap-3"><Badge n={2} /> <span className="pt-0.5">Scroll down and tap <PlusSquare className="mx-1 inline h-5 w-5" /> <b>Add to Home Screen</b>, then <b>Add</b>.</span></li>
-                <li className="flex gap-3"><Badge n={3} /> <span className="pt-0.5">Open <b>numnum Orders</b> from your home screen and log in.</span></li>
+                <li className="flex gap-3"><Badge n={3} /> <span className="pt-0.5">Open <b>{t.app}</b> from your home screen{t.iosOpen ? ` ${t.iosOpen}` : ""}.</span></li>
                 <li className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Use <b>Safari</b> (not Chrome or Instagram&apos;s browser) and iOS 16.4 or newer.</li>
               </ol>
             ) : (
@@ -113,13 +138,13 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
                       setBip(null);
                     }}
                   >
-                    <PlusSquare className="h-5 w-5" /> Install numnum Orders
+                    <PlusSquare className="h-5 w-5" /> Install {t.app}
                   </Button>
                 ) : null}
                 <ol className="mt-6 space-y-4 text-[15px]">
                   <li className="flex gap-3"><Badge n={1} /> <span className="pt-0.5">{isAndroid() ? <>In Chrome, tap <MoreVertical className="mx-1 inline h-5 w-5" /> (top right).</> : "Open your browser menu."}</span></li>
                   <li className="flex gap-3"><Badge n={2} /> <span className="pt-0.5">Tap <b>Add to Home screen</b> or <b>Install app</b>.</span></li>
-                  <li className="flex gap-3"><Badge n={3} /> <span className="pt-0.5">Open <b>numnum Orders</b> from your home screen.</span></li>
+                  <li className="flex gap-3"><Badge n={3} /> <span className="pt-0.5">Open <b>{t.app}</b> from your home screen.</span></li>
                 </ol>
               </>
             )}
@@ -129,12 +154,12 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
         {step === "notify" && (
           <>
             <BellRing className="mt-8 h-12 w-12 text-brand-500" />
-            <h1 className="mt-3 text-2xl font-extrabold leading-tight">Allow notifications for new orders</h1>
-            <p className="mt-2 text-ink-soft">Your phone will ask for permission. Tap <b>Allow</b> so you never miss an order.</p>
+            <h1 className="mt-3 text-2xl font-extrabold leading-tight">{t.notifyTitle}</h1>
+            <p className="mt-2 text-ink-soft">Your phone will ask for permission. Tap <b>Allow</b> {t.notifyBody}.</p>
             <Button size="lg" block className="mt-6" onClick={enable} loading={busy}>
-              <BellRing className="h-5 w-5" /> Turn on order notifications
+              <BellRing className="h-5 w-5" /> {t.notifyButton}
             </Button>
-            {push === "unsupported" && <p className="mt-3 text-sm text-ink-muted">This phone doesn&apos;t support web notifications. Update your phone&apos;s software, or keep the Orders screen open.</p>}
+            {push === "unsupported" && <p className="mt-3 text-sm text-ink-muted">This phone doesn&apos;t support web notifications. Update your phone&apos;s software{audience === "restaurant" ? ", or keep the Orders screen open" : ""}.</p>}
           </>
         )}
 
@@ -142,9 +167,9 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
           <>
             <BellRing className="mt-8 h-12 w-12 text-red-500" />
             <h1 className="mt-3 text-2xl font-extrabold leading-tight">Notifications are turned off</h1>
-            <p className="mt-2 text-ink-soft">numnum needs notifications to alert you about new orders. Turn them back on, then reopen the app:</p>
+            <p className="mt-2 text-ink-soft">{t.blockedBody}</p>
             <ul className="mt-4 space-y-2 text-[15px]">
-              {isIos() ? <li>iPhone: <b>Settings → Notifications → numnum Orders → Allow Notifications</b></li> : <li>Android: <b>Settings → Apps → numnum Orders → Notifications → On</b></li>}
+              {isIos() ? <li>iPhone: <b>Settings → Notifications → {t.app} → Allow Notifications</b></li> : <li>Android: <b>Settings → Apps → {t.app} → Notifications → On</b></li>}
             </ul>
             <Button size="lg" block variant="outline" className="mt-6" onClick={() => void evaluate()}>
               <CheckCircle2 className="h-5 w-5" /> I&apos;ve turned them on

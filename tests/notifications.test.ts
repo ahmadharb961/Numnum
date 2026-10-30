@@ -20,15 +20,15 @@ vi.mock("@/server/email", () => ({
 }));
 
 import { prisma } from "@/server/db";
-import { audienceUserIds, sendBroadcast } from "@/server/broadcast";
+import { audienceDevices, audienceReach, sendBroadcast } from "@/server/broadcast";
 import { createOrder, restaurantOrderAction } from "@/server/orders";
 import { makeCustomer, makeRestaurant, orderPayload, resetDb } from "./helpers";
 
-const sub = (userId: string, n: string) => prisma.pushSubscription.create({ data: { userId, endpoint: `https://push.test/${n}`, p256dh: "p256dh-key-xxxx", auth: "auth-key-x" } });
+const sub = (userId: string | null, n: string) => prisma.pushSubscription.create({ data: { userId, endpoint: `https://push.test/${n}`, p256dh: "p256dh-key-xxxx", auth: "auth-key-x" } });
 const settle = () => new Promise((r) => setTimeout(r, 300));
 
 let customer: { id: string; email: string };
-let quiet: { id: string };
+let quiet: { id: string; email: string };
 let admin: { id: string };
 let f: Awaited<ReturnType<typeof makeRestaurant>>;
 
@@ -44,15 +44,16 @@ beforeEach(async () => {
   await sub(customer.id, "c2"); // second device
   await sub(f.user.id, "owner");
   await sub(admin.id, "admin");
+  await sub(null, "guest"); // browsing without an account
 });
 
 describe("admin push broadcasts", () => {
-  it("resolves each audience to people with notifications on", async () => {
-    expect((await audienceUserIds("everyone")).sort()).toEqual([customer.id, f.user.id, admin.id].sort());
-    expect(await audienceUserIds("customers")).toEqual([customer.id]);
-    expect(await audienceUserIds("restaurants")).toEqual([f.user.id]);
-    expect(await audienceUserIds("restaurant", { restaurantId: f.restaurant.id })).toEqual([f.user.id]);
-    expect(await audienceUserIds("user", { userId: quiet.id })).toEqual([]);
+  it("reaches each audience's devices, guests counting as customers", async () => {
+    expect(await audienceReach(audienceDevices("everyone"))).toEqual({ people: 4, devices: 5 });
+    expect(await audienceReach(audienceDevices("customers"))).toEqual({ people: 2, devices: 3 });
+    expect(await audienceReach(audienceDevices("restaurants"))).toEqual({ people: 1, devices: 1 });
+    expect(await audienceReach(audienceDevices("restaurant", { restaurantId: f.restaurant.id }))).toEqual({ people: 1, devices: 1 });
+    expect(await audienceReach(audienceDevices("user", { userId: quiet.id }))).toEqual({ people: 0, devices: 0 });
   });
 
   it("validates content, link and target", async () => {
@@ -65,12 +66,12 @@ describe("admin push broadcasts", () => {
 
   it("sends a persistent notification with photo and link, and records it", async () => {
     const r = await sendBroadcast({ audience: "customers", title: "Weekend offer", body: "Free delivery", imageUrl: "/media/i/abc.webp", link: "/r/rest-1" }, admin.id);
-    expect(r).toEqual({ ok: true, people: 1, devices: 2, delivered: 2 });
-    expect(pushes.map((p) => p.endpoint).sort()).toEqual(["https://push.test/c1", "https://push.test/c2"]);
+    expect(r).toEqual({ ok: true, people: 2, devices: 3, delivered: 3 });
+    expect(pushes.map((p) => p.endpoint).sort()).toEqual(["https://push.test/c1", "https://push.test/c2", "https://push.test/guest"]);
     expect(pushes[0].payload).toMatchObject({ title: "Weekend offer", body: "Free delivery", url: "/r/rest-1", requireInteraction: true });
     expect(String(pushes[0].payload.image)).toMatch(/\/media\/i\/abc\.webp$/);
     const row = await prisma.pushBroadcast.findFirstOrThrow();
-    expect(row).toMatchObject({ audience: "customers", recipients: 1, devices: 2, delivered: 2, createdById: admin.id });
+    expect(row).toMatchObject({ audience: "customers", recipients: 2, devices: 3, delivered: 3, createdById: admin.id });
   });
 
   it("targets one restaurant's staff or one person by email", async () => {

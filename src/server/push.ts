@@ -1,5 +1,6 @@
 import "server-only";
 import webpush from "web-push";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 
 const PUB = "push.vapidPublic";
@@ -40,9 +41,14 @@ export type PushMessage = {
 
 /** Sends to every device the given users turned notifications on for. Never throws. */
 export async function pushToUsers(userIds: string[], msg: PushMessage) {
+  if (!userIds.length) return 0;
+  return pushToDevices({ userId: { in: userIds } }, msg);
+}
+
+/** Sends to every matching device (including guests' devices). Returns how many accepted it. Never throws. */
+export async function pushToDevices(where: Prisma.PushSubscriptionWhereInput, msg: PushMessage) {
   try {
-    if (!userIds.length) return 0;
-    const subs = await prisma.pushSubscription.findMany({ where: { userId: { in: userIds } } });
+    const subs = await prisma.pushSubscription.findMany({ where });
     if (!subs.length) return 0;
     const k = await vapidKeys();
     const app = process.env.APP_URL || "";

@@ -2,7 +2,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "./db";
-import { pushToUsers } from "./push";
+import { pushToDevices } from "./push";
 import { audit } from "./audit";
 
 export const AUDIENCES = ["everyone", "customers", "restaurants", "user", "restaurant"] as const;
@@ -39,37 +39,40 @@ export const broadcastSchema = z
 
 export type BroadcastInput = z.input<typeof broadcastSchema>;
 
-/** Users in an audience who have notifications on (only they can receive a push). */
-export async function audienceUserIds(a: Audience, target: { userId?: string; restaurantId?: string } = {}): Promise<string[]> {
-  const withPush = { pushSubs: { some: {} } } satisfies Prisma.UserWhereInput;
-  let users: { id: string }[];
+/**
+ * Devices in an audience (only devices with notifications on can receive a push).
+ * Guests' devices (no account yet) count as customers.
+ */
+export function audienceDevices(a: Audience, target: { userId?: string; restaurantId?: string } = {}): Prisma.PushSubscriptionWhereInput {
+  const active = { disabled: false };
   switch (a) {
     case "everyone":
-      users = await prisma.user.findMany({ where: { ...withPush, disabled: false }, select: { id: true } });
-      break;
+      return { OR: [{ userId: null }, { user: active }] };
     case "customers":
-      users = await prisma.user.findMany({ where: { ...withPush, disabled: false, staff: { none: {} }, roles: { none: { role: "ADMIN" } } }, select: { id: true } });
-      break;
+      return { OR: [{ userId: null }, { user: { ...active, staff: { none: {} }, roles: { none: { role: "ADMIN" } } } }] };
     case "restaurants":
-      users = await prisma.user.findMany({ where: { ...withPush, disabled: false, staff: { some: {} } }, select: { id: true } });
-      break;
+      return { user: { ...active, staff: { some: {} } } };
     case "user":
-      users = target.userId ? await prisma.user.findMany({ where: { id: target.userId, ...withPush }, select: { id: true } }) : [];
-      break;
+      return { userId: target.userId ?? "-" };
     case "restaurant":
-      users = target.restaurantId ? await prisma.user.findMany({ where: { ...withPush, disabled: false, staff: { some: { restaurantId: target.restaurantId } } }, select: { id: true } }) : [];
-      break;
+      return { user: { ...active, staff: { some: { restaurantId: target.restaurantId ?? "-" } } } };
   }
-  return users.map((u) => u.id);
 }
 
-/** People and devices with notifications on, per audience (shown next to the form). */
+/** People (accounts, plus each guest device) and devices reachable in an audience. */
+export async function audienceReach(where: Prisma.PushSubscriptionWhereInput) {
+  const [devices, accounts, guests] = await Promise.all([
+    prisma.pushSubscription.count({ where }),
+    prisma.pushSubscription.findMany({ where: { AND: [where, { userId: { not: null } }] }, distinct: ["userId"], select: { userId: true } }),
+    prisma.pushSubscription.count({ where: { AND: [where, { userId: null }] } }),
+  ]);
+  return { people: accounts.length + guests, devices };
+}
+
+/** Reach per group audience (shown next to the form). */
 export async function audienceStats() {
   const out = {} as Record<"everyone" | "customers" | "restaurants", { people: number; devices: number }>;
-  for (const a of ["everyone", "customers", "restaurants"] as const) {
-    const ids = await audienceUserIds(a);
-    out[a] = { people: ids.length, devices: ids.length ? await prisma.pushSubscription.count({ where: { userId: { in: ids } } }) : 0 };
-  }
+  for (const a of ["everyone", "customers", "restaurants"] as const) out[a] = await audienceReach(audienceDevices(a));
   return out;
 }
 
@@ -96,14 +99,14 @@ export async function sendBroadcast(raw: BroadcastInput, adminId: string): Promi
     if (!r) return { ok: false, fieldErrors: { restaurantId: "Restaurant not found" } };
     targetLabel = r.displayName;
   }
-  const ids = await audienceUserIds(d.audience, { userId, restaurantId: d.restaurantId });
-  if (!ids.length) return { ok: false, error: d.audience === "user" || d.audience === "restaurant" ? "They haven't turned on notifications on any device yet." : "Nobody in this audience has turned on notifications yet." };
-  const devices = await prisma.pushSubscription.count({ where: { userId: { in: ids } } });
-  const row = await prisma.pushBroadcast.create({ data: { audience: d.audience, targetLabel, title: d.title || null, body: d.body || null, imageUrl: d.imageUrl || null, link: d.link || null, recipients: ids.length, devices, createdById: adminId } });
-  const delivered = await pushToUsers(ids, { title: d.title || "numnum", body: d.body, url: d.link || "/", image: d.imageUrl ? absolute(d.imageUrl) : undefined, tag: `broadcast-${row.id}`, requireInteraction: true });
+  const where = audienceDevices(d.audience, { userId, restaurantId: d.restaurantId });
+  const { people, devices } = await audienceReach(where);
+  if (!devices) return { ok: false, error: d.audience === "user" || d.audience === "restaurant" ? "They haven't turned on notifications on any device yet." : "Nobody in this audience has turned on notifications yet." };
+  const row = await prisma.pushBroadcast.create({ data: { audience: d.audience, targetLabel, title: d.title || null, body: d.body || null, imageUrl: d.imageUrl || null, link: d.link || null, recipients: people, devices, createdById: adminId } });
+  const delivered = await pushToDevices(where, { title: d.title || "numnum", body: d.body, url: d.link || "/", image: d.imageUrl ? absolute(d.imageUrl) : undefined, tag: `broadcast-${row.id}`, requireInteraction: true });
   await prisma.pushBroadcast.update({ where: { id: row.id }, data: { delivered } });
-  await audit({ actorId: adminId, action: "push.broadcast", entityType: "push_broadcast", entityId: row.id, data: { audience: d.audience, targetLabel, people: ids.length, devices, delivered } });
-  return { ok: true, people: ids.length, devices, delivered };
+  await audit({ actorId: adminId, action: "push.broadcast", entityType: "push_broadcast", entityId: row.id, data: { audience: d.audience, targetLabel, people, devices, delivered } });
+  return { ok: true, people, devices, delivered };
 }
 
 // Notification images must be absolute URLs.

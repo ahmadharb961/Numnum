@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/server/db";
 import { getCurrentUser } from "@/server/auth";
-import { vapidKeys, pushToUsers } from "@/server/push";
+import { vapidKeys, pushToDevices } from "@/server/push";
 import { errorResponse, json, readJson } from "@/server/http";
 
 const subSchema = z.object({ endpoint: z.string().url().max(1000), keys: z.object({ p256dh: z.string().min(10).max(200), auth: z.string().min(8).max(100) }) });
@@ -14,19 +14,20 @@ export async function GET() {
 /** Save this device's subscription for the signed-in user (re-links it if another user had it). */
 export async function POST(req: Request) {
   try {
+    // Guests can turn notifications on too; the device is linked to their account once they log in.
     const user = await getCurrentUser();
-    if (!user) return json({ error: "Please log in" }, 401);
     const body = await readJson<Record<string, unknown>>(req);
     const sub = subSchema.parse(body);
     const ua = req.headers.get("user-agent")?.slice(0, 200) ?? null;
     await prisma.pushSubscription.upsert({
       where: { endpoint: sub.endpoint },
-      create: { userId: user.id, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, userAgent: ua },
-      update: { userId: user.id, p256dh: sub.keys.p256dh, auth: sub.keys.auth, userAgent: ua, lastUsedAt: new Date() },
+      create: { userId: user?.id ?? null, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, userAgent: ua },
+      // A guest re-saving a device doesn't unlink it from the account that owns it.
+      update: { ...(user ? { userId: user.id } : {}), p256dh: sub.keys.p256dh, auth: sub.keys.auth, userAgent: ua, lastUsedAt: new Date() },
     });
     if ((body as { test?: boolean }).test) {
-      const staff = await prisma.restaurantStaff.count({ where: { userId: user.id } });
-      await pushToUsers([user.id], staff ? { title: "numnum notifications are on ✅", body: "You'll be alerted here for every new order.", url: "/dashboard/orders", tag: "test" } : { title: "numnum notifications are on ✅", body: "You'll get updates about your orders here.", url: "/account/orders", tag: "test" });
+      const staff = user ? await prisma.restaurantStaff.count({ where: { userId: user.id } }) : 0;
+      await pushToDevices({ endpoint: sub.endpoint }, staff ? { title: "numnum notifications are on ✅", body: "You'll be alerted here for every new order.", url: "/dashboard/orders", tag: "test" } : { title: "numnum notifications are on ✅", body: "You'll get your order updates and the best offers here.", url: "/", tag: "test" });
     }
     return json({ ok: true });
   } catch (e) {

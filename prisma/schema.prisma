@@ -74,14 +74,15 @@ model Session {
 
 model PushSubscription {
   id         String   @id @default(cuid())
-  userId     String
+  /// Null for guests (browsing without an account); linked to the account after they log in.
+  userId     String?
   endpoint   String   @unique
   p256dh     String
   auth       String
   userAgent  String?
   createdAt  DateTime @default(now())
   lastUsedAt DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("push_subscriptions")
