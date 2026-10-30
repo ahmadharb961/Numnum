@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bookmark, Compass, Home, ShoppingBag, Store } from "lucide-react";
@@ -18,10 +19,17 @@ export function BottomNav() {
   const pathname = usePathname();
   const { count } = useCart();
   const dark = pathname === "/" || pathname.startsWith("/reel/") || /^\/r\/[^/]+\/reels/.test(pathname);
+  // The page background also colors any area iOS leaves around the app (e.g. below the nav).
+  useEffect(() => {
+    document.body.style.backgroundColor = dark ? "#000" : "";
+    return () => {
+      document.body.style.backgroundColor = "";
+    };
+  }, [dark]);
   return (
     <nav
       className={cn("fixed inset-x-0 bottom-0 z-50 border-t backdrop-blur-xl", dark ? "border-white/10 bg-black/90 text-white" : "border-black/5 bg-white/95 text-ink")}
-      style={{ paddingBottom: "var(--safe-bottom)", bottom: "calc(0px - var(--vp-gap))" }}
+      style={{ paddingBottom: "var(--safe-bottom)" }}
       aria-label="Main"
     >
       <ul className="mx-auto grid h-[var(--nav-h)] max-w-screen-sm grid-cols-5">

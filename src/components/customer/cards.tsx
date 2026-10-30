@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Eye, MapPin, Play } from "lucide-react";
+import { Eye, MapPin, Play, Timer } from "lucide-react";
 import { formatMoney } from "@/lib/money";
 import { compactNumber, cn } from "@/lib/utils";
 import { RatingPill, VerifiedBadge, Badge } from "@/components/ui/misc";
@@ -36,53 +36,58 @@ export function DishCard({ item }: { item: { id: string; name: string; descripti
   );
 }
 
-export function RestaurantCard({ r, delivery }: { delivery?: { km: number | null; deliverable: boolean; feeCents: number | null } | null; r: { slug: string; displayName: string; logoUrl: string | null; coverUrl: string | null; cuisine: string | null; area: string | null; city: string | null; verificationStatus: string; ratingAvg: number; ratingCount: number; deliveryEnabled: boolean; pickupEnabled: boolean; openingHours: unknown; _count?: { menuItems: number } } }) {
+export function RestaurantCard({ r, delivery }: { delivery?: { km: number | null; deliverable: boolean; feeCents: number | null } | null; r: { slug: string; displayName: string; logoUrl: string | null; coverUrl: string | null; cuisine: string | null; area: string | null; city: string | null; verificationStatus: string; ratingAvg: number; ratingCount: number; deliveryEnabled: boolean; pickupEnabled: boolean; openingHours: unknown; avgPrepMinutes?: number | null; _count?: { menuItems: number } } }) {
   const open = isOpenAt(r.openingHours as OpeningHours);
+  const prep = r.avgPrepMinutes ?? null;
   return (
     <Link href={`/r/${r.slug}`} className="card block overflow-hidden active:scale-[0.99]">
-      <div className="relative h-28 bg-gradient-to-br from-brand-100 to-brand-200">
+      <div className="relative aspect-[16/9] bg-gradient-to-br from-brand-100 to-brand-200">
         {r.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={r.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
         )}
-        {open !== null && <Badge tone={open ? "green" : "gray"} className="absolute right-2 top-2 bg-white/95">{open ? "Open now" : "Closed"}</Badge>}
-      </div>
-      <div className="flex items-start gap-3 p-3">
-        <div className="-mt-9 h-14 w-14 shrink-0 overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow">
+        {open !== null && <Badge tone={open ? "green" : "gray"} className="absolute right-3 top-3 bg-white/95 shadow-sm">{open ? "Open now" : "Closed"}</Badge>}
+        <div className="absolute bottom-3 left-3 h-16 w-16 overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg">
           {r.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={r.logoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <div className="grid h-full place-items-center bg-brand-500 text-xl font-black text-white">{r.displayName[0]}</div>
+            <div className="grid h-full place-items-center bg-brand-500 text-2xl font-black text-white">{r.displayName[0]}</div>
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1 font-bold">
-            <span className="truncate">{r.displayName}</span>
-            {r.verificationStatus === "APPROVED" && <VerifiedBadge />}
-          </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-muted">
-            {r.cuisine && <span>{r.cuisine}</span>}
-            {(r.area || r.city) && (
-              <span className="inline-flex items-center gap-0.5">
-                <MapPin className="h-3 w-3" />
-                {r.area || r.city}
-              </span>
-            )}
-            <RatingPill avg={r.ratingAvg} count={r.ratingCount} />
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {delivery ? (
-              delivery.deliverable ? (
-                <Badge tone="green">Delivers to you{delivery.km != null ? ` · ${formatKm(delivery.km)}` : ""}</Badge>
-              ) : (
-                <Badge tone="gray">{delivery.km != null ? `${formatKm(delivery.km)} away · ` : ""}no delivery to you</Badge>
-              )
+      </div>
+      <div className="px-4 pb-4 pt-3">
+        <div className="flex items-center gap-1.5 text-lg font-bold">
+          <span className="truncate">{r.displayName}</span>
+          {r.verificationStatus === "APPROVED" && <VerifiedBadge />}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
+          {prep != null && prep > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Timer className="h-4 w-4" />
+              {prep}–{prep + 15} mins
+            </span>
+          )}
+          <RatingPill avg={r.ratingAvg} count={r.ratingCount} />
+          {r.cuisine && <span className="truncate">{r.cuisine}</span>}
+          {(r.area || r.city) && (
+            <span className="inline-flex items-center gap-0.5">
+              <MapPin className="h-3.5 w-3.5" />
+              {r.area || r.city}
+            </span>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {delivery ? (
+            delivery.deliverable ? (
+              <Badge tone="green">Delivers to you{delivery.km != null ? ` · ${formatKm(delivery.km)}` : ""}</Badge>
             ) : (
-              r.deliveryEnabled && <Badge tone="brand">Delivery</Badge>
-            )}
-            {r.pickupEnabled && <Badge>Pickup</Badge>}
-          </div>
+              <Badge tone="gray">{delivery.km != null ? `${formatKm(delivery.km)} away · ` : ""}no delivery to you</Badge>
+            )
+          ) : (
+            r.deliveryEnabled && <Badge tone="brand">Delivery</Badge>
+          )}
+          {r.pickupEnabled && <Badge>Pickup</Badge>}
         </div>
       </div>
     </Link>

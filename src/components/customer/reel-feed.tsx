@@ -380,8 +380,8 @@ function ReelSlide({
         </div>
       </div>
 
-      {/* Info + order */}
-      <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pr-20">
+      {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pr-20 *:pointer-events-auto">
         {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">Sponsored</span>}
         <Link href={`/r/${reel.restaurant.slug}`} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
           {reel.restaurant.name}

@@ -79,12 +79,12 @@ async function logo(emoji: string, idx: number, file: string) {
   await jpeg(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">${background(400, 400, pal)}${emojiImg(emoji, 200, 200, 240)}</svg>`, file, 88);
 }
 
-// No text: the app shows the restaurant name over the cover.
-async function cover(emoji: string, idx: number, file: string) {
+// A spread of three dishes; no text (the app shows the name) and the bottom-left kept clear for the logo.
+async function cover(emojis: string[], idx: number, file: string) {
   const pal = PALETTES[idx % PALETTES.length];
+  const [a, b, c] = [emojis[0], emojis[1] ?? emojis[0], emojis[2] ?? emojis[0]];
   await jpeg(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900">${background(1200, 900, pal, scatter(1200, 900, emoji, 90, 230))}
-</svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675">${background(1200, 675, pal, scatter(1200, 675, a, 70, 200))}${plate(1010, 380, 165, c)}${plate(440, 360, 175, b)}${plate(725, 320, 205, a)}</svg>`,
     file,
   );
 }
@@ -131,7 +131,7 @@ async function main() {
     const lg = path.join(OUT, "logos", `${d.slug}.jpg`);
     if (force || !existsSync(lg)) await logo(d.items[0].emoji, ri, lg);
     const cv = path.join(OUT, "covers", `${d.slug}.jpg`);
-    if (force || !existsSync(cv)) await cover(d.items[0].emoji, ri + 1, cv);
+    if (force || !existsSync(cv)) await cover([...new Set(d.items.map((i) => i.emoji))].slice(0, 3), ri + 1, cv);
     for (const it of d.items) {
       const ph = path.join(OUT, "photos", `${d.slug}-${it.sku}.jpg`);
       if (force || !existsSync(ph)) await photo(it.emoji, idx, ph);

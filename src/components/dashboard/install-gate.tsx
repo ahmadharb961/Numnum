@@ -80,7 +80,7 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
     );
 
   return (
-    <div className="fixed inset-0 z-[90] overflow-y-auto bg-cream" style={{ bottom: "calc(0px - var(--vp-gap))", paddingTop: "calc(var(--safe-top) + 24px)", paddingBottom: "calc(var(--safe-bottom) + 24px)" }}>
+    <div className="fixed inset-0 z-[90] overflow-y-auto bg-cream" style={{ paddingTop: "calc(var(--safe-top) + 24px)", paddingBottom: "calc(var(--safe-bottom) + 24px)" }}>
       <div className="mx-auto max-w-md px-6">
         <div className="text-2xl font-black tracking-tight text-brand-600">numnum</div>
         <ol className="mt-6 flex gap-2 text-xs font-bold">

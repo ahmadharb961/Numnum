@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { ReelFeed } from "@/components/customer/reel-feed";
 import { getFeed } from "@/server/feed";
 import { likedAndSaved } from "@/server/engagement";
@@ -5,6 +6,8 @@ import { getSettings } from "@/server/settings";
 import { customerLocation } from "@/server/location";
 
 export const dynamic = "force-dynamic";
+// Black status bar above the full-screen video feed.
+export const viewport: Viewport = { themeColor: "#000000" };
 
 export default async function HomePage() {
   const loc = await customerLocation();

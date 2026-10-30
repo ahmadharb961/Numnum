@@ -131,7 +131,7 @@ export async function searchRestaurants(p: SearchParams) {
   if (p.category) (where.AND as Prisma.RestaurantWhereInput[]).push({ menuItems: { some: { archived: false, foodCategory: { slug: p.category } } } });
   return prisma.restaurant.findMany({
     where,
-    select: { id: true, slug: true, displayName: true, logoUrl: true, coverUrl: true, cuisine: true, area: true, city: true, verificationStatus: true, ratingAvg: true, ratingCount: true, deliveryEnabled: true, pickupEnabled: true, openingHours: true, latitude: true, longitude: true, deliveryZones: true, _count: { select: { menuItems: { where: { archived: false } } } } },
+    select: { id: true, slug: true, displayName: true, logoUrl: true, coverUrl: true, cuisine: true, area: true, city: true, verificationStatus: true, ratingAvg: true, ratingCount: true, deliveryEnabled: true, pickupEnabled: true, openingHours: true, avgPrepMinutes: true, latitude: true, longitude: true, deliveryZones: true, _count: { select: { menuItems: { where: { archived: false } } } } },
     orderBy: [{ verificationStatus: "asc" }, { ratingCount: "desc" }, { totalReelViews: "desc" }],
     skip: ((p.page ?? 1) - 1) * PAGE,
     take: PAGE,

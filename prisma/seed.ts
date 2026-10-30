@@ -17,7 +17,7 @@ import { generateInvoice, submitPayment } from "../src/server/billing";
 import { submitItemReview, submitRestaurantReview } from "../src/server/reviews";
 import { updateSetting, DEFAULT_SETTINGS } from "../src/server/settings";
 import { previousPeriod } from "../src/lib/utils";
-import { streamConfigured, syncStreamReels, uploadVideoToStream } from "../src/server/stream";
+import { deleteStreamVideo, streamConfigured, streamUidOf, syncStreamReels, uploadVideoToStream } from "../src/server/stream";
 import { DEMOS, PALETTES, type Demo } from "./demo-data";
 
 const CATEGORIES = [
@@ -68,7 +68,7 @@ async function seedBase() {
 
 const DEMO_DIR = path.join(__dirname, "demo");
 // Bump when the committed demo media changes, so existing demo restaurants get refreshed images.
-const DEMO_MEDIA_VERSION = 2;
+const DEMO_MEDIA_VERSION = 3;
 
 function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -96,7 +96,7 @@ async function demoImage(rel: string, label: string, emoji: string, idx: number)
  * Adds a demo reel from prisma/demo/reels. With Cloudflare Stream it is uploaded there and
  * published once Stream finishes processing; otherwise it is transcoded locally with ffmpeg.
  */
-async function addDemoReel(d: Demo, restaurantId: string, menuItemId: string, sku: string, vi: number, tmp: string) {
+async function addDemoReel(d: Demo, restaurantId: string, menuItemId: string, sku: string, vi: number, tmp: string, replace?: { id: string; storageKey: string }) {
   const file = path.join(DEMO_DIR, "reels", `${d.slug}-${sku}.mp4`);
   if (!existsSync(file)) return false;
   const it = d.items.find((x) => x.sku === sku)!;
@@ -108,6 +108,13 @@ async function addDemoReel(d: Demo, restaurantId: string, menuItemId: string, sk
     const video = readFileSync(file);
     const uid = await uploadVideoToStream(video, `${d.slug}-${sku}.mp4`);
     const asset = await prisma.mediaAsset.create({ data: { restaurantId, kind: "VIDEO", isPrivate: false, storageKey: `stream:${uid}`, url: "", mimeType: "video/mp4", sizeBytes: video.length, originalName: `${sku}.mp4` } });
+    if (replace) {
+      // Keep the reel (views, likes, stats); swap in the new video once Stream has processed it.
+      await prisma.reel.update({ where: { id: replace.id }, data: { videoAssetId: asset.id, posterUrl: poster?.url ?? null, status: "PROCESSING" } });
+      const old = streamUidOf(replace.storageKey);
+      if (old && old !== "pending") await deleteStreamVideo(old).catch(() => {});
+      return true;
+    }
     await prisma.reel.create({ data: { restaurantId, menuItemId, videoAssetId: asset.id, posterUrl: poster?.url ?? null, caption, featured, status: "PROCESSING", visibility: "DRAFT", autoPublish: true } });
     return true;
   }
@@ -116,6 +123,10 @@ async function addDemoReel(d: Demo, restaurantId: string, menuItemId: string, sk
   copyFileSync(file, raw);
   const asset = await storeRawVideo(raw, { restaurantId, originalName: `${sku}.mp4` });
   const out = await processVideoAsset(asset.id);
+  if (replace) {
+    await prisma.reel.update({ where: { id: replace.id }, data: { videoAssetId: asset.id, videoUrl: out.videoUrl, posterUrl: poster?.url ?? out.posterUrl, durationSec: out.durationSec, status: "READY" } });
+    return true;
+  }
   const publishedAt = new Date(Date.now() - Math.random() * 10 * 86400_000);
   await prisma.reel.create({
     data: { restaurantId, menuItemId, videoAssetId: asset.id, videoUrl: out.videoUrl, posterUrl: poster?.url ?? out.posterUrl, durationSec: out.durationSec, caption, status: "READY", visibility: "PUBLISHED", publishedAt, featured },
@@ -198,10 +209,11 @@ async function ensureDemoRestaurant(d: Demo, ri: number, opts: { pw: string; ref
 
   let reels = 0;
   for (const [vi, sku] of d.reels.entries()) {
-    const has = await prisma.reel.count({ where: { restaurantId: r.id, menuItemId: items[sku], status: { not: "FAILED" } } });
-    if (!has && (await addDemoReel(d, r.id, items[sku], sku, vi, opts.tmp))) reels++;
+    const existing = await prisma.reel.findFirst({ where: { restaurantId: r.id, menuItemId: items[sku], status: { not: "FAILED" } }, include: { videoAsset: { select: { storageKey: true } } } });
+    if (existing && !opts.refreshMedia) continue;
+    if (await addDemoReel(d, r.id, items[sku], sku, vi, opts.tmp, existing ? { id: existing.id, storageKey: existing.videoAsset.storageKey } : undefined)) reels++;
   }
-  console.log(`Restaurant: ${d.name} (${d.owner} / demo1234)${isNew ? "" : opts.refreshMedia ? " — images refreshed" : " — up to date"}${reels ? `, ${reels} reel(s) added` : ""}`);
+  console.log(`Restaurant: ${d.name} (${d.owner} / demo1234)${isNew ? "" : opts.refreshMedia ? " — images refreshed" : " — up to date"}${reels ? `, ${reels} reel(s) ${isNew ? "added" : "added/updated"}` : ""}`);
   return { r, owner, items };
 }
 

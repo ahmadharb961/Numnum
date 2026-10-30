@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db";
 import { publicReelWhere, reelCardSelect, toPublicReel } from "@/server/feed";
@@ -6,6 +7,8 @@ import { getSettings } from "@/server/settings";
 import { ReelFeed } from "@/components/customer/reel-feed";
 
 export const dynamic = "force-dynamic";
+// Black status bar above the full-screen video feed.
+export const viewport: Viewport = { themeColor: "#000000" };
 
 export default async function RestaurantReelsViewer({ params }: { params: Promise<{ slug: string; reelId: string }> }) {
   const { slug, reelId } = await params;

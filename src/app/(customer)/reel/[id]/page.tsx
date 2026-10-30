@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ReelFeed } from "@/components/customer/reel-feed";
@@ -9,6 +10,8 @@ import { customerLocation } from "@/server/location";
 import { formatMoney } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
+// Black status bar above the full-screen video feed.
+export const viewport: Viewport = { themeColor: "#000000" };
 
 async function load(id: string) {
   const r = await prisma.reel.findFirst({ where: { ...publicReelWhere, id }, select: reelCardSelect });

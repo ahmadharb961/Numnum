@@ -250,7 +250,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
       {/* Sticky add bar */}
       <div
         className="fixed inset-x-0 z-40 mx-auto max-w-screen-sm border-t border-black/5 bg-white/95 px-4 pt-3 backdrop-blur"
-        style={navOffset ? { bottom: "calc(var(--nav-h) + var(--safe-bottom) - var(--vp-gap))", paddingBottom: 12 } : { bottom: "calc(0px - var(--vp-gap))", paddingBottom: "calc(var(--safe-bottom) + 12px)" }}
+        style={navOffset ? { bottom: "calc(var(--nav-h) + var(--safe-bottom))", paddingBottom: 12 } : { bottom: 0, paddingBottom: "calc(var(--safe-bottom) + 12px)" }}
       >
         {canOrder ? (
           <div className="flex items-center gap-3">

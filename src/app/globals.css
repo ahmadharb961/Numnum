@@ -8,9 +8,6 @@
   --nav-h: 64px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
-  /* iOS home-screen apps can lay out the page shorter than the screen (by the status bar
-     height); set at runtime by ViewportFix so bottom bars still reach the screen edge. */
-  --vp-gap: 0px;
   color-scheme: light;
 }
 
@@ -37,7 +34,7 @@ body {
     padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
   }
   .h-feed {
-    height: calc(100dvh + var(--vp-gap) - var(--nav-h) - var(--safe-bottom));
+    height: calc(100dvh - var(--nav-h) - var(--safe-bottom));
   }
   .card {
     @apply rounded-2xl bg-white shadow-[0_1px_2px_rgba(22,18,15,0.06),0_4px_16px_rgba(22,18,15,0.04)];
