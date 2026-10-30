@@ -71,9 +71,11 @@ You already have Stream from Hireel. Reuse the same **Account ID** and the same 
 
 It issues the monthly invoices on the 1st, sends payment reminders, auto-completes orders restaurants forgot to close, and finishes video processing.
 
-1. hPanel → **Advanced** → **Cron Jobs** → **Create**.
-2. Run it **every hour** (e.g. minute `7`).
-3. Command (replace the two values):
+1. hPanel → your numnum website → **Advanced** → **Cron Jobs**.
+2. Choose **Node.js**. In **Command to Run**, type `scripts/cron.js` (it already has your environment variables, so no secret goes in the command).
+3. Run it **every hour**: Minute `7`, Hour `*` (every hour), Day `*`, Month `*`, Weekday `*`. Save.
+
+If your plan only offers a custom command instead, use (replace the secret):
 
 ```bash
 curl -fsS -H "Authorization: Bearer YOUR_CRON_SECRET" https://yourdomain.com/api/cron
