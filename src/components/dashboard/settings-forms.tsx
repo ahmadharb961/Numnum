@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState, useRef, useState, useTransition } from "react";
-import { ImagePlus, LocateFixed, Plus, Trash2 } from "lucide-react";
+import { ImagePlus, Plus, Trash2 } from "lucide-react";
 import { saveHoursAction, saveOrderingAction, saveProfileAction } from "@/actions/restaurant";
 import type { FormState } from "@/actions/auth";
 import { uploadFile } from "./upload";
+import { MapPicker, type Pin } from "@/components/map-picker";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
@@ -56,8 +57,6 @@ function ImageField({ name, label, initial, aspect }: { name: string; label: str
 export function ProfileForm({ r }: { r: Record<string, string> }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveProfileAction, undefined);
   const fe = state?.fieldErrors ?? {};
-  const [lat, setLat] = useState(r.latitude);
-  const [lng, setLng] = useState(r.longitude);
   return (
     <form action={action} className="space-y-4">
       {state?.ok && <Alert tone="green">{state.message}</Alert>}
@@ -94,29 +93,9 @@ export function ProfileForm({ r }: { r: Record<string, string> }) {
       <Field label="Description">
         <textarea name="description" className="input" maxLength={600} defaultValue={r.description} />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
-        <Field label="Google Maps link" error={fe.mapsUrl}>
-          <input name="mapsUrl" className="input" defaultValue={r.mapsUrl} placeholder="https://maps.app.goo.gl/…" />
-        </Field>
-        <div className="flex items-end">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-12"
-            onClick={() =>
-              navigator.geolocation?.getCurrentPosition((p) => {
-                setLat(p.coords.latitude.toFixed(6));
-                setLng(p.coords.longitude.toFixed(6));
-              })
-            }
-          >
-            <LocateFixed className="h-4 w-4" /> Use current location
-          </Button>
-        </div>
-      </div>
-      <input type="hidden" name="latitude" value={lat} />
-      <input type="hidden" name="longitude" value={lng} />
-      {lat && <p className="text-xs text-ink-muted">Pinned at {lat}, {lng}</p>}
+      <Field label="Google Maps link (optional, shown on your profile)" error={fe.mapsUrl}>
+        <input name="mapsUrl" className="input" defaultValue={r.mapsUrl} placeholder="https://maps.app.goo.gl/…" />
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         {(["instagram", "facebook", "tiktok", "website"] as const).map((k) => (
           <Field key={k} label={k[0].toUpperCase() + k.slice(1)} error={fe[k]}>
@@ -131,9 +110,15 @@ export function ProfileForm({ r }: { r: Record<string, string> }) {
   );
 }
 
-export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPrepMinutes: string; deliveryEnabled: boolean; pickupEnabled: boolean; requireMapsLocation: boolean; deliveryFee: string; minOrder: string; currency: string; orderingEnabled: boolean; areas: string }; currencies: string[]; agreementAccepted: boolean }) {
+type ZoneRow = { maxKm: string; fee: string };
+
+export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPrepMinutes: string; deliveryEnabled: boolean; pickupEnabled: boolean; minOrder: string; currency: string; orderingEnabled: boolean; latitude: number | null; longitude: number | null; zones: ZoneRow[] }; currencies: string[]; agreementAccepted: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveOrderingAction, undefined);
   const fe = state?.fieldErrors ?? {};
+  const [pin, setPin] = useState<Pin | null>(r.latitude != null && r.longitude != null ? { lat: r.latitude, lng: r.longitude } : null);
+  const [zones, setZones] = useState<ZoneRow[]>(r.zones.length ? r.zones : [{ maxKm: "3", fee: "1.5" }, { maxKm: "6", fee: "2.5" }]);
+  const [delivery, setDelivery] = useState(r.deliveryEnabled);
+  const radius = Math.max(0, ...zones.map((z) => Number(z.maxKm) || 0));
   return (
     <form action={action} className="space-y-4">
       {state?.ok && <Alert tone="green">{state.message}</Alert>}
@@ -142,9 +127,12 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
         <input type="checkbox" name="orderingEnabled" defaultChecked={r.orderingEnabled} disabled={!agreementAccepted} className="h-5 w-5 accent-brand-500" />
         Accepting orders (turn off to pause ordering, e.g. when you&apos;re too busy)
       </label>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Average preparation time (minutes)" error={fe.avgPrepMinutes} hint="Suggested when you accept an order; customers see it at checkout">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Average preparation time (minutes)" error={fe.avgPrepMinutes} hint="Suggested when you accept an order">
           <input name="avgPrepMinutes" type="number" min={5} max={180} className="input" defaultValue={r.avgPrepMinutes} required />
+        </Field>
+        <Field label={`Minimum order (${r.currency}, optional)`} error={fe.minOrder}>
+          <input name="minOrder" className="input" inputMode="decimal" defaultValue={r.minOrder} />
         </Field>
         <Field label="Menu currency" error={fe.currency}>
           <select name="currency" className="input" defaultValue={r.currency}>
@@ -156,26 +144,47 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
       </div>
       <div className="flex flex-wrap gap-4 text-sm font-semibold">
         <label className="flex items-center gap-2">
-          <input type="checkbox" name="deliveryEnabled" defaultChecked={r.deliveryEnabled} className="h-5 w-5 accent-brand-500" /> Delivery
+          <input type="checkbox" name="deliveryEnabled" checked={delivery} onChange={(e) => setDelivery(e.target.checked)} className="h-5 w-5 accent-brand-500" /> Delivery
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" name="pickupEnabled" defaultChecked={r.pickupEnabled} className="h-5 w-5 accent-brand-500" /> Pickup
         </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="requireMapsLocation" defaultChecked={r.requireMapsLocation} className="h-5 w-5 accent-brand-500" /> Require Google Maps location for delivery
-        </label>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={`Delivery fee (${r.currency})`} error={fe.deliveryFee} hint="Shown to customers at checkout. Enter 0 for free delivery.">
-          <input name="deliveryFee" className="input" inputMode="decimal" defaultValue={r.deliveryFee} />
-        </Field>
-        <Field label={`Minimum order (${r.currency}, optional)`} error={fe.minOrder}>
-          <input name="minOrder" className="input" inputMode="decimal" defaultValue={r.minOrder} />
-        </Field>
+
+      <div>
+        <div className="label">Restaurant location {delivery && <span className="text-brand-600">(required for delivery)</span>}</div>
+        <MapPicker value={pin} onChange={setPin} radiusKm={delivery && radius ? radius : undefined} height={300} />
+        <input type="hidden" name="latitude" value={pin?.lat ?? ""} />
+        <input type="hidden" name="longitude" value={pin?.lng ?? ""} />
+        {fe.location && <p className="mt-1 text-xs font-medium text-red-600">{fe.location}</p>}
       </div>
-      <Field label="Delivery areas (optional, one per line with its fee)" hint="e.g. “Hamra: 2.00”. When areas are listed, you only deliver to them; areas without a fee use the delivery fee above.">
-        <textarea name="areas" className="input font-mono text-sm" rows={5} defaultValue={r.areas} placeholder={"Hamra: 2.00\nAchrafieh: 3.00\nVerdun"} />
-      </Field>
+
+      {delivery && (
+        <div>
+          <div className="label">Delivery zones</div>
+          <p className="mb-2 text-xs text-ink-muted">Distance is measured in a straight line from your pin. Customers farther than your last zone can&apos;t order delivery (they can still pick up).</p>
+          <div className="space-y-2">
+            {zones.map((z, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <span className="w-14 shrink-0 text-ink-muted">Up to</span>
+                <input className="input h-10 w-20 text-sm" inputMode="decimal" value={z.maxKm} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, maxKm: e.target.value } : x)))} aria-label="Distance in km" />
+                <span className="text-ink-muted">km →</span>
+                <input className="input h-10 w-24 text-sm" inputMode="decimal" value={z.fee} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, fee: e.target.value } : x)))} aria-label={`Fee in ${r.currency}`} />
+                <span className="text-ink-muted">{r.currency}</span>
+                <button type="button" onClick={() => setZones(zones.filter((_, j) => j !== i))} className="ml-auto grid h-9 w-9 place-items-center text-ink-muted" aria-label="Remove zone">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={() => setZones([...zones, { maxKm: String((Number(zones.at(-1)?.maxKm) || 0) + 3), fee: "" }])} className="mt-2 text-sm font-semibold text-brand-600">
+            + Add zone
+          </button>
+          {radius > 0 && <p className="mt-1 text-xs text-ink-muted">You deliver up to {radius} km (shown as the circle on the map).</p>}
+          {fe.zones && <p className="mt-1 text-xs font-medium text-red-600">{fe.zones}</p>}
+          <input type="hidden" name="zones" value={JSON.stringify(zones)} />
+        </div>
+      )}
       <Button type="submit" loading={pending}>
         Save ordering settings
       </Button>

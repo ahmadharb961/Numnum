@@ -5,6 +5,7 @@ import { prisma } from "@/server/db";
 import { getFeed, publicReelWhere, reelCardSelect, toPublicReel } from "@/server/feed";
 import { likedAndSaved } from "@/server/engagement";
 import { getSettings } from "@/server/settings";
+import { customerLocation } from "@/server/location";
 import { formatMoney } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,8 @@ export default async function ReelPage({ params }: { params: Promise<{ id: strin
   const id = (await params).id;
   const reel = await load(id);
   if (!reel) notFound();
-  const [feed, settings] = await Promise.all([getFeed({ cursor: 0, limit: 5, excludeIds: [id] }), getSettings()]);
+  const loc = await customerLocation();
+  const [feed, settings] = await Promise.all([getFeed({ cursor: 0, limit: 5, excludeIds: [id], location: loc }), getSettings()]);
   const all = [reel, ...feed.reels];
   const { liked, saved } = await likedAndSaved(all.map((r) => r.id));
   const jsonLd = {
@@ -49,7 +51,7 @@ export default async function ReelPage({ params }: { params: Promise<{ id: strin
       <h1 className="sr-only">
         {reel.item.name} at {reel.restaurant.name}
       </h1>
-      <ReelFeed initial={all.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id) }))} initialCursor={feed.nextCursor} excludeIds={[id]} minViewMs={settings.minViewMs} />
+      <ReelFeed locationLabel={loc?.label ?? null} initial={all.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id) }))} initialCursor={feed.nextCursor} excludeIds={[id]} minViewMs={settings.minViewMs} />
     </main>
   );
 }

@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LocateFixed, MapPin, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { MapPin, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { MapPicker } from "@/components/map-picker";
 import { deleteAddressAction, saveAddressAction, setDefaultAddressAction } from "@/actions/account";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Field } from "@/components/ui/misc";
@@ -37,7 +38,7 @@ export function AddressBook({ addresses }: { addresses: Addr[] }) {
               </div>
               <div className="text-ink-soft">{[a.area, a.address, a.building].filter(Boolean).join(", ")}</div>
               {a.notes && <div className="text-xs text-ink-muted">{a.notes}</div>}
-              {(a.latitude != null || a.mapsUrl) && <div className="text-xs text-emerald-700">📍 Map location saved</div>}
+              {a.latitude != null ? <div className="text-xs text-emerald-700">📍 Pinned on the map</div> : <div className="text-xs font-semibold text-amber-700">Add a map pin to use this address for delivery</div>}
             </div>
           </div>
           <div className="mt-3 flex gap-4 text-xs font-semibold">
@@ -84,7 +85,7 @@ function AddressForm({ initial, onSaved }: { initial: Addr; onSaved: () => void 
       onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);
-        const r = await saveAddressAction({ ...a, mapsUrl: a.latitude != null ? undefined : a.mapsUrl || undefined });
+        const r = await saveAddressAction({ ...a, mapsUrl: undefined });
         setBusy(false);
         if (!r.ok) return setError(r.error);
         toast("Address saved", "success");
@@ -114,16 +115,11 @@ function AddressForm({ initial, onSaved }: { initial: Addr; onSaved: () => void 
       <Field label="Notes for the driver">
         <input className="input" value={a.notes} onChange={(e) => setA({ ...a, notes: e.target.value })} />
       </Field>
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="shrink-0"
-          onClick={() => navigator.geolocation?.getCurrentPosition((p) => setA({ ...a, latitude: Number(p.coords.latitude.toFixed(6)), longitude: Number(p.coords.longitude.toFixed(6)), mapsUrl: "" }), () => toast("Couldn't get your location", "error"))}
-        >
-          <LocateFixed className="h-4 w-4" /> {a.latitude != null ? "Location pinned ✓" : "Pin my location"}
-        </Button>
-        {a.latitude == null && <input className="input" placeholder="or paste a Google Maps link" value={a.mapsUrl} onChange={(e) => setA({ ...a, mapsUrl: e.target.value })} />}
+      <div>
+        <div className="label">
+          Exact location <span className="text-brand-600">(required)</span>
+        </div>
+        <MapPicker value={a.latitude != null && a.longitude != null ? { lat: a.latitude, lng: a.longitude } : null} onChange={(p) => setA({ ...a, latitude: p.lat, longitude: p.lng })} autoLocate={a.latitude == null} height={240} />
       </div>
       <label className="flex items-center gap-2 text-sm font-semibold">
         <input type="checkbox" checked={a.isDefault} onChange={(e) => setA({ ...a, isDefault: e.target.checked })} className="h-5 w-5 accent-brand-500" /> Use as default address

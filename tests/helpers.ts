@@ -17,7 +17,9 @@ export async function makeRestaurant(overrides: Partial<{ name: string; currency
       businessName: overrides.name ?? `Burger House ${n}`,
       displayName: overrides.name ?? `Burger House ${n}`,
       phone: "96170123456",
-      deliveryFeeCents: overrides.currency === "LBP" ? 179000 : 200,
+      latitude: 33.8959,
+      longitude: 35.4787,
+      deliveryZones: overrides.currency === "LBP" ? [{ maxKm: 5, feeCents: 179000 }] : [{ maxKm: 3, feeCents: 200 }, { maxKm: 8, feeCents: 350 }],
       status: "ACTIVE",
       orderingEnabled: true,
       agreementAcceptedAt: new Date(),
@@ -49,6 +51,12 @@ export function orderPayload(f: Awaited<ReturnType<typeof makeRestaurant>>, key:
       { menuItemId: f.burger.id, quantity: 2, selections: { [f.extras.id]: [f.extras.options.find((o) => o.name === "Extra cheese")!.id], [f.sauce.id]: [f.sauce.options[0].id] } },
       { menuItemId: f.fries.id, quantity: 1, selections: {} },
     ],
-    customer: { name: "John Smith", phone: "70 123 456", address: "Beirut, Hamra, Main street", latitude: 33.8959, longitude: 35.4787 },
+    customer: { name: "John Smith", phone: "70 123 456", address: "Beirut, Hamra, Main street", latitude: 33.8995, longitude: 35.4807 },
   };
+}
+
+let u = 0;
+export async function makeCustomer() {
+  u++;
+  return prisma.user.create({ data: { email: `customer${u}-${Date.now()}@test.dev`, passwordHash: "x", name: `Customer ${u}`, roles: { create: { role: "CUSTOMER" } } } });
 }

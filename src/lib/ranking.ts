@@ -31,12 +31,12 @@ export type RankCandidate = {
   orderInits: number;
   featured: boolean;
   sponsored: boolean;
-  area?: string | null;
-  deliveryAreas?: string[];
+  /** true when the restaurant delivers to the viewer's chosen location, null when unknown */
+  deliversToViewer?: boolean | null;
   foodCategoryId?: string | null;
 };
 
-export type RankContext = { now?: Date; area?: string | null; preferredCategories?: string[] };
+export type RankContext = { now?: Date; preferredCategories?: string[] };
 
 export function scoreReel(c: RankCandidate, w: RankWeights, ctx: RankContext): number {
   const now = ctx.now ?? new Date();
@@ -46,11 +46,8 @@ export function scoreReel(c: RankCandidate, w: RankWeights, ctx: RankContext): n
   const interactions = c.likeCount + 2 * c.shareCount + 2 * c.saveCount + 4 * c.orderInits;
   const engagement = (interactions + 1) / (c.viewCount + 20);
   const engagementScore = Math.min(1, engagement * 4);
-  let proximity = 0;
-  if (ctx.area) {
-    const a = ctx.area.toLowerCase();
-    if (c.area?.toLowerCase() === a || c.deliveryAreas?.some((d) => d.toLowerCase() === a)) proximity = 1;
-  }
+  // Restaurants that can deliver to the viewer rank higher; ones that can't are pushed down.
+  const proximity = c.deliversToViewer === true ? 1 : c.deliversToViewer === false ? -1 : 0;
   const category = c.foodCategoryId && ctx.preferredCategories?.includes(c.foodCategoryId) ? 1 : 0;
   const featured = c.featured || c.sponsored ? 1 : 0;
   return w.recency * recency + w.engagement * engagementScore + w.proximity * proximity + w.category * category + w.featured * featured;

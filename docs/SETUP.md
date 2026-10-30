@@ -85,11 +85,12 @@ curl -fsS -H "Authorization: Bearer YOUR_CRON_SECRET" https://yourdomain.com/api
 2. **Admin → Settings → Whish Money / Whish Pay recipient**: enter the name, Whish number and instructions restaurants will pay to.
 3. Check **Commission** (14%, charged on completed orders; open orders auto-complete after 6 hours) and **Invoicing** (due days, reminders).
 4. Restaurants sign up at `https://yourdomain.com/business`. Approve them in **Admin → Restaurants**.
+5. Tell restaurants: on their phone, open `https://yourdomain.com/dashboard` in **Safari (iPhone)** or **Chrome (Android)**. The dashboard asks them to **add numnum to the home screen** and **allow notifications** — new orders then arrive as phone notifications. In **Settings → Online ordering**, they pin their restaurant on the map and set delivery zones (e.g. up to 3 km $1.50, up to 6 km $2.50).
 
 ## Part 8: Test on real phones
 
 1. **iPhone (Safari) and Android (Chrome):** open the site. Add it to the home screen (Share → Add to Home Screen on iPhone; the Install prompt on Android).
-2. As a restaurant (or a demo owner, e.g. `owner@burgerhouse.demo` / `demo1234` if you used `SEED_DEMO`): import a menu, upload photos, and record a reel with the phone camera. The reel shows "Processing" for about a minute, then goes live.
+2. As a restaurant: on your phone, add the dashboard to the home screen and allow notifications. Then (or as a demo owner, e.g. `owner@burgerhouse.demo` / `demo1234` if you used `SEED_DEMO`): import a menu, upload photos, and record a reel with the phone camera. The reel shows "Processing" for about a minute, then goes live.
 3. As a customer: watch the reel, order the dish, check out with **cash on delivery**, and keep the tracking page open.
 4. In the restaurant dashboard → **Orders**: tap **Turn on sound**, accept the new order with a time, then **Out for delivery** and **Delivered · cash collected**. The customer's page updates within ~15 seconds.
 
@@ -98,3 +99,7 @@ curl -fsS -H "Authorization: Bearer YOUR_CRON_SECRET" https://yourdomain.com/api
 - Demo restaurants have no reels on Hostinger, because demo videos are generated with ffmpeg, which Hostinger doesn't have. Upload a few real food videos from the dashboard.
 - To remove demo data later, use a fresh Neon database (or ask me for a cleanup script).
 - Photos are stored in Neon. Roughly 150 real menu photos take about 15–20 MB (they are resized to 1200 px WebP), so the free tier covers the first restaurants. Neon's paid plan is needed when you reach a few hundred restaurants.
+
+- Maps use OpenStreetMap tiles (no API key). For heavy traffic, switch to a commercial tile provider (e.g. MapTiler) in `src/components/map-picker.tsx`.
+- Delivery distance is a straight line from the restaurant pin, not road distance. Set zones a little generously for areas with winding roads.
+- Notification keys are created automatically on first use and stored in the database (like Hireel). Optional overrides: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`.

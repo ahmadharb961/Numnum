@@ -6,7 +6,6 @@ export async function getPublicRestaurant(slug: string) {
   const r = await prisma.restaurant.findFirst({
     where: { slug, status: "ACTIVE" },
     include: {
-      deliveryAreas: { orderBy: { name: "asc" } },
       menuCategories: { orderBy: { sortOrder: "asc" } },
       _count: { select: { menuItems: { where: { archived: false } }, reels: { where: { visibility: "PUBLISHED", status: "READY" } } } },
     },

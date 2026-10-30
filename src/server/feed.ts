@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { getSettings } from "./settings";
 import { rankReels } from "@/lib/ranking";
+import { quoteDelivery, type LatLng } from "@/lib/geo";
 
 export const reelCardSelect = {
   id: true,
@@ -16,7 +17,7 @@ export const reelCardSelect = {
   featured: true,
   publishedAt: true,
   restaurantId: true,
-  restaurant: { select: { id: true, slug: true, displayName: true, logoUrl: true, verificationStatus: true, area: true, city: true, orderingEnabled: true, status: true } },
+  restaurant: { select: { id: true, slug: true, displayName: true, logoUrl: true, verificationStatus: true, area: true, city: true, orderingEnabled: true, status: true, latitude: true, longitude: true, deliveryZones: true, deliveryEnabled: true } },
   menuItem: { select: { id: true, name: true, description: true, priceCents: true, currency: true, ratingAvg: true, ratingCount: true, available: true, archived: true, foodCategoryId: true } },
 } satisfies Prisma.ReelSelect;
 
@@ -33,13 +34,13 @@ export const publicReelWhere: Prisma.ReelWhereInput = {
  * Ranked, paginated feed. Ranks a recent candidate window (cheap and
  * configurable), then pages through the ranked list with an offset cursor.
  */
-export async function getFeed(opts: { cursor?: number; limit?: number; area?: string | null; categories?: string[]; excludeIds?: string[] }) {
+export async function getFeed(opts: { cursor?: number; limit?: number; location?: LatLng | null; categories?: string[]; excludeIds?: string[] }) {
   const settings = await getSettings();
   const limit = Math.min(opts.limit ?? 6, 12);
   const offset = opts.cursor ?? 0;
   const candidates = await prisma.reel.findMany({
     where: { ...publicReelWhere, id: opts.excludeIds?.length ? { notIn: opts.excludeIds } : undefined },
-    select: { ...reelCardSelect, saveCount: true, orderInits: true, restaurant: { select: { ...reelCardSelect.restaurant.select, deliveryAreas: { select: { name: true } } } } },
+    select: { ...reelCardSelect, saveCount: true, orderInits: true },
     orderBy: { publishedAt: "desc" },
     take: 400,
   });
@@ -47,22 +48,22 @@ export async function getFeed(opts: { cursor?: number; limit?: number; area?: st
     candidates.map((c) => ({
       ...c,
       publishedAt: c.publishedAt ?? new Date(0),
-      area: c.restaurant.area,
-      deliveryAreas: c.restaurant.deliveryAreas.map((d) => d.name),
+      deliversToViewer: opts.location ? c.restaurant.deliveryEnabled && quoteDelivery(c.restaurant, opts.location).deliverable : null,
       foodCategoryId: c.menuItem.foodCategoryId,
       sponsored: c.sponsored,
     })),
     settings.feedWeights,
-    { area: opts.area, preferredCategories: opts.categories },
+    { preferredCategories: opts.categories },
   );
   const page = ranked.slice(offset, offset + limit);
   return {
-    reels: page.map(toPublicReel),
+    reels: page.map((r) => toPublicReel(r, opts.location)),
     nextCursor: offset + limit < ranked.length ? offset + limit : null,
   };
 }
 
-export function toPublicReel(r: ReelCard) {
+export function toPublicReel(r: ReelCard, location?: LatLng | null) {
+  const q = location ? quoteDelivery(r.restaurant, location) : null;
   return {
     id: r.id,
     caption: r.caption,
@@ -80,6 +81,8 @@ export function toPublicReel(r: ReelCard) {
       verified: r.restaurant.verificationStatus === "APPROVED",
       location: [r.restaurant.area, r.restaurant.city].filter(Boolean).join(", "),
       orderingEnabled: r.restaurant.orderingEnabled,
+      distanceKm: q?.km ?? null,
+      deliversToYou: q ? r.restaurant.deliveryEnabled && q.deliverable : null,
     },
     item: {
       id: r.menuItem.id,

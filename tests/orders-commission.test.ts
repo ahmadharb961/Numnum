@@ -3,13 +3,14 @@ import { prisma } from "@/server/db";
 import { autoCompleteStaleOrders, canViewOrder, claimDeviceOrders, createOrder, customerCancelOrder, OrderError, restaurantOrderAction } from "@/server/orders";
 import { generateInvoice, reviewPayment, submitPayment, openDispute, resolveDispute, runMonthlyBilling } from "@/server/billing";
 import { DEFAULT_SETTINGS } from "@/server/settings";
-import { makeRestaurant, orderPayload, resetDb } from "./helpers";
+import { makeCustomer, makeRestaurant, orderPayload, resetDb } from "./helpers";
 
 const meta: { deviceKey: string | null; ipHash: string | null; userId: string | null } = { deviceKey: "device-aaaaaaaaaaaaaaaa", ipHash: null, userId: null };
 const key = (s: string) => `test-key-${s}-${"x".repeat(16)}`;
 
 beforeEach(async () => {
   await resetDb();
+  meta.userId = (await makeCustomer()).id; // ordering requires an account
 });
 
 async function place(f: Awaited<ReturnType<typeof makeRestaurant>>, k: string, m: Partial<typeof meta> = {}, patch: Record<string, unknown> = {}) {
@@ -35,15 +36,26 @@ describe("cash-on-delivery checkout", () => {
     await expect(place(f, "chg", {}, { changeFor: "10" })).rejects.toThrow(/check your order/);
   });
 
-  it("uses area fees and refuses areas the restaurant doesn't deliver to", async () => {
+  it("charges by distance zone and refuses addresses outside the delivery radius", async () => {
+    const f = await makeRestaurant(); // zones: ≤3 km $2.00, ≤8 km $3.50, pinned in Hamra
+    const p = orderPayload(f, key("z1"));
+    const near = await createOrder(p, meta); // ~0.4 km away
+    expect(near.totalCents).toBe(2200);
+    expect((await prisma.order.findUniqueOrThrow({ where: { reference: near.reference } })).distanceKm).toBeCloseTo(0.44, 1);
+    const achrafieh = await createOrder({ ...orderPayload(f, key("z2")), customer: { ...p.customer, phone: "71 222 333", latitude: 33.8869, longitude: 35.5197 } }, { ...meta, deviceKey: "dev-z2-aaaaaaaaaaaaaaa" });
+    expect(achrafieh.totalCents).toBe(2350); // ~4 km → second zone
+    const tripoli = createOrder({ ...orderPayload(f, key("z3")), customer: { ...p.customer, latitude: 34.4367, longitude: 35.8497 } }, meta);
+    await expect(tripoli).rejects.toMatchObject({ fieldErrors: { "customer.location": expect.stringMatching(/km away .* delivers up to 8 km/) } });
+    const noPin = createOrder({ ...orderPayload(f, key("z4")), customer: { ...p.customer, latitude: null, longitude: null } }, meta);
+    await expect(noPin).rejects.toMatchObject({ fieldErrors: { "customer.location": expect.stringMatching(/Pin your delivery location/) } });
+    // pickup ignores distance
+    const pickup = await createOrder({ ...orderPayload(f, key("z5")), fulfillment: "PICKUP", customer: { name: "Far Away", phone: "76 123 456" } }, { ...meta, deviceKey: "dev-z5-aaaaaaaaaaaaaaa" });
+    expect(pickup.totalCents).toBe(2000);
+  });
+
+  it("requires an account to order", async () => {
     const f = await makeRestaurant();
-    await prisma.restaurantDeliveryArea.createMany({ data: [{ restaurantId: f.restaurant.id, name: "Hamra", feeCents: 150 }, { restaurantId: f.restaurant.id, name: "Verdun", feeCents: null }] });
-    const p = orderPayload(f, key("area1"));
-    const hamra = await createOrder({ ...p, customer: { ...p.customer, area: "Hamra" } }, meta);
-    expect(hamra.totalCents).toBe(2150);
-    const verdun = await createOrder({ ...orderPayload(f, key("area2")), customer: { ...p.customer, area: "Verdun" } }, { ...meta, deviceKey: "dev-verdun-aaaaaaaaaaaa" });
-    expect(verdun.totalCents).toBe(2200); // falls back to default fee
-    await expect(createOrder({ ...orderPayload(f, key("area3")), customer: { ...p.customer, area: "Jounieh" } }, meta)).rejects.toThrow(/check your order/);
+    await expect(createOrder(orderPayload(f, key("anon")), { ...meta, userId: null })).rejects.toThrow(/log in/);
   });
 
   it("refuses orders while the restaurant is closed or paused", async () => {
@@ -76,7 +88,7 @@ describe("cash-on-delivery checkout", () => {
 
   it("saves the address for logged-in customers and reuses it by id", async () => {
     const f = await makeRestaurant();
-    const user = await prisma.user.create({ data: { email: "c@test.dev", passwordHash: "x", name: "Rana" } });
+    const user = await makeCustomer();
     const p = orderPayload(f, key("u1"));
     await createOrder({ ...p, customer: { ...p.customer, saveAddress: true, addressLabel: "Home" } }, { ...meta, userId: user.id });
     const addr = await prisma.customerAddress.findFirstOrThrow({ where: { userId: user.id } });
@@ -86,26 +98,28 @@ describe("cash-on-delivery checkout", () => {
     const o2 = await createOrder({ ...p2, customer: { name: "Rana", phone: "70123456", addressId: addr.id } }, { ...meta, userId: user.id, deviceKey: "dev2-aaaaaaaaaaaaaaaa" });
     expect((await prisma.order.findUniqueOrThrow({ where: { reference: o2.reference } })).address).toBe("Beirut, Hamra, Main street");
     // someone else's address id is refused
-    const other = await prisma.user.create({ data: { email: "o@test.dev", passwordHash: "x", name: "Other" } });
+    const other = await makeCustomer();
     await expect(createOrder({ ...orderPayload(f, key("u3")), customer: { name: "X Y", phone: "70123456", addressId: addr.id } }, { ...meta, userId: other.id })).rejects.toThrow(/not found/);
   });
 
-  it("lets guests track by device or token, and claims their orders on sign-in", async () => {
+  it("shows an order to its owner, the same device or the tracking link only", async () => {
     const f = await makeRestaurant();
     const { order } = await place(f, "g");
+    expect(canViewOrder(order, { userId: meta.userId, deviceKey: null })).toBe(true);
     expect(canViewOrder(order, { userId: null, deviceKey: meta.deviceKey })).toBe(true);
-    expect(canViewOrder(order, { userId: null, deviceKey: "other-device-aaaaaaa" })).toBe(false);
+    expect(canViewOrder(order, { userId: "someone-else", deviceKey: "other-device-aaaaaaa" })).toBe(false);
     expect(canViewOrder(order, { userId: null, deviceKey: null, token: order.trackingToken })).toBe(true);
-    const user = await prisma.user.create({ data: { email: "g@test.dev", passwordHash: "x", name: "Guest" } });
+    // legacy guest orders on a device are attached when that person signs in
+    await prisma.order.update({ where: { id: order.id }, data: { userId: null } });
+    const user = await makeCustomer();
     expect(await claimDeviceOrders(user.id, meta.deviceKey)).toBe(1);
-    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).userId).toBe(user.id);
   });
 });
 
 describe("order lifecycle", () => {
   it("moves through accepted → preparing → out for delivery → completed with notifications", async () => {
     const f = await makeRestaurant();
-    const user = await prisma.user.create({ data: { email: "l@test.dev", passwordHash: "x", name: "L" } });
+    const user = await makeCustomer();
     const { order } = await place(f, "life", { userId: user.id });
     await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT", { etaMinutes: 30 });
     await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "PREPARING");

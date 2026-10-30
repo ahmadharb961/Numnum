@@ -11,6 +11,7 @@ import { notifyAdmins } from "@/server/notifications";
 import { normalizePhone } from "@/lib/phone";
 import { parseAmount } from "@/lib/money";
 import { DAYS, isValidTime, type OpeningHours } from "@/lib/hours";
+import { isValidLatLng, MAX_ZONE_KM, normalizeZones, type DeliveryZone } from "@/lib/geo";
 import { uniqueSlug } from "@/server/restaurants";
 import type { FormState } from "./auth";
 import type { ActionResult } from "./menu";
@@ -26,8 +27,6 @@ const profileSchema = z.object({
   area: z.string().trim().max(80).optional(),
   city: z.string().trim().max(80).optional(),
   mapsUrl: z.string().trim().url().optional().or(z.literal("")),
-  latitude: z.string().optional(),
-  longitude: z.string().optional(),
   instagram: z.string().trim().url().optional().or(z.literal("")),
   facebook: z.string().trim().url().optional().or(z.literal("")),
   tiktok: z.string().trim().url().optional().or(z.literal("")),
@@ -47,8 +46,6 @@ export async function saveProfileAction(_: FormState, form: FormData): Promise<F
     if (!p.ok) return { fieldErrors: { phone: p.error } };
     phone = p.e164;
   }
-  const lat = d.latitude ? Number(d.latitude) : null;
-  const lng = d.longitude ? Number(d.longitude) : null;
   // only accept media URLs that belong to this restaurant
   const media = async (url?: string) => (url ? ((await prisma.mediaAsset.findFirst({ where: { restaurantId: ctx.restaurant.id, url } })) ? url : undefined) : undefined);
   const slugChanged = d.displayName !== ctx.restaurant.displayName && ctx.restaurant.status === "DRAFT";
@@ -66,8 +63,6 @@ export async function saveProfileAction(_: FormState, form: FormData): Promise<F
       area: d.area || null,
       city: d.city || null,
       mapsUrl: d.mapsUrl || null,
-      latitude: lat !== null && Number.isFinite(lat) && Math.abs(lat) <= 90 ? lat : null,
-      longitude: lng !== null && Number.isFinite(lng) && Math.abs(lng) <= 180 ? lng : null,
       socialLinks: { instagram: d.instagram || undefined, facebook: d.facebook || undefined, tiktok: d.tiktok || undefined, website: d.website || undefined },
       logoUrl: (await media(d.logoUrl)) ?? undefined,
       coverUrl: (await media(d.coverUrl)) ?? undefined,
@@ -80,9 +75,6 @@ export async function saveProfileAction(_: FormState, form: FormData): Promise<F
 export async function saveOrderingAction(_: FormState, form: FormData): Promise<FormState> {
   const ctx = await requireRestaurant("OWNER");
   const r = ctx.restaurant;
-  const fee = String(form.get("deliveryFee") || "").trim();
-  const feeCents = fee ? parseAmount(fee, r.currency) : null;
-  if (fee && (feeCents === null || feeCents < 0)) return { fieldErrors: { deliveryFee: "Enter a valid fee (0 for free delivery)" } };
   const min = String(form.get("minOrder") || "").trim();
   const minCents = min ? parseAmount(min, r.currency) : null;
   if (min && (minCents === null || minCents < 0)) return { fieldErrors: { minOrder: "Enter a valid amount or leave empty" } };
@@ -96,28 +88,42 @@ export async function saveOrderingAction(_: FormState, form: FormData): Promise<
   if (!settings.supportedCurrencies.includes(currency)) return { fieldErrors: { currency: "Unsupported currency" } };
   if (currency !== r.currency && (await prisma.menuItem.count({ where: { restaurantId: r.id } }))) return { fieldErrors: { currency: "Menu currency can't be changed after items are added" } };
 
-  const areas = String(form.get("areas") || "")
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, 100)
-    .map((l) => {
-      const [name, f] = l.split(/[:|,]\s*/);
-      const c = f ? parseAmount(f, currency) : null;
-      return { name: name.slice(0, 80), feeCents: c !== null && c >= 0 ? c : null };
-    });
-  // Customers see the full price at checkout, so every delivery order needs a known fee.
-  if (deliveryEnabled && feeCents == null && (!areas.length || areas.some((a) => a.feeCents == null))) {
-    return { fieldErrors: { deliveryFee: "Set a default delivery fee (0 for free), or a fee for every delivery area" } };
+  // Restaurant pin + delivery zones by distance.
+  const lat = Number(form.get("latitude"));
+  const lng = Number(form.get("longitude"));
+  const hasPin = isValidLatLng(lat, lng);
+  let zonesIn: { maxKm: string; fee: string }[] = [];
+  try {
+    zonesIn = JSON.parse(String(form.get("zones") || "[]"));
+  } catch {}
+  const zones: DeliveryZone[] = [];
+  for (const z of zonesIn) {
+    if (!String(z.maxKm).trim() && !String(z.fee).trim()) continue;
+    const km = Number(z.maxKm);
+    const fee = parseAmount(String(z.fee || "0"), currency);
+    if (!Number.isFinite(km) || km <= 0 || km > MAX_ZONE_KM) return { fieldErrors: { zones: `Distances must be between 0.1 and ${MAX_ZONE_KM} km` } };
+    if (fee === null || fee < 0) return { fieldErrors: { zones: "Enter a valid fee for each zone (0 for free)" } };
+    zones.push({ maxKm: Math.round(km * 10) / 10, feeCents: fee });
   }
-  await prisma.$transaction([
-    prisma.restaurant.update({
-      where: { id: r.id },
-      data: { deliveryEnabled, pickupEnabled, requireMapsLocation: form.get("requireMapsLocation") === "on", deliveryFeeCents: feeCents, minOrderCents: minCents, avgPrepMinutes: prep, currency, orderingEnabled: r.agreementAcceptedAt ? form.get("orderingEnabled") === "on" : false },
-    }),
-    prisma.restaurantDeliveryArea.deleteMany({ where: { restaurantId: r.id } }),
-    prisma.restaurantDeliveryArea.createMany({ data: areas.map((a) => ({ ...a, restaurantId: r.id })) }),
-  ]);
+  const sorted = normalizeZones(zones);
+  if (new Set(sorted.map((z) => z.maxKm)).size !== sorted.length) return { fieldErrors: { zones: "Each zone needs a different distance" } };
+  if (deliveryEnabled && !hasPin) return { fieldErrors: { location: "Pin your restaurant on the map — delivery distance is measured from it" } };
+  if (deliveryEnabled && !sorted.length) return { fieldErrors: { zones: "Add at least one delivery zone (e.g. up to 5 km)" } };
+
+  await prisma.restaurant.update({
+    where: { id: r.id },
+    data: {
+      deliveryEnabled,
+      pickupEnabled,
+      deliveryZones: sorted,
+      latitude: hasPin ? lat : r.latitude,
+      longitude: hasPin ? lng : r.longitude,
+      minOrderCents: minCents,
+      avgPrepMinutes: prep,
+      currency,
+      orderingEnabled: r.agreementAcceptedAt ? form.get("orderingEnabled") === "on" : false,
+    },
+  });
   revalidatePath("/dashboard/settings");
   return { ok: true, message: "Ordering settings saved" };
 }

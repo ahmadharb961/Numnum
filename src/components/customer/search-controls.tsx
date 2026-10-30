@@ -6,10 +6,11 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { LocationChip } from "./location-picker";
 
 type Facets = { categories: { slug: string; name: string; emoji: string | null }[]; areas: string[]; cuisines: string[] };
 
-export function SearchControls({ facets }: { facets: Facets }) {
+export function SearchControls({ facets, locationLabel }: { facets: Facets; locationLabel: string | null }) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -41,6 +42,9 @@ export function SearchControls({ facets }: { facets: Facets }) {
   return (
     <div className="sticky top-0 z-30 bg-cream/95 pb-2 backdrop-blur-xl" style={{ paddingTop: "calc(var(--safe-top) + 10px)" }}>
       <div className="container-app">
+        <div className="mb-2">
+          <LocationChip label={locationLabel} />
+        </div>
         <div className="flex gap-2">
           <label className="relative flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-muted" />
@@ -120,7 +124,7 @@ function FilterSheet({ open, onClose, facets, current, apply }: { open: boolean;
         </div>
         <div className="flex flex-wrap gap-2">
           {[
-            ["delivery", "Delivery"],
+            ["delivery", "Delivers to me"],
             ["pickup", "Pickup"],
             ["verified", "Verified restaurants"],
             ["available", "Available now"],

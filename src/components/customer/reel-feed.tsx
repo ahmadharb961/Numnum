@@ -12,6 +12,8 @@ import { useToast } from "@/components/ui/toast";
 import { ItemSheet } from "./item-sheet";
 import { api, track } from "./track";
 import { HlsVideo } from "@/components/hls-video";
+import { LocationChip } from "./location-picker";
+import { formatKm } from "@/lib/geo";
 
 export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean };
 
@@ -24,9 +26,10 @@ type Props = {
   startIndex?: number;
   excludeIds?: string[];
   backHref?: string;
+  locationLabel?: string | null;
 };
 
-export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref }: Props) {
+export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref, locationLabel = null }: Props) {
   const router = useRouter();
   const [reels, setReels] = useState<FeedReel[]>(initial);
   const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
@@ -142,8 +145,11 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
         </button>
       )}
       {!fixed && !backHref && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-center bg-gradient-to-b from-black/50 to-transparent pb-8" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-3 pb-8" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
           <span className="text-lg font-black tracking-tight">numnum</span>
+          <span className="pointer-events-auto min-w-0">
+            <LocationChip label={locationLabel} dark />
+          </span>
         </div>
       )}
       <button onClick={() => setMuted((m) => !m)} className="absolute right-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={muted ? "Unmute" : "Mute"}>
@@ -385,6 +391,8 @@ function ReelSlide({
           <div className="mt-0.5 flex items-center gap-1 text-xs text-white/80 text-shadow">
             <MapPin className="h-3.5 w-3.5" />
             {reel.restaurant.location}
+            {reel.restaurant.distanceKm != null && <span>· {formatKm(reel.restaurant.distanceKm)}</span>}
+            {reel.restaurant.deliversToYou === false && <span className="rounded bg-white/20 px-1.5 text-[10px] font-bold uppercase">Pickup only</span>}
           </div>
         )}
         <button onClick={onOpen} className="mt-2 block text-left">

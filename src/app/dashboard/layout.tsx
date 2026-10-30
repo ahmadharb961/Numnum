@@ -5,8 +5,14 @@ import { DashboardNav } from "@/components/dashboard/nav";
 import { Alert } from "@/components/ui/misc";
 import Link from "next/link";
 import { NewOrderAlert } from "@/components/dashboard/new-order-alert";
+import { InstallGate } from "@/components/dashboard/install-gate";
 
-export const metadata: Metadata = { title: { default: "Dashboard", template: "%s · numnum for restaurants" }, robots: { index: false } };
+export const metadata: Metadata = {
+  title: { default: "Dashboard", template: "%s · numnum for restaurants" },
+  robots: { index: false },
+  manifest: "/manifest-business.webmanifest",
+  appleWebApp: { capable: true, title: "numnum Orders", statusBarStyle: "default" },
+};
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireRestaurant();
@@ -17,6 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ]);
   return (
     <div className="min-h-dvh bg-cream">
+      <InstallGate>
       <DashboardNav restaurantName={r.displayName} slug={r.slug} role={ctx.staffRole} memberships={ctx.memberships} currentId={r.id} unread={unread} pendingOrders={pendingOrders} />
       <div className="lg:pl-64">
         <div className="flex justify-end px-4 pt-3 lg:px-8">
@@ -36,6 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         )}
         {children}
       </div>
+      </InstallGate>
     </div>
   );
 }

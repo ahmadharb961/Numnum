@@ -2,9 +2,9 @@
 
 Video-first food discovery and delivery ordering for Lebanon — a mobile-first web app (installable PWA), not a native app. Payment is **cash on delivery** only.
 
-**Customer flow:** watch food reels → open the dish → customize → add to cart → checkout as a guest or logged in (saved addresses) → delivery or pickup → cash on delivery → place order → live tracking. Accounts are optional and add order history, saved addresses, saved items and reorder.
+**Customer flow:** browse reels and menus freely → open the dish → customize → add to cart → log in (required to order) → delivery or pickup → pick a saved address or pin a new one on the map → distance-based delivery fee → cash on delivery → place order → live tracking → rating popup after delivery. Accounts add order history, saved addresses, saved items and reorder.
 
-**Restaurant flow:** register → import menu (CSV) → upload photos (ZIP / bulk, matched by SKU) → upload reels linked to dishes → receive orders with a sound alert → accept with an ETA → preparing → out for delivery / ready → completed (cash collected) → review the monthly commission invoice → pay via Whish → upload proof.
+**Restaurant flow:** register → add the dashboard to the phone's home screen and allow notifications (required on phones) → pin the restaurant and set delivery zones by distance → import menu (CSV) → upload photos (ZIP / bulk, matched by SKU) → upload reels linked to dishes → receive orders with a sound alert → accept with an ETA → preparing → out for delivery / ready → completed (cash collected) → review the monthly commission invoice → pay via Whish → upload proof.
 
 **Admin:** restaurant approval and verification, moderation, commission ledger, monthly invoicing, Whish payment reconciliation, disputes, adjustments, global settings, audit log.
 
@@ -28,6 +28,8 @@ Video-first food discovery and delivery ordering for Lebanon — a mobile-first 
 | Prices never trusted from the browser | `src/server/orders.ts` → `priceCart()` re-prices from DB and re-validates customizations (`src/lib/customization.ts`, shared with the UI) |
 | Immutable financial snapshots | `orders`, `order_items`, `order_item_customizations` store names/prices at order time; commission events store base, rate and amount |
 | Money is integer minor units | `src/lib/money.ts` (`calcCommission` = base × bps / 10000, half-up to the cent). LBP menus use an explicit admin-set exchange rate stored on each order |
+| Delivery range | Restaurants pin their location and define zones by straight-line distance (`src/lib/geo.ts`: up to N km → fee). Customers' delivery addresses must be pinned (GPS or draggable OpenStreetMap pin); orders beyond the last zone are refused server-side. Restaurant pages, lists and the feed show distance and "delivers to you" from the chosen location (`nn_loc` cookie) |
+| Order notifications | Web Push (VAPID keys auto-created in the DB, `src/server/push.ts`); on phones the dashboard requires the home-screen app + notifications (`install-gate.tsx`), plus an in-page sound alert |
 | Order lifecycle | `PLACED` → `ACCEPTED` (ETA) → `PREPARING` → `OUT_FOR_DELIVERY` / `READY_FOR_PICKUP` → `COMPLETED`; exits `REJECTED` (restaurant, with reason), `CANCELED` (customer before acceptance, or admin), `FAILED` (not delivered). See `src/server/orders.ts` |
 | Billable event (default: completed orders) | `src/server/commission.ts` → `ensureCommission()`; Admin → Settings can switch to accepted orders. Accepted orders left open are auto-completed after N hours (`autoCompleteStaleOrders`, run by `/api/cron`) |
 | Exactly one commission per order | Unique index on `commission_events.orderId` + `INSERT … ON CONFLICT DO NOTHING`; orders use an idempotency key, so repeated taps or refreshes return the same order |

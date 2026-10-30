@@ -1,8 +1,41 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { MapPin, Receipt, ShieldCheck } from "lucide-react";
+import { getCurrentUser } from "@/server/auth";
 import { Checkout } from "@/components/customer/checkout";
+import { PageHeader } from "@/components/customer/page-header";
+import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Checkout", robots: { index: false } };
+export const dynamic = "force-dynamic";
 
-export default function CheckoutPage() {
-  return <Checkout mapsKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""} />;
+/** Browsing is open to everyone; placing an order needs an account (location, contact, history). */
+export default async function CheckoutPage() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return (
+      <main className="pb-nav">
+        <PageHeader title="Checkout" />
+        <div className="container-app pt-8 text-center">
+          <div className="text-5xl">🛵</div>
+          <h1 className="mt-3 text-2xl font-black tracking-tight">Log in to place your order</h1>
+          <p className="mx-auto mt-2 max-w-sm text-ink-muted">Your cart is saved. An account lets the restaurant reach you and deliver to your exact location.</p>
+          <ul className="mx-auto mt-6 max-w-sm space-y-3 text-left text-sm">
+            <li className="flex gap-3"><MapPin className="h-5 w-5 shrink-0 text-brand-500" /> Saved addresses pinned on the map — checkout in seconds</li>
+            <li className="flex gap-3"><Receipt className="h-5 w-5 shrink-0 text-brand-500" /> Live order tracking and order history</li>
+            <li className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0 text-brand-500" /> Cash on delivery — no card needed</li>
+          </ul>
+          <div className="mx-auto mt-8 grid max-w-sm gap-3">
+            <Link href="/account/register?next=/checkout" className={buttonClass("primary", "lg")}>
+              Create an account
+            </Link>
+            <Link href="/login?next=/checkout" className={buttonClass("outline", "lg")}>
+              I already have an account
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+  return <Checkout />;
 }

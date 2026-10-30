@@ -12,6 +12,11 @@ import { formatPhone } from "@/lib/phone";
 import { compactNumber, formatDate } from "@/lib/utils";
 import { evidenceLabel } from "@/server/reviews";
 import { ReportButton } from "@/components/customer/report-button";
+import { customerLocation } from "@/server/location";
+import { formatKm, normalizeZones, quoteDelivery } from "@/lib/geo";
+import { formatMoney } from "@/lib/money";
+import { LocationChip } from "@/components/customer/location-picker";
+import { RestaurantViewTracker } from "@/components/customer/item-view-tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +39,8 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
   const { restaurant: r, sections, reels, reviews, subRatings } = data;
   const key = await ownerKey();
   const saved = key ? !!(await prisma.savedItem.findUnique({ where: { ownerKey_type_refId: { ownerKey: key, type: "RESTAURANT", refId: r.id } } })) : false;
+  const loc = await customerLocation();
+  const dq = loc ? quoteDelivery(r, loc) : null;
   const hours = (r.openingHours ?? {}) as OpeningHours;
   const open = isOpenAt(hours);
   const social = (r.socialLinks ?? {}) as Record<string, string>;
@@ -54,6 +61,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
   return (
     <main className="pb-nav">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <RestaurantViewTracker restaurantId={r.id} />
       <div className="relative h-44 bg-gradient-to-br from-brand-200 to-brand-400 sm:h-56">
         {r.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -112,6 +120,17 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           ))}
         </div>
 
+        {r.deliveryEnabled && (
+          <div className={`mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-3 text-sm ${dq?.deliverable ? "bg-emerald-50 text-emerald-900" : dq ? "bg-amber-50 text-amber-900" : "bg-white"}`}>
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <Bike className="h-4 w-4" />
+              {!dq && "Set your location to check delivery"}
+              {dq?.deliverable && `Delivers to ${loc!.label} · ${formatKm(dq.km)} · ${dq.feeCents ? formatMoney(dq.feeCents, r.currency) : "free delivery"}`}
+              {dq && !dq.deliverable && (dq.reason === "out_of_range" ? `${formatKm(dq.km!)} away — delivers up to ${formatKm(dq.maxKm)}${r.pickupEnabled ? " · pickup available" : ""}` : "Delivery not set up yet")}
+            </span>
+            <LocationChip label={loc?.label ?? null} className="bg-white/80" />
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge tone={r.deliveryEnabled ? "brand" : "gray"}>
             <Bike className="h-3.5 w-3.5" /> {r.deliveryEnabled ? "Delivery" : "No delivery"}
@@ -143,7 +162,11 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
               </table>
             )}
             {r.address && <p>{r.address}</p>}
-            {r.deliveryAreas.length > 0 && <p className="text-ink-muted">Delivers to: {r.deliveryAreas.map((a) => a.name).join(", ")}</p>}
+            {r.deliveryEnabled && normalizeZones(r.deliveryZones).length > 0 && (
+              <p className="text-ink-muted">
+                Delivery: {normalizeZones(r.deliveryZones).map((z) => `up to ${formatKm(z.maxKm)} ${z.feeCents ? formatMoney(z.feeCents, r.currency) : "free"}`).join(" · ")}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               {mapsHref && (
                 <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="chip">

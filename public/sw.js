@@ -3,7 +3,7 @@
 // - images/posters: stale-while-revalidate (bounded)
 // - pages: network-first with offline fallback
 // - API, uploads and videos: never cached (videos use HTTP range requests)
-const VERSION = "nn-v1";
+const VERSION = "nn-v2";
 const STATIC = `${VERSION}-static`;
 const IMAGES = `${VERSION}-images`;
 const PAGES = `${VERSION}-pages`;
@@ -51,4 +51,41 @@ self.addEventListener("fetch", (e) => {
         .catch(async () => (await caches.match(req)) || (await caches.match(OFFLINE_URL))),
     );
   }
+});
+
+// ───── Push notifications (new orders for restaurants) ─────
+self.addEventListener("push", (event) => {
+  let d = {};
+  try {
+    d = event.data ? event.data.json() : {};
+  } catch {
+    d = { title: "numnum", body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(d.title || "numnum", {
+      body: d.body || "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      tag: d.tag || undefined,
+      renotify: !!d.tag,
+      requireInteraction: (d.tag || "").startsWith("order-"),
+      vibrate: [200, 100, 200, 100, 200],
+      data: { url: d.url || "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const win = list.find((c) => c.url.startsWith(self.location.origin));
+      if (!win) return self.clients.openWindow(url);
+      const focused = await win.focus().catch(() => win);
+      if ("navigate" in focused) return focused.navigate(url).catch(() => self.clients.openWindow(url));
+      return self.clients.openWindow(url);
+    })(),
+  );
 });

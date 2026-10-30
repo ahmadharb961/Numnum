@@ -19,6 +19,8 @@ export type SearchParams = {
   minRating?: number; // restaurant rating
   minItemRating?: number;
   page?: number;
+  /** restaurant ids that deliver to the viewer (set when "Delivers to me" is on) */
+  nearIds?: string[];
 };
 
 export function parseSearchParams(sp: Record<string, string | string[] | undefined>): SearchParams {
@@ -50,7 +52,8 @@ export function parseSearchParams(sp: Record<string, string | string[] | undefin
 function restaurantWhere(p: SearchParams): Prisma.RestaurantWhereInput {
   const and: Prisma.RestaurantWhereInput[] = [{ status: "ACTIVE" }];
   if (p.cuisine) and.push({ cuisine: { contains: p.cuisine, mode: "insensitive" } });
-  if (p.area) and.push({ OR: [{ area: { contains: p.area, mode: "insensitive" } }, { city: { contains: p.area, mode: "insensitive" } }, { deliveryAreas: { some: { name: { contains: p.area, mode: "insensitive" } } } }] });
+  if (p.area) and.push({ OR: [{ area: { contains: p.area, mode: "insensitive" } }, { city: { contains: p.area, mode: "insensitive" } }] });
+  if (p.nearIds) and.push({ id: { in: p.nearIds } });
   if (p.delivery) and.push({ deliveryEnabled: true });
   if (p.pickup) and.push({ pickupEnabled: true });
   if (p.verified) and.push({ verificationStatus: "APPROVED" });
@@ -109,7 +112,7 @@ export async function searchReels(p: SearchParams) {
     skip: ((p.page ?? 1) - 1) * PAGE,
     take: PAGE,
   });
-  return reels.map(toPublicReel);
+  return reels.map((r) => toPublicReel(r));
 }
 
 export async function searchRestaurants(p: SearchParams) {
@@ -128,7 +131,7 @@ export async function searchRestaurants(p: SearchParams) {
   if (p.category) (where.AND as Prisma.RestaurantWhereInput[]).push({ menuItems: { some: { archived: false, foodCategory: { slug: p.category } } } });
   return prisma.restaurant.findMany({
     where,
-    select: { id: true, slug: true, displayName: true, logoUrl: true, coverUrl: true, cuisine: true, area: true, city: true, verificationStatus: true, ratingAvg: true, ratingCount: true, deliveryEnabled: true, pickupEnabled: true, openingHours: true, _count: { select: { menuItems: { where: { archived: false } } } } },
+    select: { id: true, slug: true, displayName: true, logoUrl: true, coverUrl: true, cuisine: true, area: true, city: true, verificationStatus: true, ratingAvg: true, ratingCount: true, deliveryEnabled: true, pickupEnabled: true, openingHours: true, latitude: true, longitude: true, deliveryZones: true, _count: { select: { menuItems: { where: { archived: false } } } } },
     orderBy: [{ verificationStatus: "asc" }, { ratingCount: "desc" }, { totalReelViews: "desc" }],
     skip: ((p.page ?? 1) - 1) * PAGE,
     take: PAGE,
@@ -142,4 +145,11 @@ export async function facets() {
     prisma.restaurant.findMany({ where: { status: "ACTIVE", cuisine: { not: null } }, select: { cuisine: true }, distinct: ["cuisine"], orderBy: { cuisine: "asc" } }),
   ]);
   return { categories, areas: areas.map((a) => a.area!).filter(Boolean), cuisines: cuisines.map((c) => c.cuisine!).filter(Boolean) };
+}
+
+/** Ids of active restaurants that deliver to a location. */
+export async function restaurantsDeliveringTo(loc: { lat: number; lng: number }) {
+  const { quoteDelivery } = await import("@/lib/geo");
+  const rs = await prisma.restaurant.findMany({ where: { status: "ACTIVE", deliveryEnabled: true, latitude: { not: null } }, select: { id: true, latitude: true, longitude: true, deliveryZones: true } });
+  return rs.filter((r) => quoteDelivery(r, loc).deliverable).map((r) => r.id);
 }

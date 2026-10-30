@@ -13,6 +13,8 @@ import { normalizePhone } from "@/lib/phone";
 import { formatMoney, parseAmount, toUsdCents } from "@/lib/money";
 import { isOpenAt, type OpeningHours } from "@/lib/hours";
 import { STATUS_META, type OrderStatusKey } from "@/lib/order-status";
+import { formatKm, isValidLatLng, quoteDelivery } from "@/lib/geo";
+import { pushToRestaurantStaff } from "./push";
 
 export class OrderError extends Error {
   status = 400;
@@ -139,19 +141,14 @@ export async function priceCart(restaurantId: string, items: OrderInput["items"]
   return { lines, subtotalCents, fieldErrors, currency: menuItems[0]?.currency ?? "USD" };
 }
 
-/** Delivery fee for an area: area-specific fee, else the restaurant default. null = delivery not available there. */
-export function deliveryFeeFor(r: { deliveryFeeCents: number | null; deliveryAreas: { name: string; feeCents: number | null }[] }, area: string | null | undefined): number | null {
-  if (r.deliveryAreas.length) {
-    const a = area ? r.deliveryAreas.find((x) => x.name.toLowerCase() === area.toLowerCase()) : null;
-    if (!a) return null;
-    return a.feeCents ?? r.deliveryFeeCents;
-  }
-  return r.deliveryFeeCents;
-}
-
 export type CreatedOrder = { reference: string; trackingToken: string; totalCents: number; currency: string; duplicate: boolean };
 
 export async function createOrder(raw: unknown, meta: { deviceKey: string | null; ipHash: string | null; userId: string | null }): Promise<CreatedOrder> {
+  if (!meta.userId) {
+    const e = new OrderError("Please log in to place your order");
+    e.status = 401;
+    throw e;
+  }
   const parsed = orderInputSchema.safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -168,7 +165,7 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   }
 
   const settings = await getSettings();
-  const restaurant = await prisma.restaurant.findUnique({ where: { id: input.restaurantId }, include: { deliveryAreas: true } });
+  const restaurant = await prisma.restaurant.findUnique({ where: { id: input.restaurantId } });
   if (!restaurant || restaurant.status !== "ACTIVE") throw new OrderError("This restaurant is not accepting orders right now");
   if (!restaurant.orderingEnabled || !restaurant.agreementAcceptedAt) throw new OrderError("This restaurant isn't taking online orders right now");
   if (isOpenAt(restaurant.openingHours as OpeningHours) === false) throw new OrderError(`${restaurant.displayName} is closed right now`);
@@ -190,12 +187,19 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   const mapsUrl = normalizeMapsUrl(c.mapsUrl, c.latitude, c.longitude);
   if (c.mapsUrl && !mapsUrl && c.latitude == null) fieldErrors["customer.mapsUrl"] = "Enter a valid Google Maps link";
   let deliveryFeeCents = 0;
+  let distance: number | null = null;
   if (input.fulfillment === "DELIVERY") {
     if (!c.address || c.address.length < 4) fieldErrors["customer.address"] = "Enter your delivery address";
-    if (restaurant.requireMapsLocation && !mapsUrl) fieldErrors["customer.mapsUrl"] = "This restaurant needs your location on the map";
-    const fee = deliveryFeeFor(restaurant, c.area);
-    if (fee == null) fieldErrors["customer.area"] = restaurant.deliveryAreas.length ? "This restaurant doesn't deliver to that area" : "Delivery fees aren't set up yet — choose pickup";
-    else deliveryFeeCents = fee;
+    // Delivery needs an exact pin: the fee and the delivery range are based on distance.
+    if (!isValidLatLng(c.latitude, c.longitude)) fieldErrors["customer.location"] = "Pin your delivery location on the map";
+    else {
+      const q = quoteDelivery(restaurant, { lat: c.latitude!, lng: c.longitude! });
+      if (q.deliverable) {
+        deliveryFeeCents = q.feeCents;
+        distance = Math.round(q.km * 100) / 100;
+      } else if (q.reason === "out_of_range") fieldErrors["customer.location"] = `This address is ${formatKm(q.km!)} away — ${restaurant.displayName} delivers up to ${formatKm(q.maxKm)}. Choose pickup or another restaurant.`;
+      else fieldErrors["customer.location"] = `${restaurant.displayName} hasn't set up delivery yet — choose pickup`;
+    }
   }
 
   const priced = await priceCart(restaurant.id, input.items);
@@ -259,6 +263,7 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
           exchangeRate,
           restaurantName: restaurant.displayName,
           restaurantPhone: restaurant.phone,
+          distanceKm: distance,
           deviceKey: meta.deviceKey,
           ipHash: meta.ipHash,
           suspicious,
@@ -301,6 +306,13 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
         tx,
       );
       return created;
+    });
+    // Phone notification to every staff device (never blocks the order).
+    void pushToRestaurantStaff(restaurant.id, {
+      title: `🔔 New order · ${formatMoney(totalCents, currency)}`,
+      body: `${c.name} · ${input.fulfillment === "DELIVERY" ? `Delivery${distance != null ? ` (${formatKm(distance)})` : ""}` : "Pickup"} · ${priced.lines.reduce((n, l) => n + l.quantity, 0)} items`,
+      url: `/dashboard/orders?ref=${order.reference}`,
+      tag: `order-${order.reference}`,
     });
     return { reference: order.reference, trackingToken: order.trackingToken, totalCents: order.totalCents, currency: order.currency, duplicate: false };
   } catch (e) {

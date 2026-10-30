@@ -12,6 +12,7 @@ import { Badge, StatCard } from "@/components/ui/misc";
 import { setRestaurantStatusAction, revokeVerificationAction } from "@/actions/admin";
 import { formatMoney, formatRate } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
+import { deliveryRadiusKm, normalizeZones } from "@/lib/geo";
 import { compactNumber, formatDate, formatDateTime, periodLabel } from "@/lib/utils";
 
 export const metadata = { title: "Restaurant" };
@@ -77,7 +78,7 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
         <Section title="Business">
           <dl className="grid grid-cols-[140px_1fr] gap-y-1.5 text-sm">
             <dt className="text-ink-muted">Ordering</dt>
-            <dd>{r.orderingEnabled ? "Accepting orders" : "Paused"} · prep ~{r.avgPrepMinutes} min · {r.deliveryEnabled ? `delivery ${r.deliveryFeeCents != null ? `(${(r.deliveryFeeCents / 100).toFixed(2)} ${r.currency})` : ""}` : "no delivery"}{r.pickupEnabled ? " · pickup" : ""}</dd>
+            <dd>{r.orderingEnabled ? "Accepting orders" : "Paused"} · prep ~{r.avgPrepMinutes} min · {r.deliveryEnabled ? `delivery up to ${deliveryRadiusKm(normalizeZones(r.deliveryZones))} km` : "no delivery"}{r.pickupEnabled ? " · pickup" : ""}</dd>
             <dt className="text-ink-muted">Phone</dt>
             <dd>{r.phone ? formatPhone(r.phone) : "—"}</dd>
             <dt className="text-ink-muted">Email</dt>

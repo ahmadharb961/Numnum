@@ -26,7 +26,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             Register your restaurant
           </Link>
         </p>
-        <p className="pt-2 text-xs text-ink-muted">You never need an account to browse or order.</p>
+        <p className="pt-2 text-xs text-ink-muted">Browsing is open to everyone — an account is only needed to order.</p>
       </div>
     </div>
   );

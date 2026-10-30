@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Banknote, Bike, Check, Clock, Loader2, LocateFixed, MapPin, Plus, ShoppingBag, AlertTriangle } from "lucide-react";
+import { Banknote, Bike, Check, Clock, Loader2, MapPin, Plus, ShoppingBag, AlertTriangle } from "lucide-react";
+import { MapPicker, type Pin } from "@/components/map-picker";
+import { distanceKm, formatKm, type DeliveryZone } from "@/lib/geo";
+import { writeLocation } from "./location-picker";
 import { useCart, lineTotal } from "./cart";
 import { formatMoney, minorDigits } from "@/lib/money";
 import { normalizePhone } from "@/lib/phone";
@@ -21,22 +24,21 @@ type Info = {
   currency: string;
   deliveryEnabled: boolean;
   pickupEnabled: boolean;
-  requireMapsLocation: boolean;
-  deliveryFeeCents: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  zones: DeliveryZone[];
   minOrderCents: number | null;
   orderingEnabled: boolean;
   openNow: boolean | null;
   avgPrepMinutes: number;
   address: string | null;
-  deliveryAreas: { name: string; feeCents: number | null }[];
 };
 
-type Quote = { subtotalCents: number; deliveryFeeCents: number | null; totalCents: number | null; currency: string; errors: Record<string, string>; lines: { lineTotalCents: number }[] };
-type SavedAddress = { id: string; label: string; area: string | null; address: string; building: string | null; notes: string | null; hasLocation: boolean; isDefault: boolean };
+type Quote = { subtotalCents: number; deliveryFeeCents: number | null; distanceKm: number | null; deliveryError: string | null; totalCents: number | null; currency: string; errors: Record<string, string>; lines: { lineTotalCents: number }[] };
+type SavedAddress = { id: string; label: string; area: string | null; address: string; building: string | null; notes: string | null; latitude: number | null; longitude: number | null; hasLocation: boolean; isDefault: boolean };
 type Profile = { user: { name: string; phone: string | null } | null; addresses: SavedAddress[] };
-type Details = { name: string; phone: string; address: string; building: string; area: string; notes: string; mapsUrl: string; latitude: number | null; longitude: number | null };
+type Details = { name: string; phone: string; address: string; building: string; area: string; notes: string };
 
-const DETAILS_KEY = "nn_details_v1";
 const RECENT_KEY = "nn_recent_orders_v2";
 const STEPS = ["Method", "Details", "Review & pay"] as const;
 
@@ -46,7 +48,7 @@ function newKey() {
   return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function Checkout({ mapsKey }: { mapsKey: string }) {
+export function Checkout() {
   const { cart, ready, clear } = useCart();
   const router = useRouter();
   const [info, setInfo] = useState<Info | null>(null);
@@ -55,18 +57,17 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
   const [step, setStep] = useState(0);
   const [method, setMethod] = useState<"DELIVERY" | "PICKUP" | null>(null);
   const [addressId, setAddressId] = useState<string | null>(null); // saved address, or null for a new one
-  const [d, setD] = useState<Details>({ name: "", phone: "", address: "", building: "", area: "", notes: "", mapsUrl: "", latitude: null, longitude: null });
+  const [d, setD] = useState<Details>({ name: "", phone: "", address: "", building: "", area: "", notes: "" });
+  const [pin, setPin] = useState<Pin | null>(null);
   const [saveAddress, setSaveAddress] = useState(true);
   const [addressLabel, setAddressLabel] = useState("");
-  const [remember, setRemember] = useState(false);
   const [changeFor, setChangeFor] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [quote, setQuote] = useState<Quote | null>(null);
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
 
-  // Prefill: account profile + saved addresses, or details remembered on this device (guests).
+  // Prefill name, phone and saved addresses from the account.
   useEffect(() => {
     fetch("/api/account/checkout-profile")
       .then((r) => r.json())
@@ -74,16 +75,8 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
         setProfile(p);
         if (p.user) {
           setD((x) => ({ ...x, name: x.name || p.user!.name, phone: x.phone || p.user!.phone || "" }));
-          const def = p.addresses.find((a) => a.isDefault) ?? p.addresses[0];
+          const def = p.addresses.find((a) => a.isDefault && a.hasLocation) ?? p.addresses.find((a) => a.hasLocation);
           if (def) setAddressId(def.id);
-        } else {
-          try {
-            const saved = localStorage.getItem(DETAILS_KEY);
-            if (saved) {
-              setD((x) => ({ ...x, ...JSON.parse(saved) }));
-              setRemember(true);
-            }
-          } catch {}
         }
       })
       .catch(() => setProfile({ user: null, addresses: [] }));
@@ -105,14 +98,13 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
   const items = useMemo(() => cart?.lines.map((l) => ({ menuItemId: l.menuItemId, quantity: l.quantity, selections: l.selections, note: l.note, reelId: l.reelId })) ?? [], [cart]);
   const localSubtotal = cart?.lines.reduce((s, l) => s + lineTotal(l), 0) ?? 0;
   const savedAddress = profile?.addresses.find((a) => a.id === addressId) ?? null;
-  const area = method === "DELIVERY" ? (savedAddress ? savedAddress.area : d.area) : null;
-  const feeForArea = (name: string | null) => {
-    if (!info) return null;
-    if (info.deliveryAreas.length) {
-      const a = info.deliveryAreas.find((x) => x.name.toLowerCase() === (name ?? "").toLowerCase());
-      return a ? (a.feeCents ?? info.deliveryFeeCents) : null;
-    }
-    return info.deliveryFeeCents;
+  const point: Pin | null = savedAddress?.latitude != null && savedAddress.longitude != null ? { lat: savedAddress.latitude, lng: savedAddress.longitude } : pin;
+  // Instant estimate for the UI; the server recalculates everything when the order is placed.
+  const estimate = (p: Pin | null) => {
+    if (!info || !p || info.latitude == null || info.longitude == null) return null;
+    const km = distanceKm({ lat: info.latitude, lng: info.longitude }, p);
+    const zone = info.zones.find((z) => km <= z.maxKm);
+    return { km, feeCents: zone ? zone.feeCents : null, maxKm: info.zones.at(-1)?.maxKm ?? 0 };
   };
 
   // Idempotency key per checkout attempt: survives refresh & double taps; a changed cart gets a new key.
@@ -145,60 +137,38 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
     );
 
   const currency = cart.currency;
-  const loggedIn = !!profile?.user;
 
   function validateDetails() {
     const e: Record<string, string> = {};
     if (d.name.trim().length < 2) e.name = "Enter your full name";
     const p = normalizePhone(d.phone);
     if (!p.ok) e.phone = p.error;
-    if (method === "DELIVERY" && !savedAddress) {
-      if (info?.deliveryAreas.length && !d.area) e.area = "Choose your area";
-      if (d.address.trim().length < 4) e.address = "Enter your delivery address";
-      if (info?.requireMapsLocation && !d.mapsUrl && d.latitude == null) e.mapsUrl = "This restaurant needs your location on the map";
-      if (d.mapsUrl && d.latitude == null && !/^https?:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|goo\.gl\/maps|maps\.app\.goo\.gl)/i.test(d.mapsUrl)) e.mapsUrl = "Paste a Google Maps link (maps.google.com or maps.app.goo.gl)";
+    if (method === "DELIVERY") {
+      if (!savedAddress && d.address.trim().length < 4) e.address = "Enter your street address";
+      if (!point) e.location = "Pin your delivery location on the map";
+      else {
+        const est = estimate(point);
+        if (est && est.feeCents == null) e.location = `This address is ${formatKm(est.km)} away — ${info?.displayName} delivers up to ${formatKm(est.maxKm)}. Choose pickup or another address.`;
+      }
     }
-    if (method === "DELIVERY" && savedAddress && info?.deliveryAreas.length && feeForArea(savedAddress.area) == null) e.addressId = `${info.displayName} doesn't deliver to ${savedAddress.area ?? "this address"}`;
-    if (method === "DELIVERY" && !savedAddress && d.area && feeForArea(d.area) == null) e.area = "This restaurant doesn't deliver to that area";
     setErrors(e);
+    const first = Object.keys(e)[0];
+    if (first) requestAnimationFrame(() => (document.getElementById(first) ?? document.querySelector("[data-error]"))?.scrollIntoView({ behavior: "smooth", block: "center" }));
     return Object.keys(e).length === 0;
   }
 
   async function goReview() {
     if (!validateDetails()) return;
-    try {
-      if (!loggedIn) {
-        if (remember) localStorage.setItem(DETAILS_KEY, JSON.stringify({ name: d.name, phone: d.phone, address: d.address, building: d.building, area: d.area }));
-        else localStorage.removeItem(DETAILS_KEY);
-      }
-    } catch {}
+    if (method === "DELIVERY" && point) writeLocation({ ...point, label: savedAddress?.label ?? (d.area.trim() || "your address") });
     track("order_details_completed", { restaurantId: cart!.restaurantId });
     setStep(2);
     setQuote(null);
     setPlaceError(null);
     try {
-      setQuote(await api<Quote>("/api/cart/quote", { restaurantId: cart!.restaurantId, items, fulfillment: method, area }));
+      setQuote(await api<Quote>("/api/cart/quote", { restaurantId: cart!.restaurantId, items, fulfillment: method, addressId: savedAddress?.id ?? null, latitude: savedAddress ? null : pin?.lat ?? null, longitude: savedAddress ? null : pin?.lng ?? null }));
     } catch (e) {
       setPlaceError((e as Error).message);
     }
-  }
-
-  function locate() {
-    if (!navigator.geolocation) return setErrors((e) => ({ ...e, mapsUrl: "Location isn't available on this device" }));
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = Number(pos.coords.latitude.toFixed(6)), lng = Number(pos.coords.longitude.toFixed(6));
-        setD((p) => ({ ...p, latitude: lat, longitude: lng, mapsUrl: `https://maps.google.com/?q=${lat},${lng}` }));
-        setErrors((e) => ({ ...e, mapsUrl: "" }));
-        setLocating(false);
-      },
-      () => {
-        setLocating(false);
-        setErrors((e) => ({ ...e, mapsUrl: "We couldn't get your location. Paste a Google Maps link instead." }));
-      },
-      { enableHighAccuracy: true, timeout: 15000 },
-    );
   }
 
   async function placeOrder() {
@@ -218,12 +188,11 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
           addressId: delivery && savedAddress ? savedAddress.id : null,
           address: delivery && !savedAddress ? d.address.trim() : null,
           building: delivery && !savedAddress ? d.building.trim() || null : null,
-          area: delivery && !savedAddress ? d.area || null : null,
+          area: delivery && !savedAddress ? d.area.trim() || null : null,
           notes: d.notes.trim() || null,
-          mapsUrl: delivery && !savedAddress && d.latitude == null ? d.mapsUrl || null : null,
-          latitude: delivery && !savedAddress ? d.latitude : null,
-          longitude: delivery && !savedAddress ? d.longitude : null,
-          saveAddress: delivery && loggedIn && !savedAddress && saveAddress,
+          latitude: delivery && !savedAddress ? pin?.lat ?? null : null,
+          longitude: delivery && !savedAddress ? pin?.lng ?? null : null,
+          saveAddress: delivery && !savedAddress && saveAddress,
           addressLabel: addressLabel.trim() || null,
         },
       });
@@ -242,7 +211,7 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
   }
 
   const subtotal = quote?.subtotalCents ?? localSubtotal;
-  const fee = method === "DELIVERY" ? (quote ? quote.deliveryFeeCents : feeForArea(area)) : 0;
+  const fee = method === "DELIVERY" ? (quote ? quote.deliveryFeeCents : estimate(point)?.feeCents ?? null) : 0;
   const total = fee == null ? null : subtotal + fee;
   const quoteChanged = quote && quote.subtotalCents !== localSubtotal;
   const below = info?.minOrderCents && subtotal < info.minOrderCents;
@@ -284,7 +253,7 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
                 onClick={() => setMethod("DELIVERY")}
                 icon={<Bike className="h-6 w-6" />}
                 title="Delivery"
-                body={info.deliveryAreas.length ? `Fee depends on your area · about ${info.avgPrepMinutes + 15} min` : `${info.deliveryFeeCents ? `Delivery fee ${formatMoney(info.deliveryFeeCents, currency)}` : "Free delivery"} · about ${info.avgPrepMinutes + 15} min`}
+                body={`Up to ${formatKm(info.zones.at(-1)?.maxKm ?? 0)} · fee from ${info.zones[0]?.feeCents ? formatMoney(info.zones[0].feeCents, currency) : "free"} · about ${info.avgPrepMinutes + 15} min`}
               />
             )}
             {info.pickupEnabled && <MethodCard active={method === "PICKUP"} onClick={() => setMethod("PICKUP")} icon={<ShoppingBag className="h-6 w-6" />} title="Pickup" body={`Ready in about ${info.avgPrepMinutes} min${info.address ? ` · ${info.address}` : ""}`} />}
@@ -304,12 +273,6 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
             }}
             noValidate
           >
-            {!loggedIn && profile && (
-              <div className="rounded-2xl bg-white p-3.5 text-sm">
-                Ordering as a guest. <Link href="/login?next=/checkout" className="font-semibold text-brand-600">Log in</Link> or{" "}
-                <Link href="/account/register?next=/checkout" className="font-semibold text-brand-600">create an account</Link> to save addresses and see your order history.
-              </div>
-            )}
             <h2 className="text-lg font-extrabold">Your details</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Full name" error={errors.name} htmlFor="name">
@@ -326,93 +289,77 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
                 {profile?.addresses.length ? (
                   <div className="space-y-2" role="radiogroup" aria-label="Saved addresses">
                     {profile.addresses.map((a) => {
-                      const aFee = feeForArea(a.area);
+                      const est = a.latitude != null && a.longitude != null ? estimate({ lat: a.latitude, lng: a.longitude }) : null;
+                      const usable = a.hasLocation && est?.feeCents != null;
                       return (
-                        <button key={a.id} type="button" role="radio" aria-checked={addressId === a.id} onClick={() => setAddressId(a.id)} className={cn("flex w-full items-start gap-3 rounded-2xl border-2 bg-white p-3.5 text-left", addressId === a.id ? "border-brand-500" : "border-transparent")}>
+                        <button key={a.id} type="button" role="radio" aria-checked={addressId === a.id} disabled={!usable} onClick={() => setAddressId(a.id)} className={cn("flex w-full items-start gap-3 rounded-2xl border-2 bg-white p-3.5 text-left disabled:opacity-60", addressId === a.id ? "border-brand-500" : "border-transparent")}>
                           <MapPin className={cn("mt-0.5 h-5 w-5 shrink-0", addressId === a.id ? "text-brand-500" : "text-ink-muted")} />
                           <span className="min-w-0 flex-1 text-sm">
                             <span className="font-bold">{a.label}</span>
                             <span className="block text-ink-soft">{[a.area, a.address, a.building].filter(Boolean).join(", ")}</span>
-                            {aFee == null && info.deliveryAreas.length > 0 && <span className="block text-xs font-semibold text-red-600">Outside this restaurant&apos;s delivery areas</span>}
+                            {!a.hasLocation && <span className="block text-xs font-semibold text-amber-700">No map pin — edit it in Saved addresses</span>}
+                            {est && est.feeCents == null && <span className="block text-xs font-semibold text-red-600">{formatKm(est.km)} away · outside delivery range</span>}
                           </span>
-                          {aFee != null && <span className="tabular text-xs font-semibold text-ink-muted">{aFee ? `+${formatMoney(aFee, currency)}` : "Free"}</span>}
+                          {est && est.feeCents != null && (
+                            <span className="text-right text-xs font-semibold text-ink-muted">
+                              {formatKm(est.km)}
+                              <span className="block tabular">{est.feeCents ? `+${formatMoney(est.feeCents, currency)}` : "Free"}</span>
+                            </span>
+                          )}
                         </button>
                       );
                     })}
                     <button type="button" onClick={() => setAddressId(null)} className={cn("flex w-full items-center gap-3 rounded-2xl border-2 bg-white p-3.5 text-left text-sm font-semibold", addressId === null ? "border-brand-500" : "border-dashed border-black/15")}>
-                      <Plus className="h-5 w-5" /> Use a new address
+                      <Plus className="h-5 w-5" /> Deliver to a new address
                     </button>
-                    {errors.addressId && <p className="text-xs font-medium text-red-600">{errors.addressId}</p>}
                   </div>
                 ) : null}
 
                 {!savedAddress && (
                   <div className="space-y-4">
-                    {info.deliveryAreas.length > 0 && (
-                      <Field label="Area" error={errors.area} htmlFor="area">
-                        <select id="area" className="input" value={d.area} onChange={(e) => setD({ ...d, area: e.target.value })}>
-                          <option value="">Choose your area</option>
-                          {info.deliveryAreas.map((a) => (
-                            <option key={a.name} value={a.name}>
-                              {a.name} · {(a.feeCents ?? info.deliveryFeeCents) ? formatMoney((a.feeCents ?? info.deliveryFeeCents)!, currency) : "free"}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    )}
-                    <Field label="Street address" error={errors.address} htmlFor="address">
-                      <textarea id="address" className="input min-h-[80px]" autoComplete="street-address" placeholder="Street, landmark, city" value={d.address} onChange={(e) => setD({ ...d, address: e.target.value })} />
-                    </Field>
-                    <Field label="Building & floor (optional)" htmlFor="building">
-                      <input id="building" className="input" placeholder="Bldg. Azar, 3rd floor" value={d.building} onChange={(e) => setD({ ...d, building: e.target.value })} />
-                    </Field>
                     <div>
                       <div className="label">
-                        Location on the map {info.requireMapsLocation ? <span className="text-brand-600">(required)</span> : <span className="font-normal text-ink-muted">(optional, helps the driver)</span>}
+                        Pin your exact location <span className="text-brand-600">(required)</span>
                       </div>
-                      <div className="flex gap-2">
-                        <Button type="button" variant="outline" onClick={locate} loading={locating} className="shrink-0">
-                          <LocateFixed className="h-4 w-4" /> Use my location
-                        </Button>
-                        <input className="input" placeholder="or paste a Google Maps link" value={d.latitude != null ? "" : d.mapsUrl} onChange={(e) => setD({ ...d, mapsUrl: e.target.value, latitude: null, longitude: null })} />
-                      </div>
-                      {d.latitude != null && (
-                        <div className="mt-2 overflow-hidden rounded-xl border border-black/10">
-                          <iframe title="Your location" className="h-40 w-full" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={mapsKey ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${d.latitude},${d.longitude}&zoom=16` : `https://maps.google.com/maps?q=${d.latitude},${d.longitude}&z=16&output=embed`} />
-                          <div className="flex items-center justify-between bg-white px-3 py-2 text-xs">
-                            <span className="inline-flex items-center gap-1 text-emerald-700">
-                              <MapPin className="h-3.5 w-3.5" /> Location pinned
-                            </span>
-                            <button type="button" className="font-semibold text-ink-muted" onClick={() => setD({ ...d, latitude: null, longitude: null, mapsUrl: "" })}>
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {errors.mapsUrl && <p className="mt-1 text-xs font-medium text-red-600">{errors.mapsUrl}</p>}
+                      <MapPicker value={pin} onChange={setPin} autoLocate={!pin} height={280} />
+                      {pin && (() => {
+                        const est = estimate(pin);
+                        if (!est) return null;
+                        return est.feeCents == null ? (
+                          <p className="mt-1 text-xs font-semibold text-red-600">{formatKm(est.km)} away — {info.displayName} delivers up to {formatKm(est.maxKm)}</p>
+                        ) : (
+                          <p className="mt-1 text-xs font-semibold text-emerald-700">
+                            ✓ {formatKm(est.km)} away · delivery {est.feeCents ? formatMoney(est.feeCents, currency) : "free"}
+                          </p>
+                        );
+                      })()}
                     </div>
-                    {loggedIn && (
-                      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-3 text-sm">
-                        <label className="flex items-center gap-2 font-semibold">
-                          <input type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} className="h-5 w-5 accent-brand-500" /> Save to my addresses
-                        </label>
-                        {saveAddress && <input className="input h-10 w-40 text-sm" placeholder="Label (Home, Work…)" value={addressLabel} onChange={(e) => setAddressLabel(e.target.value)} />}
-                      </div>
-                    )}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Area / neighborhood" htmlFor="area">
+                        <input id="area" className="input" placeholder="Hamra" value={d.area} onChange={(e) => setD({ ...d, area: e.target.value })} />
+                      </Field>
+                      <Field label="Building & floor (optional)" htmlFor="building">
+                        <input id="building" className="input" placeholder="Bldg. Azar, 3rd floor" value={d.building} onChange={(e) => setD({ ...d, building: e.target.value })} />
+                      </Field>
+                    </div>
+                    <Field label="Street address" error={errors.address} htmlFor="address">
+                      <textarea id="address" className="input min-h-[72px]" autoComplete="street-address" placeholder="Street, landmark" value={d.address} onChange={(e) => setD({ ...d, address: e.target.value })} />
+                    </Field>
+                    <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-3 text-sm">
+                      <label className="flex items-center gap-2 font-semibold">
+                        <input type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} className="h-5 w-5 accent-brand-500" /> Save to my addresses
+                      </label>
+                      {saveAddress && <input className="input h-10 w-40 text-sm" placeholder="Label (Home, Work…)" value={addressLabel} onChange={(e) => setAddressLabel(e.target.value)} />}
+                    </div>
                   </div>
                 )}
+                {errors.location && <p id="location" className="text-sm font-medium text-red-600">{errors.location}</p>}
               </>
             )}
 
             <Field label={method === "DELIVERY" ? "Notes for the driver (optional)" : "Pickup notes (optional)"} htmlFor="notes">
               <textarea id="notes" className="input min-h-[72px]" maxLength={400} placeholder={method === "DELIVERY" ? "Ring twice, call on arrival…" : "I'll arrive around 8pm"} value={d.notes} onChange={(e) => setD({ ...d, notes: e.target.value })} />
             </Field>
-            {!loggedIn && (
-              <label className="flex items-center gap-3 text-sm">
-                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-5 w-5 accent-brand-500" />
-                Remember my details on this device
-              </label>
-            )}
             <div className="grid grid-cols-3 gap-3 pt-2">
               <Button type="button" variant="outline" onClick={() => setStep(0)}>
                 Back
@@ -462,6 +409,7 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
                 {d.name} · {d.phone}
               </div>
               {method === "DELIVERY" && <div className="mt-1 text-ink-soft">{savedAddress ? `${savedAddress.label}: ${[savedAddress.area, savedAddress.address, savedAddress.building].filter(Boolean).join(", ")}` : [d.area, d.address, d.building].filter(Boolean).join(", ")}</div>}
+              {method === "DELIVERY" && quote?.distanceKm != null && <div className="mt-1 text-xs text-emerald-700">📍 {formatKm(quote.distanceKm)} from {info.displayName}</div>}
               {d.notes && <div className="mt-1 text-xs text-ink-muted">Note: {d.notes}</div>}
               <button className="mt-2 text-xs font-semibold text-brand-600" onClick={() => setStep(1)}>
                 Edit details
@@ -496,6 +444,7 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
               </Alert>
             )}
             {below && <Alert tone="amber">Minimum order is {formatMoney(info.minOrderCents!, currency)}.</Alert>}
+            {quote?.deliveryError && <Alert tone="red">{quote.deliveryError}</Alert>}
             {placeError && <Alert tone="red">{placeError}</Alert>}
             <Button size="lg" block onClick={placeOrder} loading={placing} disabled={!quote || Object.keys(quote.errors).length > 0 || !!below || total == null}>
               Place order{total != null ? ` · ${formatMoney(total, currency)}` : ""}

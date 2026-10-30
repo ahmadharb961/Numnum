@@ -28,7 +28,7 @@ async function evidenceFor(user: CurrentUser, restaurantId: string, reference: s
 }
 
 function checkLimits(userId: string) {
-  if (!rateLimit(`review:${userId}`, 10, 86400_000).ok) throw new ReviewError("You've reached today's review limit");
+  if (!rateLimit(`review:${userId}`, 30, 86400_000).ok) throw new ReviewError("You've reached today's review limit");
 }
 
 function cleanBody(body?: string | null) {
@@ -92,4 +92,35 @@ export function evidenceLabel(e: ReviewEvidence): string | null {
   if (e === "COMPLETED_ORDER") return "Verified order";
   if (e === "ACCEPTED_ORDER") return "Ordered on numnum";
   return null;
+}
+
+/** The most recent delivered order (last 14 days) the customer hasn't rated or dismissed. */
+export async function pendingOrderReview(userId: string) {
+  const order = await prisma.order.findFirst({
+    where: { userId, status: "COMPLETED", reviewedAt: null, reviewDismissedAt: null, completedAt: { gte: new Date(Date.now() - 14 * 86400_000) } },
+    orderBy: { completedAt: "desc" },
+    include: { items: { select: { menuItemId: true, name: true } }, restaurant: { select: { id: true, displayName: true, logoUrl: true, slug: true } } },
+  });
+  if (!order) return null;
+  const ids = Array.from(new Set(order.items.map((i) => i.menuItemId).filter(Boolean))) as string[];
+  const images = await prisma.menuItemImage.findMany({ where: { menuItemId: { in: ids } }, orderBy: [{ isMain: "desc" }, { sortOrder: "asc" }], include: { asset: { select: { thumbUrl: true, url: true } } } });
+  const items = ids.map((id) => ({ menuItemId: id, name: order.items.find((i) => i.menuItemId === id)!.name, imageUrl: images.find((im) => im.menuItemId === id)?.asset.thumbUrl ?? null }));
+  return { reference: order.reference, fulfillment: order.fulfillment, restaurant: order.restaurant, items };
+}
+
+/** Saves the post-delivery ratings for one order (dishes + restaurant), linked as a verified order. */
+export async function submitOrderReview(
+  user: CurrentUser,
+  reference: string,
+  input: { restaurant?: { rating: number; foodQuality?: number | null; service?: number | null; value?: number | null; delivery?: number | null; body?: string | null } | null; items: { menuItemId: string; rating: number; body?: string | null }[] },
+) {
+  const order = await prisma.order.findFirst({ where: { reference, userId: user.id }, include: { items: { select: { menuItemId: true } } } });
+  if (!order) throw new ReviewError("Order not found");
+  if (order.status !== "COMPLETED") throw new ReviewError("You can rate an order once it's delivered");
+  const allowed = new Set(order.items.map((i) => i.menuItemId));
+  const items = input.items.filter((i) => allowed.has(i.menuItemId) && i.rating >= 1).slice(0, 20);
+  if (!items.length && !input.restaurant) throw new ReviewError("Tap the stars to rate");
+  for (const it of items) await submitItemReview(user, { menuItemId: it.menuItemId, rating: it.rating, body: it.body ?? null, orderReference: reference });
+  if (input.restaurant) await submitRestaurantReview(user, { restaurantId: order.restaurantId, ...input.restaurant, orderReference: reference });
+  await prisma.order.update({ where: { id: order.id }, data: { reviewedAt: new Date() } });
 }

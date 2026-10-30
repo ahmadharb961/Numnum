@@ -209,11 +209,11 @@ async function seedDemo(adminId: string) {
       data: {
         slug: d.slug, businessName: d.business, displayName: d.name, description: d.desc, cuisine: d.cuisine, area: d.area, city: d.city, address: `${d.area} main street, ${d.city}`,
         phone: "96170123456", email: d.owner, latitude: d.lat, longitude: d.lng, currency, avgPrepMinutes: 25,
-        deliveryEnabled: true, pickupEnabled: true, deliveryFeeCents: d.fee ?? 0, socialLinks: { instagram: `https://instagram.com/${d.slug.replace(/-/g, "")}` },
+        deliveryEnabled: true, pickupEnabled: true,
+        deliveryZones: currency === "LBP" ? [{ maxKm: 3, feeCents: 100000 }, { maxKm: 8, feeCents: 200000 }] : [{ maxKm: 3, feeCents: d.fee ?? 150 }, { maxKm: 6, feeCents: (d.fee ?? 150) + 100 }, { maxKm: 10, feeCents: (d.fee ?? 150) + 200 }], socialLinks: { instagram: `https://instagram.com/${d.slug.replace(/-/g, "")}` },
         status: "ACTIVE", publishedAt: new Date(), orderingEnabled: true, agreementAcceptedAt: new Date(), agreementVersion: DEFAULT_SETTINGS.agreementVersion, agreementAcceptedBy: owner.id,
         verificationStatus: d.verified ? "APPROVED" : "NOT_REQUESTED",
         staff: { create: { userId: owner.id, role: "OWNER" } },
-        deliveryAreas: d.areas ? { create: d.areas.map(([name, fee]) => ({ name, feeCents: fee == null ? null : Math.round(fee * 100) })) } : undefined,
       },
     });
     const logo = await processImage(await foodImage("", d.items[0].emoji, imgIdx), { restaurantId: r.id, originalName: "logo.jpg", maxSize: 400 });
@@ -292,8 +292,32 @@ async function seedDemo(adminId: string) {
     return order;
   };
   const plan: Plan[] = ["complete", "complete", "complete", "complete", "complete", "reject", "out", "preparing", "placed", "cancel"];
+  const buyers = [customer.id];
+  for (let i = 1; i < plan.length; i++) {
+    const u = await prisma.user.create({ data: { email: `buyer${i}@numnum.demo`, name: `Customer ${i}`, phone: `96170${String(i).padStart(2, "0")}2345`, passwordHash: pw, roles: { create: { role: "CUSTOMER" } } } });
+    buyers.push(u.id);
+  }
   const orders = [];
-  for (const [i, st] of plan.entries()) orders.push(await make(i, i === 0 ? "71 111 111" : `70 2${String(i).padStart(2, "0")} 345`, st, i === 0 || i === 7 ? customer.id : null));
+  for (const [i, st] of plan.entries()) orders.push(await make(i, i === 0 ? "71 111 111" : `70 2${String(i).padStart(2, "0")} 345`, st, buyers[i]));
+  // A month of completed orders + visits + reel views for Burger House, so Insights has data to show.
+  for (let i = 0; i < 24; i++) {
+    const o = await make(100 + i, `70 3${String(i).padStart(2, "0")} 111`, "complete", buyers[(i % (buyers.length - 1)) + 1]);
+    const when = new Date(Date.now() - (1 + Math.floor((i * 29) / 24)) * 86400_000 + (i % 5) * 3600_000);
+    await prisma.order.update({ where: { id: o.id }, data: { createdAt: when, acceptedAt: when, completedAt: new Date(when.getTime() + 40 * 60_000), reviewDismissedAt: new Date() } });
+    await prisma.commissionEvent.updateMany({ where: { orderId: o.id }, data: { createdAt: when } });
+  }
+  const burgerReels = await prisma.reel.findMany({ where: { restaurantId: burger.r.id }, select: { id: true } });
+  const visits = [], views = [];
+  for (let day = 0; day < 30; day++) {
+    const base = Date.now() - day * 86400_000;
+    const n = 15 + ((day * 37) % 40);
+    for (let j = 0; j < n; j++) visits.push({ type: "restaurant_opened", restaurantId: burger.r.id, deviceKey: `demo-visitor-${(day * 7 + j) % 120}`, createdAt: new Date(base - j * 600_000) });
+    for (const [ri, r] of burgerReels.entries()) for (let j = 0; j < n * (3 - ri); j++) views.push({ reelId: r.id, viewerKey: `d:demo-${day}-${j}`, watchMs: 4000, createdAt: new Date(base - j * 300_000) });
+  }
+  await prisma.analyticsEvent.createMany({ data: visits });
+  await prisma.reelView.createMany({ data: views });
+  for (const r of burgerReels) await prisma.reel.update({ where: { id: r.id }, data: { viewCount: await prisma.reelView.count({ where: { reelId: r.id } }) } });
+  await prisma.restaurant.update({ where: { id: burger.r.id }, data: { totalReelViews: views.length } });
   // Opening hours are set after the demo orders so seeding works at any time of day.
   const ALWAYS = Object.fromEntries(["sun", "mon", "tue", "wed", "thu", "fri", "sat"].map((d) => [d, [{ open: "00:00", close: "00:00" }]]));
   for (const c of created) await prisma.restaurant.update({ where: { id: c.r.id }, data: { openingHours: ["burger-house", "shawarma-station", "bean-bar"].includes(c.r.slug) ? ALWAYS : HOURS } });

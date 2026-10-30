@@ -4,6 +4,7 @@ import { formatMoney } from "@/lib/money";
 import { compactNumber, cn } from "@/lib/utils";
 import { RatingPill, VerifiedBadge, Badge } from "@/components/ui/misc";
 import { isOpenAt, type OpeningHours } from "@/lib/hours";
+import { formatKm } from "@/lib/geo";
 
 export function DishCard({ item }: { item: { id: string; name: string; description: string | null; priceCents: number; currency: string; ratingAvg: number; ratingCount: number; available: boolean; image: { url: string; thumbUrl: string | null } | null; restaurant?: { slug: string; displayName: string; verificationStatus: string } } }) {
   return (
@@ -35,7 +36,7 @@ export function DishCard({ item }: { item: { id: string; name: string; descripti
   );
 }
 
-export function RestaurantCard({ r }: { r: { slug: string; displayName: string; logoUrl: string | null; coverUrl: string | null; cuisine: string | null; area: string | null; city: string | null; verificationStatus: string; ratingAvg: number; ratingCount: number; deliveryEnabled: boolean; pickupEnabled: boolean; openingHours: unknown; _count?: { menuItems: number } } }) {
+export function RestaurantCard({ r, delivery }: { delivery?: { km: number | null; deliverable: boolean; feeCents: number | null } | null; r: { slug: string; displayName: string; logoUrl: string | null; coverUrl: string | null; cuisine: string | null; area: string | null; city: string | null; verificationStatus: string; ratingAvg: number; ratingCount: number; deliveryEnabled: boolean; pickupEnabled: boolean; openingHours: unknown; _count?: { menuItems: number } } }) {
   const open = isOpenAt(r.openingHours as OpeningHours);
   return (
     <Link href={`/r/${r.slug}`} className="card block overflow-hidden active:scale-[0.99]">
@@ -70,8 +71,16 @@ export function RestaurantCard({ r }: { r: { slug: string; displayName: string; 
             )}
             <RatingPill avg={r.ratingAvg} count={r.ratingCount} />
           </div>
-          <div className="mt-1.5 flex gap-1.5">
-            {r.deliveryEnabled && <Badge tone="brand">Delivery</Badge>}
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {delivery ? (
+              delivery.deliverable ? (
+                <Badge tone="green">Delivers to you{delivery.km != null ? ` · ${formatKm(delivery.km)}` : ""}</Badge>
+              ) : (
+                <Badge tone="gray">{delivery.km != null ? `${formatKm(delivery.km)} away · ` : ""}no delivery to you</Badge>
+              )
+            ) : (
+              r.deliveryEnabled && <Badge tone="brand">Delivery</Badge>
+            )}
             {r.pickupEnabled && <Badge>Pickup</Badge>}
           </div>
         </div>

@@ -5,7 +5,8 @@ import { Search } from "lucide-react";
 import { SearchControls } from "@/components/customer/search-controls";
 import { DishCard, ReelThumb, RestaurantCard } from "@/components/customer/cards";
 import { EmptyState } from "@/components/ui/misc";
-import { facets, parseSearchParams, searchDishes, searchReels, searchRestaurants } from "@/server/search";
+import { facets, parseSearchParams, searchDishes, searchReels, searchRestaurants, restaurantsDeliveringTo } from "@/server/search";
+import { customerLocation } from "@/server/location";
 
 export const metadata: Metadata = { title: "Explore food", description: "Search dishes, reels and restaurants across Lebanon." };
 export const dynamic = "force-dynamic";
@@ -13,6 +14,8 @@ export const dynamic = "force-dynamic";
 export default async function ExplorePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const p = parseSearchParams(sp);
+  const loc = await customerLocation();
+  if (p.delivery && loc) p.nearIds = await restaurantsDeliveringTo(loc);
   const f = await facets();
   const qs = (patch: Record<string, string>) => {
     const u = new URLSearchParams(Object.entries(sp).filter(([, v]) => typeof v === "string") as [string, string][]);
@@ -68,7 +71,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   return (
     <main className="pb-nav">
       <Suspense>
-        <SearchControls facets={f} />
+        <SearchControls facets={f} locationLabel={loc?.label ?? null} />
       </Suspense>
       <div className="container-app pt-2">{body}</div>
     </main>

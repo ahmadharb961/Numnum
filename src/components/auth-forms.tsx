@@ -38,8 +38,8 @@ export function CustomerRegisterForm({ next }: { next?: string }) {
       <Field label="Email" error={fe.email} htmlFor="email">
         <input id="email" name="email" type="email" autoComplete="email" required className="input" />
       </Field>
-      <Field label="Phone (optional)" error={fe.phone} hint="Used only to link your reviews to orders you placed." htmlFor="phone">
-        <input id="phone" name="phone" type="tel" autoComplete="tel" placeholder="70 123 456" className="input" />
+      <Field label="Phone" error={fe.phone} hint="The restaurant and driver use it to reach you about your orders." htmlFor="phone">
+        <input id="phone" name="phone" type="tel" autoComplete="tel" placeholder="70 123 456" className="input" required />
       </Field>
       <Field label="Password" error={fe.password} hint="At least 8 characters" htmlFor="password">
         <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />

@@ -37,6 +37,7 @@ model User {
   roles         UserRole[]
   orders        Order[]
   addresses     CustomerAddress[]
+  pushSubs      PushSubscription[]
   sessions      Session[]
   staff         RestaurantStaff[]
   itemReviews   ItemReview[]
@@ -69,6 +70,21 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model CustomerAddress {
@@ -136,8 +152,8 @@ model Restaurant {
   currency            String             @default("USD")
   deliveryEnabled     Boolean            @default(true)
   pickupEnabled       Boolean            @default(true)
+  deliveryZones       Json? // [{maxKm, feeCents}] by straight-line distance from the restaurant pin
   requireMapsLocation Boolean            @default(false)
-  deliveryFeeCents    Int? // null = restaurant confirms per order
   minOrderCents       Int?
   openingHours        Json? // { mon: [{open:"10:00", close:"23:00"}], ... }
   socialLinks         Json? // { instagram, facebook, tiktok, website }
@@ -160,7 +176,6 @@ model Restaurant {
   updatedAt           DateTime           @updatedAt
 
   staff             RestaurantStaff[]
-  deliveryAreas     RestaurantDeliveryArea[]
   verifications     RestaurantVerification[]
   menuCategories    MenuCategory[]
   menuItems         MenuItem[]
@@ -195,18 +210,6 @@ model RestaurantStaff {
   @@unique([restaurantId, userId])
   @@index([userId])
   @@map("restaurant_staff")
-}
-
-model RestaurantDeliveryArea {
-  id           String     @id @default(cuid())
-  restaurantId String
-  name         String
-  feeCents     Int?
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-
-  @@index([restaurantId])
-  @@index([name])
-  @@map("restaurant_delivery_areas")
 }
 
 model RestaurantVerification {
@@ -650,6 +653,9 @@ model Order {
   restaurantName      String
   restaurantPhone     String?
   estimatedMinutes    Int?
+  distanceKm          Float?
+  reviewedAt          DateTime?
+  reviewDismissedAt   DateTime?
   deviceKey           String?
   ipHash              String?
   acceptedAt          DateTime?

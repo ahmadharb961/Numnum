@@ -1,5 +1,4 @@
 import { requireRestaurant, canAccess } from "@/server/auth";
-import { prisma } from "@/server/db";
 import { getSettings } from "@/server/settings";
 import { DashPage, Section } from "@/components/dashboard/page";
 import { ProfileForm, OrderingForm, HoursEditor } from "@/components/dashboard/settings-forms";
@@ -8,13 +7,14 @@ import { minorDigits } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import type { OpeningHours } from "@/lib/hours";
 import Link from "next/link";
+import { normalizeZones } from "@/lib/geo";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const ctx = await requireRestaurant("MANAGER");
   const r = ctx.restaurant;
-  const [areas, settings] = await Promise.all([prisma.restaurantDeliveryArea.findMany({ where: { restaurantId: r.id }, orderBy: { name: "asc" } }), getSettings()]);
+  const settings = await getSettings();
   const d = minorDigits(r.currency);
   const fmt = (c: number | null) => (c == null ? "" : (c / 10 ** d).toFixed(d));
   const social = (r.socialLinks ?? {}) as Record<string, string>;
@@ -36,7 +36,7 @@ export default async function SettingsPage() {
             <OrderingForm
               agreementAccepted={!!r.agreementAcceptedAt}
               currencies={settings.supportedCurrencies}
-              r={{ avgPrepMinutes: String(r.avgPrepMinutes), deliveryEnabled: r.deliveryEnabled, pickupEnabled: r.pickupEnabled, requireMapsLocation: r.requireMapsLocation, deliveryFee: fmt(r.deliveryFeeCents), minOrder: fmt(r.minOrderCents), currency: r.currency, orderingEnabled: r.orderingEnabled, areas: areas.map((a) => (a.feeCents != null ? `${a.name}: ${fmt(a.feeCents)}` : a.name)).join("\n") }}
+              r={{ avgPrepMinutes: String(r.avgPrepMinutes), deliveryEnabled: r.deliveryEnabled, pickupEnabled: r.pickupEnabled, minOrder: fmt(r.minOrderCents), currency: r.currency, orderingEnabled: r.orderingEnabled, latitude: r.latitude, longitude: r.longitude, zones: normalizeZones(r.deliveryZones).map((z) => ({ maxKm: String(z.maxKm), fee: fmt(z.feeCents) })) }}
             />
           </>
         ) : (

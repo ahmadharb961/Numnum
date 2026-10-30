@@ -13,7 +13,7 @@ export default async function RestaurantReelsViewer({ params }: { params: Promis
   const idx = reels.findIndex((r) => r.id === reelId);
   if (idx === -1) notFound();
   const settings = await getSettings();
-  const pub = reels.map(toPublicReel);
+  const pub = reels.map((r) => toPublicReel(r));
   const { liked, saved } = await likedAndSaved(pub.map((r) => r.id));
   return (
     <main>

@@ -6,6 +6,7 @@ import { prisma } from "@/server/db";
 import { requireUser } from "@/server/auth";
 import { normalizeMapsUrl } from "@/server/orders";
 import type { ActionResult } from "./menu";
+import { isValidLatLng } from "@/lib/geo";
 
 const addressSchema = z.object({
   id: z.string().optional(),
@@ -25,8 +26,9 @@ export async function saveAddressAction(input: z.infer<typeof addressSchema>): P
   const parsed = addressSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const a = parsed.data;
-  const mapsUrl = normalizeMapsUrl(a.mapsUrl, a.latitude, a.longitude);
-  if (a.mapsUrl && !mapsUrl) return { ok: false, error: "Enter a valid Google Maps link" };
+  // Delivery fees and range are calculated from the pin, so every saved address needs one.
+  if (!isValidLatLng(a.latitude, a.longitude)) return { ok: false, error: "Pin the exact location on the map" };
+  const mapsUrl = normalizeMapsUrl(null, a.latitude, a.longitude);
   const data = { label: a.label, area: a.area || null, address: a.address, building: a.building || null, notes: a.notes || null, mapsUrl, latitude: a.latitude ?? null, longitude: a.longitude ?? null };
   await prisma.$transaction(async (tx) => {
     const count = await tx.customerAddress.count({ where: { userId: user.id } });
