@@ -68,7 +68,7 @@ function Row({ children }: { children: React.ReactNode }) {
 
 const AppIcon = ({ size = "h-10 w-10" }: { size?: string }) => (
   // eslint-disable-next-line @next/next/no-img-element
-  <img src="/icons/icon-192.png" alt="" className={cn(size, "rounded-[22%] shadow")} />
+  <img src="/icons/v2/icon-192.png" alt="" className={cn(size, "rounded-[22%] shadow")} />
 );
 
 function Page({ children, bar, barTop }: { children?: React.ReactNode; bar?: React.ReactNode; barTop?: boolean }) {

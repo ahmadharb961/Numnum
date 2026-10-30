@@ -3,14 +3,14 @@
 // - images/posters: stale-while-revalidate (bounded)
 // - pages: network-first with offline fallback
 // - API, uploads and videos: never cached (videos use HTTP range requests)
-const VERSION = "nn-v4";
+const VERSION = "nn-v5";
 const STATIC = `${VERSION}-static`;
 const IMAGES = `${VERSION}-images`;
 const PAGES = `${VERSION}-pages`;
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(STATIC).then((c) => c.addAll([OFFLINE_URL, "/icons/icon-192.png"])).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(STATIC).then((c) => c.addAll([OFFLINE_URL, "/icons/v2/icon-192.png"])).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {
@@ -64,8 +64,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(d.title || "numnum", {
       body: d.body || "",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
+      icon: "/icons/v2/icon-192.png",
+      badge: "/icons/v2/icon-192.png",
       tag: d.tag || undefined,
       renotify: !!d.tag,
       image: d.image || undefined,

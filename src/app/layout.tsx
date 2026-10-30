@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   applicationName: "numnum",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "numnum", statusBarStyle: "black-translucent" },
-  icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  icons: { icon: "/icons/v2/icon.svg", apple: "/icons/v2/apple-touch-icon.png" },
   openGraph: { type: "website", siteName: "numnum", locale: "en_LB" },
   twitter: { card: "summary_large_image" },
   formatDetection: { telephone: false },

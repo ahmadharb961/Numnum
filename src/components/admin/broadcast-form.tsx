@@ -148,7 +148,7 @@ export function BroadcastForm({ stats, restaurants }: { stats: Record<"everyone"
         <div className="rounded-2xl bg-white/90 p-3 shadow-lg ring-1 ring-black/5">
           <div className="flex items-start gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-192.png" alt="" className="h-9 w-9 rounded-lg" />
+            <img src="/icons/v2/icon-192.png" alt="" className="h-9 w-9 rounded-lg" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between text-[11px] text-ink-muted">
                 <span className="font-semibold uppercase tracking-wide">numnum</span>

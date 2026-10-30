@@ -27,7 +27,7 @@ const out = (p, data) => {
   const files = {
     "public/logo/numnum-stack-orange.svg": stackSvg(ORANGE),
     "public/logo/numnum-stack-white.svg": stackSvg("#fff"),
-    "public/icons/icon.svg": iconSvg({ rx: 112 }),
+    "public/icons/v2/icon.svg": iconSvg({ rx: 112 }),
     "brand/numnum-logo-orange.svg": stackSvg(ORANGE),
     "brand/numnum-instagram.svg": iconSvg({ w: 0.62 }),
   };
@@ -40,10 +40,12 @@ const out = (p, data) => {
     await page.setContent(`<style>*{margin:0}html,body{background:transparent}svg{display:block;width:${w}px;height:${h}px}</style>${svg}`);
     out(path.join(root, p), await page.screenshot({ omitBackground: transparent, type: "png" }));
   };
-  await png(iconSvg({ rx: 112 }), 192, 192, "public/icons/icon-192.png");
-  await png(iconSvg({ rx: 112 }), 512, 512, "public/icons/icon-512.png");
-  await png(iconSvg({ w: 0.64 }), 180, 180, "public/icons/apple-touch-icon.png", false);
-  await png(iconSvg({ w: 0.56 }), 512, 512, "public/icons/maskable-512.png", false);
+  await png(iconSvg({ rx: 112 }), 192, 192, "public/icons/v2/icon-192.png");
+  await png(iconSvg({ rx: 112 }), 512, 512, "public/icons/v2/icon-512.png");
+  await png(iconSvg({ w: 0.64 }), 180, 180, "public/icons/v2/apple-touch-icon.png", false);
+  // iPhones also look for this at the site root.
+  await png(iconSvg({ w: 0.64 }), 180, 180, "public/apple-touch-icon.png", false);
+  await png(iconSvg({ w: 0.56 }), 512, 512, "public/icons/v2/maskable-512.png", false);
   await png(iconSvg({ rx: 112, w: 0.8 }), 32, 32, "public/favicon.png");
   // Emails can't show SVG: a PNG at 2× the size it's shown (96 px wide).
   await png(stackSvg(ORANGE), 192, Math.round((192 * STACK_H) / STACK_W), "public/logo/numnum-email.png");
