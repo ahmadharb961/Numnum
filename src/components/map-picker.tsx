@@ -13,13 +13,15 @@ const BEIRUT: Pin = { lat: 33.8938, lng: 35.5018 };
 /**
  * Drag-the-pin map (OpenStreetMap tiles, no API key). Starts at `value`, else the
  * device location when the user taps "Use my location", else Beirut.
- * Optional `radiusKm` draws a delivery circle around the pin (restaurant setup).
+ * Optional `radiusKm` draws a delivery circle around the pin (restaurant setup); `rings` adds
+ * fainter inner circles (km) for delivery fee zones.
  */
-export function MapPicker({ value, onChange, radiusKm, height = 260, autoLocate }: { value: Pin | null; onChange: (p: Pin) => void; radiusKm?: number; height?: number; autoLocate?: boolean }) {
+export function MapPicker({ value, onChange, radiusKm, rings = [], height = 260, autoLocate }: { value: Pin | null; onChange: (p: Pin) => void; radiusKm?: number; rings?: number[]; height?: number; autoLocate?: boolean }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<LMap | null>(null);
   const marker = useRef<Marker | null>(null);
   const circle = useRef<Circle | null>(null);
+  const ringRefs = useRef<Circle[]>([]);
   const changeRef = useRef(onChange);
   changeRef.current = onChange;
   const [locating, setLocating] = useState(false);
@@ -69,12 +71,15 @@ export function MapPicker({ value, onChange, radiusKm, height = 260, autoLocate 
       }
       circle.current?.remove();
       circle.current = null;
+      ringRefs.current.forEach((c) => c.remove());
+      ringRefs.current = [];
       if (radiusKm && value) {
         circle.current = L.circle([value.lat, value.lng], { radius: radiusKm * 1000, color: "#ff5412", weight: 2, fillOpacity: 0.08 }).addTo(map.current);
-        map.current.fitBounds(circle.current.getBounds(), { padding: [12, 12] });
+        for (const km of rings) if (km > 0 && km < radiusKm) ringRefs.current.push(L.circle([value.lat, value.lng], { radius: km * 1000, color: "#ff5412", weight: 1, dashArray: "4 6", fill: false }).addTo(map.current));
+        map.current.fitBounds(circle.current.getBounds(), { padding: [12, 12], animate: false });
       }
     })();
-  }, [value?.lat, value?.lng, radiusKm]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value?.lat, value?.lng, radiusKm, rings.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function locate() {
     if (!navigator.geolocation) return setError("Location isn't available on this device — drag the pin instead.");

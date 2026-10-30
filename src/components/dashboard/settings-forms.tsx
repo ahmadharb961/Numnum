@@ -6,14 +6,19 @@ import { saveHoursAction, saveOrderingAction, saveProfileAction } from "@/action
 import type { FormState } from "@/actions/auth";
 import { uploadFile } from "./upload";
 import { MapPicker, type Pin } from "@/components/map-picker";
+import { MAX_ZONE_KM } from "@/lib/geo";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
+import { FramedCropper } from "./framed-cropper";
 import { DAYS, DAY_LABELS, type OpeningHours } from "@/lib/hours";
 
-function ImageField({ name, label, initial, aspect }: { name: string; label: string; initial: string; aspect: string }) {
+type Crop = { aspect: number; outputWidth: number; title: string; guide?: { aspect: number; label: string } };
+
+function ImageField({ name, label, initial, aspect, crop }: { name: string; label: string; initial: string; aspect: string; crop: Crop }) {
   const [url, setUrl] = useState(initial);
   const [busy, setBusy] = useState(false);
+  const [picked, setPicked] = useState<File | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   const toast = useToast();
   return (
@@ -30,24 +35,37 @@ function ImageField({ name, label, initial, aspect }: { name: string; label: str
             {busy ? "Uploading…" : "Upload"}
           </span>
         )}
+        {url && <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white">{busy ? "Uploading…" : "Change"}</span>}
       </button>
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          if (!f) return;
+      <FramedCropper
+        file={picked}
+        title={crop.title}
+        aspect={crop.aspect}
+        outputWidth={crop.outputWidth}
+        guide={crop.guide}
+        onCancel={() => setPicked(null)}
+        onDone={async (blob) => {
+          setPicked(null);
           setBusy(true);
           try {
-            const up = await uploadFile(f, "image");
+            const up = await uploadFile(new File([blob], `${name}.jpg`, { type: "image/jpeg" }), "image");
             setUrl(up.url ?? "");
           } catch (err) {
             toast((err as Error).message, "error");
           } finally {
             setBusy(false);
           }
+        }}
+      />
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) setPicked(f);
         }}
       />
     </div>
@@ -61,8 +79,8 @@ export function ProfileForm({ r }: { r: Record<string, string> }) {
     <form action={action} className="space-y-4">
       {state?.ok && <Alert tone="green">{state.message}</Alert>}
       <div className="grid grid-cols-[120px_1fr] gap-4">
-        <ImageField name="logoUrl" label="Logo" initial={r.logoUrl} aspect="aspect-square" />
-        <ImageField name="coverUrl" label="Cover photo" initial={r.coverUrl} aspect="aspect-[3/1] h-[120px]" />
+        <ImageField name="logoUrl" label="Logo" initial={r.logoUrl} aspect="aspect-square" crop={{ aspect: 1, outputWidth: 600, title: "Adjust your logo" }} />
+        <ImageField name="coverUrl" label="Cover photo" initial={r.coverUrl} aspect="aspect-[16/9] max-w-sm" crop={{ aspect: 16 / 9, outputWidth: 1600, title: "Adjust your cover photo", guide: { aspect: 3.1, label: "Visible on wide screens" } }} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Restaurant name" error={fe.displayName}>
@@ -119,6 +137,18 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
   const [zones, setZones] = useState<ZoneRow[]>(r.zones.length ? r.zones : [{ maxKm: "3", fee: "1.5" }, { maxKm: "6", fee: "2.5" }]);
   const [delivery, setDelivery] = useState(r.deliveryEnabled);
   const radius = Math.max(0, ...zones.map((z) => Number(z.maxKm) || 0));
+  const innerRings = zones.map((z) => Number(z.maxKm) || 0).filter((km) => km > 0 && km < radius);
+  // Typed values apply on blur/Enter, so typing "15" doesn't briefly apply "1" and drop inner zones.
+  const [radiusText, setRadiusText] = useState<string | null>(null);
+  // The radius control edits the outermost zone; inner zones beyond the new radius are dropped.
+  const setRadius = (km: number) => {
+    if (!Number.isFinite(km) || km <= 0) return;
+    const v = String(Math.min(MAX_ZONE_KM, Math.round(km * 10) / 10));
+    const sorted = [...zones].sort((a, b) => (Number(a.maxKm) || 0) - (Number(b.maxKm) || 0));
+    if (!sorted.length) return setZones([{ maxKm: v, fee: "" }]);
+    const outer = { ...sorted[sorted.length - 1], maxKm: v };
+    setZones([...sorted.slice(0, -1).filter((z) => (Number(z.maxKm) || 0) < Number(v)), outer]);
+  };
   return (
     <form action={action} className="space-y-4">
       {state?.ok && <Alert tone="green">{state.message}</Alert>}
@@ -153,7 +183,45 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
 
       <div>
         <div className="label">Restaurant location {delivery && <span className="text-brand-600">(required for delivery)</span>}</div>
-        <MapPicker value={pin} onChange={setPin} radiusKm={delivery && radius ? radius : undefined} height={300} />
+        <MapPicker value={pin} onChange={setPin} radiusKm={delivery && radius ? radius : undefined} rings={delivery ? innerRings : []} height={300} />
+        {delivery && (
+          <div className="mt-3 rounded-xl border border-black/10 bg-white p-3">
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="radius-km" className="text-sm font-semibold">
+                Delivery radius
+              </label>
+              <span className="flex items-center gap-1.5 text-sm font-semibold">
+                <input
+                  id="radius-km"
+                  type="number"
+                  min={0.5}
+                  max={MAX_ZONE_KM}
+                  step={0.5}
+                  value={radiusText ?? (radius || "")}
+                  onChange={(e) => setRadiusText(e.target.value)}
+                  onBlur={() => {
+                    if (radiusText !== null) setRadius(Number(radiusText));
+                    setRadiusText(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  className="input h-9 w-20 text-right text-sm"
+                />
+                km
+              </span>
+            </div>
+            <input type="range" min={0.5} max={30} step={0.5} value={Math.min(radius || 0.5, 30)} onChange={(e) => setRadius(Number(e.target.value))} className="mt-2 w-full accent-brand-500" aria-label="Delivery radius in km" />
+            <div className="flex justify-between text-[11px] text-ink-muted">
+              <span>0.5 km</span>
+              <span>30 km (type up to {MAX_ZONE_KM})</span>
+            </div>
+            <p className="mt-1 text-xs text-ink-muted">Customers outside the circle can still order pickup. Set fees per distance in the delivery zones below.</p>
+          </div>
+        )}
         <input type="hidden" name="latitude" value={pin?.lat ?? ""} />
         <input type="hidden" name="longitude" value={pin?.lng ?? ""} />
         {fe.location && <p className="mt-1 text-xs font-medium text-red-600">{fe.location}</p>}
