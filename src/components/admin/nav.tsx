@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, Menu, Scale, ScrollText, Settings, ShieldCheck, Store, Wallet, X, LogOut } from "lucide-react";
+import { BarChart3, Bell, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, Menu, Scale, ScrollText, Settings, ShieldCheck, Store, Wallet, X, LogOut, Megaphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/actions/auth";
 
@@ -23,6 +23,7 @@ export function AdminNav({ counts }: { counts: Record<string, number> }) {
     { href: "/admin/categories", label: "Categories", icon: LayoutGrid },
     { href: "/admin/settings", label: "Settings", icon: Settings },
     { href: "/admin/audit", label: "Audit log", icon: ScrollText },
+    { href: "/admin/push", label: "Push notifications", icon: Megaphone },
     { href: "/admin/notifications", label: "Notifications", icon: Bell, badge: counts.notifications },
   ];
   const content = (

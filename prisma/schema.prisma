@@ -1047,3 +1047,22 @@ model Job {
   @@index([status, runAfter])
   @@map("jobs")
 }
+
+/// Admin push broadcasts (history shown on Admin → Push notifications).
+model PushBroadcast {
+  id          String   @id @default(cuid())
+  audience    String // everyone | customers | restaurants | user | restaurant
+  targetLabel String?
+  title       String?
+  body        String?
+  imageUrl    String?
+  link        String?
+  recipients  Int      @default(0) // people with notifications on
+  devices     Int      @default(0)
+  delivered   Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("push_broadcasts")
+}

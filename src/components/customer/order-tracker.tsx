@@ -7,6 +7,7 @@ import { Banknote, CheckCircle2, ChefHat, Circle, Clock, Phone, RotateCcw, Star,
 import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { isActive, STATUS_META, type OrderStatusKey } from "@/lib/order-status";
+import { NotifyPrompt } from "./notify-prompt";
 import { formatDateTime, cn } from "@/lib/utils";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Alert, Badge } from "@/components/ui/misc";
@@ -123,6 +124,8 @@ export function OrderTracker({ order: o, token, placed, loggedIn }: { order: Ord
             <p className="mt-1">You&apos;ll see updates here as soon as they accept it.{!loggedIn && " Keep this page or bookmark the link to track it."}</p>
           </div>
         )}
+
+        {loggedIn && active && <NotifyPrompt compact />}
 
         <div className="card p-5">
           <div className="flex items-start justify-between gap-3">

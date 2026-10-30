@@ -9,12 +9,12 @@ import { notifyRestaurant, notifyUser } from "./notifications";
 import { sendEmail } from "./email";
 import { randomToken } from "./crypto";
 import { validateSelections, unitPrice, type CustomizationGroupDef } from "@/lib/customization";
-import { normalizePhone } from "@/lib/phone";
+import { formatPhone, normalizePhone } from "@/lib/phone";
 import { formatMoney, parseAmount, toUsdCents } from "@/lib/money";
 import { isOpenAt, type OpeningHours } from "@/lib/hours";
 import { STATUS_META, type OrderStatusKey } from "@/lib/order-status";
 import { formatKm, isValidLatLng, quoteDelivery } from "@/lib/geo";
-import { pushToRestaurantStaff } from "./push";
+import { pushToRestaurantStaff, pushToUsers } from "./push";
 
 export class OrderError extends Error {
   status = 400;
@@ -314,6 +314,13 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
       url: `/dashboard/orders?ref=${order.reference}`,
       tag: `order-${order.reference}`,
     });
+    void emailNewOrder(restaurant.id, order.reference, {
+      customer: `${c.name} · ${formatPhone(e164)}`,
+      fulfillment: input.fulfillment === "DELIVERY" ? `Delivery${distance != null ? ` (${formatKm(distance)})` : ""}: ${[c.area, c.address, c.building].filter(Boolean).join(", ")}` : "Pickup",
+      lines: priced.lines.map((l) => `${l.quantity}× ${l.name}${l.chosen.length ? ` (${l.chosen.map((x) => x.optionName).join(", ")})` : ""}${l.specialInstructions ? ` — ${l.specialInstructions}` : ""}  ${formatMoney(l.lineTotalCents, currency)}`),
+      total: formatMoney(totalCents, currency),
+      notes: c.notes || null,
+    });
     return { reference: order.reference, trackingToken: order.trackingToken, totalCents: order.totalCents, currency: order.currency, duplicate: false };
   } catch (e) {
     if (isUniqueViolation(e)) {
@@ -321,6 +328,20 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
       if (again) return { reference: again.reference, trackingToken: again.trackingToken, totalCents: again.totalCents, currency: again.currency, duplicate: true };
     }
     throw e;
+  }
+}
+
+/** Email the restaurant (its contact email + owners/managers) about a new order. Never throws. */
+async function emailNewOrder(restaurantId: string, reference: string, o: { customer: string; fulfillment: string; lines: string[]; total: string; notes: string | null }) {
+  try {
+    const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { displayName: true, email: true, staff: { where: { role: { in: ["OWNER", "MANAGER"] } }, select: { user: { select: { email: true } } } } } });
+    if (!r) return;
+    const to = Array.from(new Set([r.email, ...r.staff.map((s) => s.user.email)].filter((e): e is string => !!e)));
+    const link = `${process.env.APP_URL ?? ""}/dashboard/orders?ref=${reference}`;
+    const text = [`New order ${reference} for ${r.displayName}`, "", `Customer: ${o.customer}`, o.fulfillment, "", ...o.lines, "", `Total (cash on delivery): ${o.total}`, ...(o.notes ? ["", `Note: ${o.notes}`] : []), "", `Accept it in your dashboard: ${link}`].join("\n");
+    await Promise.all(to.map((addr) => sendEmail(addr, `🔔 New order ${reference} · ${o.total}`, text)));
+  } catch (e) {
+    console.error("[email] new order", e);
   }
 }
 
@@ -343,6 +364,8 @@ async function notifyCustomer(tx: Tx, order: { id: string; userId: string | null
   await notifyUser(order.userId, { type: "ORDER_STATUS", title, body: extra, link: `/order/${order.reference}` }, tx);
   const u = await tx.user.findUnique({ where: { id: order.userId }, select: { email: true } });
   if (u?.email) void sendEmail(u.email, `Order ${order.reference} — ${STATUS_META[status].label}`, `${title}${extra ? `\n${extra}` : ""}\n\n${process.env.APP_URL ?? ""}/order/${order.reference}?t=${order.trackingToken}`);
+  // Phone notification (if they turned notifications on); tapping opens the order.
+  void pushToUsers([order.userId], { title, body: extra || "Tap to see your order", url: `/order/${order.reference}`, tag: `status-${order.reference}` });
 }
 
 /**
@@ -448,6 +471,7 @@ export async function adminCancelOrder(adminId: string, orderId: string, note: s
     const order = await tx.order.update({ where: { id: orderId }, data: { status: "CANCELED", canceledAt: new Date(), canceledBy: "ADMIN", cancelReason: note } });
     await tx.orderEvent.create({ data: { orderId, type: "ADMIN_CANCELED", actorType: "ADMIN", actorId: adminId, data: { note } } });
     await tx.commissionEvent.updateMany({ where: { orderId, status: "ACCRUED" }, data: { status: "VOIDED" } });
+    await notifyCustomer(tx, order, "CANCELED", note || undefined);
     return order;
   });
 }

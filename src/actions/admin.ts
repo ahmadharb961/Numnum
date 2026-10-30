@@ -9,6 +9,7 @@ import { ipHash } from "@/server/request";
 import { notifyRestaurant } from "@/server/notifications";
 import { getSettings, updateSetting, type Settings } from "@/server/settings";
 import { adminCancelOrder } from "@/server/orders";
+import { sendBroadcast, type BroadcastInput, type BroadcastResult } from "@/server/broadcast";
 import { applyAdjustmentToInvoice, createAdjustment, decideAdjustment, generateInvoice, recordManualPayment, resolveDispute, reviewPayment, runBillingMaintenance, runMonthlyBilling, previewInvoice, refreshInvoiceStatus, type PaymentReview } from "@/server/billing";
 import { recomputeItemRating, recomputeRestaurantRating } from "@/server/reviews";
 import { parseAmount } from "@/lib/money";
@@ -345,4 +346,11 @@ export async function markAdminNotificationsReadAction() {
     await prisma.notification.updateMany({ where: { audience: "ADMIN", readAt: null }, data: { readAt: new Date() } });
     revalidatePath("/admin", "layout");
   });
+}
+
+export async function sendBroadcastAction(input: BroadcastInput): Promise<BroadcastResult> {
+  const admin = await requireAdmin();
+  const r = await sendBroadcast(input, admin.id);
+  if (r.ok) revalidatePath("/admin/push");
+  return r;
 }

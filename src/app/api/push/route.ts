@@ -24,7 +24,10 @@ export async function POST(req: Request) {
       create: { userId: user.id, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, userAgent: ua },
       update: { userId: user.id, p256dh: sub.keys.p256dh, auth: sub.keys.auth, userAgent: ua, lastUsedAt: new Date() },
     });
-    if ((body as { test?: boolean }).test) await pushToUsers([user.id], { title: "numnum notifications are on ✅", body: "You'll be alerted here for every new order.", url: "/dashboard/orders", tag: "test" });
+    if ((body as { test?: boolean }).test) {
+      const staff = await prisma.restaurantStaff.count({ where: { userId: user.id } });
+      await pushToUsers([user.id], staff ? { title: "numnum notifications are on ✅", body: "You'll be alerted here for every new order.", url: "/dashboard/orders", tag: "test" } : { title: "numnum notifications are on ✅", body: "You'll get updates about your orders here.", url: "/account/orders", tag: "test" });
+    }
     return json({ ok: true });
   } catch (e) {
     return errorResponse(e);

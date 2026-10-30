@@ -27,7 +27,16 @@ export async function vapidKeys() {
   return keys;
 }
 
-export type PushMessage = { title: string; body: string; url: string; tag?: string };
+export type PushMessage = {
+  title: string;
+  body: string;
+  url: string;
+  tag?: string;
+  /** Large picture shown in the notification (Android/desktop; iOS shows text only). */
+  image?: string;
+  /** Keep it on screen until the person taps or dismisses it. */
+  requireInteraction?: boolean;
+};
 
 /** Sends to every device the given users turned notifications on for. Never throws. */
 export async function pushToUsers(userIds: string[], msg: PushMessage) {
@@ -42,7 +51,7 @@ export async function pushToUsers(userIds: string[], msg: PushMessage) {
     await Promise.allSettled(
       subs.map(async (s) => {
         try {
-          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(msg), { TTL: 60 * 60, timeout: 8000, urgency: "high" });
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(msg), { TTL: msg.requireInteraction ? 24 * 3600 : 60 * 60, timeout: 8000, urgency: "high" });
           sent++;
           await prisma.pushSubscription.update({ where: { id: s.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
         } catch (e) {

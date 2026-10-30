@@ -3,7 +3,7 @@
 // - images/posters: stale-while-revalidate (bounded)
 // - pages: network-first with offline fallback
 // - API, uploads and videos: never cached (videos use HTTP range requests)
-const VERSION = "nn-v2";
+const VERSION = "nn-v3";
 const STATIC = `${VERSION}-static`;
 const IMAGES = `${VERSION}-images`;
 const PAGES = `${VERSION}-pages`;
@@ -53,7 +53,7 @@ self.addEventListener("fetch", (e) => {
   }
 });
 
-// ───── Push notifications (new orders for restaurants) ─────
+// ───── Push notifications (new orders, order updates, admin broadcasts) ─────
 self.addEventListener("push", (event) => {
   let d = {};
   try {
@@ -68,7 +68,9 @@ self.addEventListener("push", (event) => {
       badge: "/icons/icon-192.png",
       tag: d.tag || undefined,
       renotify: !!d.tag,
-      requireInteraction: (d.tag || "").startsWith("order-"),
+      image: d.image || undefined,
+      // Stays on screen until tapped: new orders, order updates and admin broadcasts.
+      requireInteraction: d.requireInteraction ?? (d.tag || "").startsWith("order-"),
       vibrate: [200, 100, 200, 100, 200],
       data: { url: d.url || "/" },
     }),
@@ -80,6 +82,8 @@ self.addEventListener("notificationclick", (event) => {
   const url = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin).href;
   event.waitUntil(
     (async () => {
+      // Links to other sites open in the browser instead of replacing the app.
+      if (new URL(url).origin !== self.location.origin) return self.clients.openWindow(url);
       const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const win = list.find((c) => c.url.startsWith(self.location.origin));
       if (!win) return self.clients.openWindow(url);

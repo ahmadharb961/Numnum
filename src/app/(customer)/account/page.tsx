@@ -4,6 +4,7 @@ import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { PageHeader } from "@/components/customer/page-header";
 import { AccountForm } from "@/components/customer/account-form";
+import { NotifyPrompt } from "@/components/customer/notify-prompt";
 import { logoutAction } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/misc";
@@ -39,6 +40,7 @@ export default async function AccountPage() {
             <span className="tabular text-sm font-semibold">{formatMoney(o.totalCents, o.currency)}</span>
           </Link>
         ))}
+        <NotifyPrompt />
         <nav className="card divide-y divide-black/5">
           {[
             ...workLinks,
