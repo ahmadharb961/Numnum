@@ -17,18 +17,23 @@ export function ItemSheet({ itemId, reelId, open, onClose }: { itemId: string | 
     if (!open || !itemId) return;
     setError(null);
     track("product_opened", { menuItemId: itemId, reelId: reelId ?? undefined });
-    if (cache.has(itemId)) {
-      setItem(cache.get(itemId)!);
-      return;
-    }
-    setItem(null);
-    fetch(`/api/items/${itemId}`)
+    // Show the remembered copy instantly, but always refresh it: restaurants change photos,
+    // prices and availability while the app stays open.
+    const cached = cache.get(itemId);
+    setItem(cached ?? null);
+    let cancelled = false;
+    fetch(`/api/items/${itemId}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Item not available"))))
       .then((d: PublicItem) => {
         cache.set(itemId, d);
-        setItem(d);
+        if (!cancelled) setItem(d);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        if (!cancelled && !cached) setError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open, itemId, reelId]);
 
   return (
