@@ -7,7 +7,11 @@ import { getCurrentUser } from "@/server/auth";
 import { getMainImages } from "@/server/menu";
 import { publicReelWhere } from "@/server/feed";
 import { DishCard, ReelThumb, RestaurantCard } from "@/components/customer/cards";
-import { EmptyState } from "@/components/ui/misc";
+import { Badge, EmptyState } from "@/components/ui/misc";
+import { deviceId } from "@/server/request";
+import { formatMoney } from "@/lib/money";
+import { STATUS_META } from "@/lib/order-status";
+import { MapPin, Receipt, UserRound } from "lucide-react";
 
 export const metadata: Metadata = { title: "Saved", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -22,6 +26,12 @@ export default async function SavedPage() {
     prisma.restaurant.findMany({ where: { id: { in: ids("RESTAURANT") }, status: "ACTIVE" }, include: { _count: { select: { menuItems: true } } } }),
   ]);
   const images = await getMainImages(items.map((i) => i.id));
+  const dev = await deviceId();
+  const recentOrders = user
+    ? await prisma.order.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 3 })
+    : dev
+      ? await prisma.order.findMany({ where: { deviceKey: dev, userId: null }, orderBy: { createdAt: "desc" }, take: 5 })
+      : [];
   const empty = !reels.length && !items.length && !restaurants.length;
   return (
     <main className="pb-nav">
@@ -33,7 +43,7 @@ export default async function SavedPage() {
             <Link href="/account/register?next=/saved" className="font-semibold text-brand-600">
               Create an account
             </Link>{" "}
-            to keep them across devices.
+            to keep saves, addresses and order history across devices.
           </p>
         )}
         {user && (
@@ -46,6 +56,36 @@ export default async function SavedPage() {
         )}
       </header>
       <div className="container-app space-y-6 pt-2">
+        {user && (
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { href: "/account/orders", icon: Receipt, label: "Orders" },
+              { href: "/account/addresses", icon: MapPin, label: "Addresses" },
+              { href: "/account", icon: UserRound, label: "Account" },
+            ].map((l) => (
+              <Link key={l.href} href={l.href} className="card flex flex-col items-center gap-1 py-3 text-xs font-semibold">
+                <l.icon className="h-5 w-5 text-brand-600" />
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        )}
+        {recentOrders.length > 0 && (
+          <section>
+            <h2 className="mb-2 font-extrabold">{user ? "Recent orders" : "Your orders on this device"}</h2>
+            <div className="space-y-2">
+              {recentOrders.map((o) => (
+                <Link key={o.id} href={`/order/${o.reference}`} className="card flex items-center justify-between gap-3 p-3.5 text-sm">
+                  <span className="min-w-0">
+                    <span className="block truncate font-bold">{o.restaurantName}</span>
+                    <Badge tone={STATUS_META[o.status].tone}>{STATUS_META[o.status].label}</Badge>
+                  </span>
+                  <span className="tabular font-semibold">{formatMoney(o.totalCents, o.currency)}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
         {empty && <EmptyState icon={<Bookmark />} title="Nothing saved yet" body="Tap the bookmark on reels or save restaurants to find them here." action={<Link href="/" className="chip chip-active">Watch reels</Link>} />}
         {reels.length > 0 && (
           <section>

@@ -9,7 +9,7 @@ const appUrl = process.env.APP_URL || "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: { default: "numnum — Watch it. Crave it. Order it.", template: "%s · numnum" },
-  description: "Discover Lebanon's best food through short videos and order straight from restaurants on WhatsApp.",
+  description: "Discover Lebanon's best food through short videos and order from local restaurants — cash on delivery.",
   applicationName: "numnum",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "numnum", statusBarStyle: "black-translucent" },

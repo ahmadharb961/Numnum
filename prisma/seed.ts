@@ -12,7 +12,7 @@ import { prisma } from "../src/server/db";
 import { hashPassword } from "../src/server/passwords";
 import { processImage, storeRawVideo, processVideoAsset } from "../src/server/media";
 import { attachImage } from "../src/server/menu";
-import { createOrder, recordHandoff, restaurantOrderAction } from "../src/server/orders";
+import { createOrder, restaurantOrderAction, customerCancelOrder } from "../src/server/orders";
 import { generateInvoice, submitPayment } from "../src/server/billing";
 import { submitItemReview, submitRestaurantReview } from "../src/server/reviews";
 import { updateSetting, DEFAULT_SETTINGS } from "../src/server/settings";
@@ -108,7 +108,7 @@ const DEMOS: Demo[] = [
   {
     slug: "burger-house", name: "Burger House", business: "Burger House SARL", cuisine: "Burgers, American", area: "Hamra", city: "Beirut", owner: "owner@burgerhouse.demo", verified: true, fee: null,
     desc: "Smashed-to-order burgers on toasted brioche. Fresh beef ground daily, hand-cut fries.", lat: 33.8959, lng: 35.4787,
-    areas: [["Hamra", 1.5], ["Ras Beirut", 2], ["Verdun", 2.5], ["Achrafieh", null]],
+    areas: [["Hamra", 1.5], ["Ras Beirut", 2], ["Verdun", 2.5], ["Achrafieh", 3]],
     groups: {
       cheese: { name: "Cheese", type: "SINGLE", required: true, options: [["Cheddar", 0, true], ["American", 0], ["Swiss", 50]] },
       extras: { name: "Extra toppings", type: "MULTIPLE", max: 4, options: [["Extra cheese", 100], ["Bacon", 150], ["Fried egg", 100], ["Caramelized onions", 75]] },
@@ -152,7 +152,7 @@ const DEMOS: Demo[] = [
     reels: ["SH001", "SH003"],
   },
   {
-    slug: "pizza-forno", name: "Pizza Forno", business: "Forno Group", cuisine: "Pizza, Italian", area: "Jounieh", city: "Jounieh", owner: "owner@forno.demo", fee: null,
+    slug: "pizza-forno", name: "Pizza Forno", business: "Forno Group", cuisine: "Pizza, Italian", area: "Jounieh", city: "Jounieh", owner: "owner@forno.demo", fee: 250,
     desc: "48-hour fermented dough, San Marzano tomatoes, wood-fired at 450°C.", lat: 33.9808, lng: 35.6178,
     groups: { size: { name: "Size", type: "SINGLE", required: true, options: [["Medium", 0, true], ["Large", 300]] }, crust: { name: "Crust", type: "SINGLE", required: true, options: [["Classic", 0, true], ["Thin", 0]] }, top: { name: "Toppings", type: "MULTIPLE", max: 5, options: [["Extra cheese", 150], ["Mushrooms", 100], ["Olives", 75], ["Rocket", 75], ["Spicy salami", 200]] } },
     items: [
@@ -174,7 +174,7 @@ const DEMOS: Demo[] = [
     reels: ["CF002"],
   },
   {
-    slug: "sweet-ashta", name: "Sweet Ashta", business: "Sweet Ashta", cuisine: "Lebanese desserts", area: "Tripoli", city: "Tripoli", owner: "owner@ashta.demo", currency: "LBP", fee: null,
+    slug: "sweet-ashta", name: "Sweet Ashta", business: "Sweet Ashta", cuisine: "Lebanese desserts", area: "Tripoli", city: "Tripoli", owner: "owner@ashta.demo", currency: "LBP", fee: 150000,
     desc: "Traditional Tripoli sweets — warm knefeh and fresh ashta.", lat: 34.4367, lng: 35.8497,
     groups: { bread: { name: "Serve with", type: "SINGLE", options: [["Kaak bread", 0, true], ["Plate only", 0]] } },
     items: [
@@ -208,8 +208,8 @@ async function seedDemo(adminId: string) {
     const r = await prisma.restaurant.create({
       data: {
         slug: d.slug, businessName: d.business, displayName: d.name, description: d.desc, cuisine: d.cuisine, area: d.area, city: d.city, address: `${d.area} main street, ${d.city}`,
-        phone: "96170123456", whatsappNumber: "96170123456", email: d.owner, latitude: d.lat, longitude: d.lng, currency,
-        deliveryEnabled: true, pickupEnabled: true, deliveryFeeCents: d.fee ?? null, openingHours: HOURS, socialLinks: { instagram: `https://instagram.com/${d.slug.replace(/-/g, "")}` },
+        phone: "96170123456", email: d.owner, latitude: d.lat, longitude: d.lng, currency, avgPrepMinutes: 25,
+        deliveryEnabled: true, pickupEnabled: true, deliveryFeeCents: d.fee ?? 0, socialLinks: { instagram: `https://instagram.com/${d.slug.replace(/-/g, "")}` },
         status: "ACTIVE", publishedAt: new Date(), orderingEnabled: true, agreementAcceptedAt: new Date(), agreementVersion: DEFAULT_SETTINGS.agreementVersion, agreementAcceptedBy: owner.id,
         verificationStatus: d.verified ? "APPROVED" : "NOT_REQUESTED",
         staff: { create: { userId: owner.id, role: "OWNER" } },
@@ -262,31 +262,41 @@ async function seedDemo(adminId: string) {
   const groups = await prisma.customizationGroup.findMany({ where: { restaurantId: burger.r.id }, include: { options: true } });
   const g = (name: string) => groups.find((x) => x.name === name)!;
   const opt = (gn: string, on: string) => g(gn).options.find((o) => o.name === on)!.id;
-  const make = async (i: number, phone: string, status: "ack" | "accept" | "fulfill" | "reject" | "none") => {
+  type Plan = "complete" | "accept" | "preparing" | "out" | "placed" | "reject" | "cancel";
+  const make = async (i: number, phone: string, plan: Plan, userId: string | null) => {
+    const device = `seed-device-${i}-aaaaaaaaaaaa`;
     const o = await createOrder(
       {
         idempotencyKey: `seed-order-${i}-xxxxxxxxxxxxxxxx`,
         restaurantId: burger.r.id,
         fulfillment: "DELIVERY",
+        changeFor: i % 3 === 0 ? "50" : null,
         items: [
           { menuItemId: burger.items.BRG001, quantity: 2, selections: { [g("Cheese").id]: [opt("Cheese", "Cheddar")], [g("Extra toppings").id]: [opt("Extra toppings", "Extra cheese")], [g("Remove ingredients").id]: [opt("Remove ingredients", "No pickles")], [g("Sauce").id]: [opt("Sauce", "BBQ sauce")], [g("Cooking preference").id]: [opt("Cooking preference", "Medium")] } },
           { menuItemId: burger.items.SD001, quantity: 1, selections: {} },
         ],
-        customer: { name: i === 0 ? "Rana Haddad" : `Customer ${i}`, phone, address: "Hamra, Bliss street, near AUB gate", area: "Hamra", latitude: 33.8995, longitude: 35.4807 },
+        customer: { name: i === 0 ? "Rana Haddad" : `Customer ${i}`, phone, address: "Bliss street, near AUB gate", building: "Azar bldg, 3rd floor", area: "Hamra", latitude: 33.8995, longitude: 35.4807, saveAddress: i === 0, addressLabel: "Home" },
       },
-      { deviceKey: `seed-device-${i}-aaaaaaaaaaaa`, ipHash: null },
+      { deviceKey: device, ipHash: null, userId },
     );
     const order = await prisma.order.findUniqueOrThrow({ where: { reference: o.reference } });
-    await recordHandoff(o.reference, `seed-device-${i}-aaaaaaaaaaaa`);
-    if (status === "ack" || status === "accept" || status === "fulfill") await restaurantOrderAction(burger.r.id, burger.owner.id, order.id, "ACKNOWLEDGE");
-    if (status === "accept" || status === "fulfill") await restaurantOrderAction(burger.r.id, burger.owner.id, order.id, "ACCEPT");
-    if (status === "fulfill") await restaurantOrderAction(burger.r.id, burger.owner.id, order.id, "FULFILL");
-    if (status === "reject") await restaurantOrderAction(burger.r.id, burger.owner.id, order.id, "REJECT", { reason: "Outside delivery area" });
+    const act = (a: Parameters<typeof restaurantOrderAction>[3], opts = {}) => restaurantOrderAction(burger.r.id, burger.owner.id, order.id, a, opts);
+    if (plan === "reject") await act("REJECT", { reason: "Too busy right now" });
+    else if (plan === "cancel") await customerCancelOrder(o.reference, { userId, deviceKey: device });
+    else if (plan !== "placed") {
+      await act("ACCEPT", { etaMinutes: 35 });
+      if (plan === "preparing" || plan === "out" || plan === "complete") await act("PREPARING");
+      if (plan === "out" || plan === "complete") await act("DISPATCH");
+      if (plan === "complete") await act("COMPLETE");
+    }
     return order;
   };
-  const plan: ("fulfill" | "accept" | "ack" | "reject" | "none")[] = ["fulfill", "fulfill", "fulfill", "accept", "fulfill", "reject", "ack", "none", "none"];
+  const plan: Plan[] = ["complete", "complete", "complete", "complete", "complete", "reject", "out", "preparing", "placed", "cancel"];
   const orders = [];
-  for (const [i, st] of plan.entries()) orders.push(await make(i, i === 0 ? "71 111 111" : `70 2${String(i).padStart(2, "0")} 345`, st));
+  for (const [i, st] of plan.entries()) orders.push(await make(i, i === 0 ? "71 111 111" : `70 2${String(i).padStart(2, "0")} 345`, st, i === 0 || i === 7 ? customer.id : null));
+  // Opening hours are set after the demo orders so seeding works at any time of day.
+  const ALWAYS = Object.fromEntries(["sun", "mon", "tue", "wed", "thu", "fri", "sat"].map((d) => [d, [{ open: "00:00", close: "00:00" }]]));
+  for (const c of created) await prisma.restaurant.update({ where: { id: c.r.id }, data: { openingHours: ["burger-house", "shawarma-station", "bean-bar"].includes(c.r.slug) ? ALWAYS : HOURS } });
 
   // Move the first five commission events into last month and invoice them
   const last = previousPeriod();

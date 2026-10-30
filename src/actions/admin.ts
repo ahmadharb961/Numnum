@@ -8,7 +8,7 @@ import { audit } from "@/server/audit";
 import { ipHash } from "@/server/request";
 import { notifyRestaurant } from "@/server/notifications";
 import { getSettings, updateSetting, type Settings } from "@/server/settings";
-import { adminSetOrderStatus } from "@/server/orders";
+import { adminCancelOrder } from "@/server/orders";
 import { applyAdjustmentToInvoice, createAdjustment, decideAdjustment, generateInvoice, recordManualPayment, resolveDispute, reviewPayment, runBillingMaintenance, runMonthlyBilling, previewInvoice, refreshInvoiceStatus, type PaymentReview } from "@/server/billing";
 import { recomputeItemRating, recomputeRestaurantRating } from "@/server/reviews";
 import { parseAmount } from "@/lib/money";
@@ -90,12 +90,12 @@ export async function revokeVerificationAction(restaurantId: string, note: strin
 
 // ───── Orders ─────
 
-export async function adminOrderStatusAction(orderId: string, status: "CANCELED" | "DISPUTED", note: string) {
+export async function adminCancelOrderAction(orderId: string, note: string) {
   const { user, ip } = await admin();
   return wrap(async () => {
     if (!note.trim()) throw new Error("Add a note");
-    await adminSetOrderStatus(user.id, orderId, status, note);
-    await audit({ actorId: user.id, action: `order.${status.toLowerCase()}`, entityType: "order", entityId: orderId, data: { note }, ipHash: ip });
+    await adminCancelOrder(user.id, orderId, note);
+    await audit({ actorId: user.id, action: "order.cancel", entityType: "order", entityId: orderId, data: { note }, ipHash: ip });
     revalidatePath("/admin/orders");
   }, "Order updated");
 }
@@ -328,7 +328,7 @@ export async function saveSettingsAction(patch: Partial<Settings>) {
   return wrap(async () => {
     const current = await getSettings();
     if (patch.defaultCommissionRateBps !== undefined && (patch.defaultCommissionRateBps < 0 || patch.defaultCommissionRateBps > 5000)) throw new Error("Commission must be between 0% and 50%");
-    if (patch.billableEvent === "MESSAGE_CONFIRMED" && !(patch.whatsappBusinessIntegration ?? current.whatsappBusinessIntegration)) throw new Error("Message-confirmed billing requires a verified WhatsApp Business integration");
+    if (patch.autoCompleteHours !== undefined && (patch.autoCompleteHours < 1 || patch.autoCompleteHours > 72)) throw new Error("Auto-complete must be between 1 and 72 hours");
     if (patch.lbpPerUsd !== undefined && !(patch.lbpPerUsd > 0)) throw new Error("Exchange rate must be positive");
     if (patch.invoiceDueDays !== undefined && (patch.invoiceDueDays < 1 || patch.invoiceDueDays > 90)) throw new Error("Due days must be 1–90");
     for (const [k, v] of Object.entries(patch) as [keyof Settings, Settings[keyof Settings]][]) {

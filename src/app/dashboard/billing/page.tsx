@@ -13,7 +13,7 @@ import { formatDate, periodLabel } from "@/lib/utils";
 
 export const metadata = { title: "Billing & Commissions" };
 
-const BILLABLE: Record<string, string> = { ACKNOWLEDGED: "you acknowledge an order request", ACCEPTED: "you accept an order request", FULFILLED: "you mark an order fulfilled", MESSAGE_CONFIRMED: "a WhatsApp message delivery is confirmed" };
+const BILLABLE: Record<string, string> = { ACCEPTED: "you accept an order", COMPLETED: "an order is completed (delivered or picked up)" };
 
 export default async function BillingPage() {
   const ctx = await requireRestaurant("OWNER");
@@ -49,7 +49,7 @@ export default async function BillingPage() {
           <PayWhishButton invoice={{ id: payable.id, number: payable.number, outstandingCents: outstanding(payable) }} whish={s.settings.whish} />
         </div>
       )}
-      {!r.agreementAcceptedAt && <Alert className="mb-5">You haven&apos;t accepted the commission agreement yet, so WhatsApp ordering is off. <Link className="font-semibold underline" href="/dashboard/agreement">Review agreement</Link></Alert>}
+      {!r.agreementAcceptedAt && <Alert className="mb-5">You haven&apos;t accepted the commission agreement yet, so online ordering is off. <Link className="font-semibold underline" href="/dashboard/agreement">Review agreement</Link></Alert>}
 
       <Section title="Invoices">
         {invoices.length ? (

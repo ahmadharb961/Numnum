@@ -40,7 +40,7 @@ function ReviewCard({ r, kind, canReply }: { r: Review; kind: "item" | "restaura
         <div className="flex items-center gap-2">
           <Stars value={r.rating} />
           <span className="text-sm font-semibold">{r.user.split(" ")[0]}</span>
-          {r.evidence !== "UNVERIFIED" && <Badge tone="green">{r.evidence === "FULFILLED_ORDER" ? "Fulfilled order" : "Acknowledged order"}</Badge>}
+          {r.evidence !== "UNVERIFIED" && <Badge tone="green">{r.evidence === "COMPLETED_ORDER" ? "Verified order" : "Ordered on numnum"}</Badge>}
           {r.hidden && <Badge tone="red">Hidden by moderators</Badge>}
         </div>
         <span className="text-xs text-ink-muted">{formatDate(r.createdAt)}</span>

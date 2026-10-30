@@ -75,7 +75,7 @@ export function ProfileForm({ r }: { r: Record<string, string> }) {
         <Field label="Cuisine">
           <input name="cuisine" className="input" defaultValue={r.cuisine} placeholder="Lebanese, Grills" />
         </Field>
-        <Field label="Public phone" error={fe.phone}>
+        <Field label="Restaurant phone (customers call this about orders)" error={fe.phone}>
           <input name="phone" className="input" type="tel" defaultValue={r.phone} />
         </Field>
         <Field label="Email (billing notifications)" error={fe.email}>
@@ -131,7 +131,7 @@ export function ProfileForm({ r }: { r: Record<string, string> }) {
   );
 }
 
-export function OrderingForm({ r, currencies, agreementAccepted }: { r: { whatsappNumber: string; deliveryEnabled: boolean; pickupEnabled: boolean; requireMapsLocation: boolean; deliveryFee: string; minOrder: string; currency: string; orderingEnabled: boolean; areas: string }; currencies: string[]; agreementAccepted: boolean }) {
+export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPrepMinutes: string; deliveryEnabled: boolean; pickupEnabled: boolean; requireMapsLocation: boolean; deliveryFee: string; minOrder: string; currency: string; orderingEnabled: boolean; areas: string }; currencies: string[]; agreementAccepted: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveOrderingAction, undefined);
   const fe = state?.fieldErrors ?? {};
   return (
@@ -140,11 +140,11 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { whatsa
       {state?.error && <Alert tone="red">{state.error}</Alert>}
       <label className="flex items-center gap-3 rounded-xl bg-cream p-3 text-sm font-semibold">
         <input type="checkbox" name="orderingEnabled" defaultChecked={r.orderingEnabled} disabled={!agreementAccepted} className="h-5 w-5 accent-brand-500" />
-        Accept WhatsApp order requests
+        Accepting orders (turn off to pause ordering, e.g. when you&apos;re too busy)
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="WhatsApp ordering number" error={fe.whatsappNumber} hint="Orders open a chat with this number">
-          <input name="whatsappNumber" type="tel" className="input" defaultValue={r.whatsappNumber} required />
+        <Field label="Average preparation time (minutes)" error={fe.avgPrepMinutes} hint="Suggested when you accept an order; customers see it at checkout">
+          <input name="avgPrepMinutes" type="number" min={5} max={180} className="input" defaultValue={r.avgPrepMinutes} required />
         </Field>
         <Field label="Menu currency" error={fe.currency}>
           <select name="currency" className="input" defaultValue={r.currency}>
@@ -166,14 +166,14 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { whatsa
         </label>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={`Default delivery fee (${r.currency}, optional)`} error={fe.deliveryFee} hint="Leave empty to confirm the fee with each customer">
+        <Field label={`Delivery fee (${r.currency})`} error={fe.deliveryFee} hint="Shown to customers at checkout. Enter 0 for free delivery.">
           <input name="deliveryFee" className="input" inputMode="decimal" defaultValue={r.deliveryFee} />
         </Field>
         <Field label={`Minimum order (${r.currency}, optional)`} error={fe.minOrder}>
           <input name="minOrder" className="input" inputMode="decimal" defaultValue={r.minOrder} />
         </Field>
       </div>
-      <Field label="Delivery areas (one per line, optional fee after a colon)" hint="e.g. “Hamra: 2.00”. When areas are listed, customers choose one at checkout.">
+      <Field label="Delivery areas (optional, one per line with its fee)" hint="e.g. “Hamra: 2.00”. When areas are listed, you only deliver to them; areas without a fee use the delivery fee above.">
         <textarea name="areas" className="input font-mono text-sm" rows={5} defaultValue={r.areas} placeholder={"Hamra: 2.00\nAchrafieh: 3.00\nVerdun"} />
       </Field>
       <Button type="submit" loading={pending}>

@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "./db";
 import { DEFAULT_RANK_WEIGHTS, type RankWeights } from "@/lib/ranking";
 
-export type BillableEvent = "ACKNOWLEDGED" | "ACCEPTED" | "FULFILLED" | "MESSAGE_CONFIRMED";
+export type BillableEvent = "ACCEPTED" | "COMPLETED";
 
 export type WhishSettings = {
   recipientName: string;
@@ -19,14 +19,13 @@ export type Settings = {
   supportEmail: string;
   defaultCommissionRateBps: number;
   billableEvent: BillableEvent;
-  whatsappBusinessIntegration: boolean; // only true when verified message evidence exists
+  autoCompleteHours: number; // accepted orders not closed by the restaurant are completed automatically
   agreementVersion: string;
   minViewMs: number;
   viewDedupeMinutes: number;
   invoiceDueDays: number;
   graceDays: number;
   disputeWindowDays: number;
-  ackWindowDays: number;
   lbpPerUsd: number;
   supportedCurrencies: string[];
   whish: WhishSettings;
@@ -48,15 +47,14 @@ export const DEFAULT_SETTINGS: Settings = {
   tagline: "Watch it. Crave it. Order it.",
   supportEmail: "support@numnum.app",
   defaultCommissionRateBps: 1400,
-  billableEvent: "ACKNOWLEDGED",
-  whatsappBusinessIntegration: false,
+  billableEvent: "COMPLETED",
+  autoCompleteHours: 6,
   agreementVersion: "2026-10",
   minViewMs: 2000,
   viewDedupeMinutes: 30,
   invoiceDueDays: 10,
   graceDays: 7,
   disputeWindowDays: 14,
-  ackWindowDays: 7,
   lbpPerUsd: 89500,
   supportedCurrencies: ["USD", "LBP"],
   whish: { recipientName: "", whishNumber: "", accountId: "", instructions: "Send the exact amount due via Whish Money and include the invoice number in the transfer note." },

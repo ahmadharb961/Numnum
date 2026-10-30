@@ -28,7 +28,7 @@ export default async function ReelDetailPage({ params }: { params: Promise<{ id:
         <StatCard label="Shares" value={compactNumber(reel.shareCount)} />
         <StatCard label="Product opens" value={compactNumber(reel.productOpens)} sub={rate(reel.productOpens)} />
         <StatCard label="Add to cart" value={compactNumber(reel.addToCarts)} />
-        <StatCard label="WhatsApp orders started" value={compactNumber(reel.orderInits)} sub="not confirmed orders" />
+        <StatCard label="Orders placed" value={compactNumber(reel.orderInits)} sub="from this reel" />
       </div>
       <ReelEditor
         reel={{ id: reel.id, status: reel.status, visibility: reel.visibility, caption: reel.caption ?? "", videoUrl: reel.videoUrl, posterUrl: reel.posterUrl, menuItemId: reel.menuItemId, processingError: reel.processingError, removedReason: reel.removedReason }}

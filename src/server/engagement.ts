@@ -112,6 +112,7 @@ export const ANALYTICS_EVENTS = [
   "product_opened",
   "add_to_cart",
   "cart_reviewed",
+  "checkout_started",
   "order_details_completed",
 ] as const;
 

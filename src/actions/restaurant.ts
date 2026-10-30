@@ -80,14 +80,14 @@ export async function saveProfileAction(_: FormState, form: FormData): Promise<F
 export async function saveOrderingAction(_: FormState, form: FormData): Promise<FormState> {
   const ctx = await requireRestaurant("OWNER");
   const r = ctx.restaurant;
-  const wa = normalizePhone(String(form.get("whatsappNumber") || ""));
-  if (!wa.ok) return { fieldErrors: { whatsappNumber: wa.error } };
   const fee = String(form.get("deliveryFee") || "").trim();
   const feeCents = fee ? parseAmount(fee, r.currency) : null;
-  if (fee && (feeCents === null || feeCents < 0)) return { fieldErrors: { deliveryFee: "Enter a valid fee or leave empty" } };
+  if (fee && (feeCents === null || feeCents < 0)) return { fieldErrors: { deliveryFee: "Enter a valid fee (0 for free delivery)" } };
   const min = String(form.get("minOrder") || "").trim();
   const minCents = min ? parseAmount(min, r.currency) : null;
   if (min && (minCents === null || minCents < 0)) return { fieldErrors: { minOrder: "Enter a valid amount or leave empty" } };
+  const prep = Number(form.get("avgPrepMinutes") || 30);
+  if (!Number.isInteger(prep) || prep < 5 || prep > 180) return { fieldErrors: { avgPrepMinutes: "Between 5 and 180 minutes" } };
   const deliveryEnabled = form.get("deliveryEnabled") === "on";
   const pickupEnabled = form.get("pickupEnabled") === "on";
   if (!deliveryEnabled && !pickupEnabled) return { error: "Enable delivery, pickup, or both" };
@@ -106,19 +106,18 @@ export async function saveOrderingAction(_: FormState, form: FormData): Promise<
       const c = f ? parseAmount(f, currency) : null;
       return { name: name.slice(0, 80), feeCents: c !== null && c >= 0 ? c : null };
     });
-  const waChanged = wa.e164 !== r.whatsappNumber;
+  // Customers see the full price at checkout, so every delivery order needs a known fee.
+  if (deliveryEnabled && feeCents == null && (!areas.length || areas.some((a) => a.feeCents == null))) {
+    return { fieldErrors: { deliveryFee: "Set a default delivery fee (0 for free), or a fee for every delivery area" } };
+  }
   await prisma.$transaction([
     prisma.restaurant.update({
       where: { id: r.id },
-      data: { whatsappNumber: wa.e164, deliveryEnabled, pickupEnabled, requireMapsLocation: form.get("requireMapsLocation") === "on", deliveryFeeCents: feeCents, minOrderCents: minCents, currency, orderingEnabled: r.agreementAcceptedAt ? form.get("orderingEnabled") === "on" : false },
+      data: { deliveryEnabled, pickupEnabled, requireMapsLocation: form.get("requireMapsLocation") === "on", deliveryFeeCents: feeCents, minOrderCents: minCents, avgPrepMinutes: prep, currency, orderingEnabled: r.agreementAcceptedAt ? form.get("orderingEnabled") === "on" : false },
     }),
     prisma.restaurantDeliveryArea.deleteMany({ where: { restaurantId: r.id } }),
     prisma.restaurantDeliveryArea.createMany({ data: areas.map((a) => ({ ...a, restaurantId: r.id })) }),
   ]);
-  if (waChanged) {
-    await audit({ actorId: ctx.user.id, action: "restaurant.whatsapp_changed", entityType: "restaurant", entityId: r.id, data: { from: r.whatsappNumber, to: wa.e164 } });
-    if (r.verificationStatus === "APPROVED") await notifyAdmins({ type: "WHATSAPP_CHANGED", title: `${r.displayName} changed its WhatsApp number`, link: `/admin/restaurants/${r.id}` });
-  }
   revalidatePath("/dashboard/settings");
   return { ok: true, message: "Ordering settings saved" };
 }
@@ -138,10 +137,10 @@ export async function saveHoursAction(hours: OpeningHours): Promise<ActionResult
 export async function acceptAgreementAction(): Promise<ActionResult> {
   const ctx = await requireRestaurant("OWNER");
   const s = await getSettings();
-  await prisma.restaurant.update({ where: { id: ctx.restaurant.id }, data: { agreementAcceptedAt: new Date(), agreementVersion: s.agreementVersion, agreementAcceptedBy: ctx.user.id, orderingEnabled: !!ctx.restaurant.whatsappNumber } });
+  await prisma.restaurant.update({ where: { id: ctx.restaurant.id }, data: { agreementAcceptedAt: new Date(), agreementVersion: s.agreementVersion, agreementAcceptedBy: ctx.user.id, orderingEnabled: true } });
   await audit({ actorId: ctx.user.id, action: "agreement.accept", entityType: "restaurant", entityId: ctx.restaurant.id, data: { version: s.agreementVersion, rateBps: ctx.restaurant.commissionRateBps ?? s.defaultCommissionRateBps } });
   revalidatePath("/dashboard", "layout");
-  return { ok: true, message: "Agreement accepted. WhatsApp ordering is on." };
+  return { ok: true, message: "Agreement accepted. Online ordering is on." };
 }
 
 export async function publishProfileAction(): Promise<ActionResult> {
@@ -149,7 +148,7 @@ export async function publishProfileAction(): Promise<ActionResult> {
   const r = ctx.restaurant;
   const s = await getSettings();
   const items = await prisma.menuItem.count({ where: { restaurantId: r.id, archived: false } });
-  const missing = [!r.displayName && "restaurant name", !r.whatsappNumber && "WhatsApp number", !items && "at least one menu item", !r.agreementAcceptedAt && "commission agreement"].filter(Boolean);
+  const missing = [!r.displayName && "restaurant name", !r.phone && "restaurant phone", !items && "at least one menu item", !r.agreementAcceptedAt && "commission agreement"].filter(Boolean);
   if (missing.length) return { ok: false, error: `Before publishing, add: ${missing.join(", ")}` };
   if (r.status === "ACTIVE") return { ok: true, message: "Already live" };
   if (r.status === "SUSPENDED") return { ok: false, error: "Your account is suspended. Contact support." };

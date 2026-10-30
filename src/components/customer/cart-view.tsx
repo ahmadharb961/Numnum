@@ -96,9 +96,9 @@ export function CartView() {
             </div>
             <div className="flex justify-between text-ink-muted">
               <span>Delivery fee</span>
-              <span>Confirmed at checkout</span>
+              <span>Shown at checkout</span>
             </div>
-            <p className="pt-1 text-xs text-ink-muted">No online payment. You&apos;ll send this order to the restaurant on WhatsApp and pay them directly.</p>
+            <p className="pt-1 text-xs text-ink-muted">💵 Pay cash on delivery — no card needed.</p>
           </div>
           <div className="sticky mt-4" style={{ bottom: "calc(var(--nav-h) + var(--safe-bottom) + 12px)" }}>
             <Button size="lg" block onClick={() => router.push("/checkout")}>

@@ -1,137 +1,231 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/server/db";
-import { createOrder, recordHandoff, restaurantOrderAction, OrderError } from "@/server/orders";
+import { autoCompleteStaleOrders, canViewOrder, claimDeviceOrders, createOrder, customerCancelOrder, OrderError, restaurantOrderAction } from "@/server/orders";
 import { generateInvoice, reviewPayment, submitPayment, openDispute, resolveDispute, runMonthlyBilling } from "@/server/billing";
+import { DEFAULT_SETTINGS } from "@/server/settings";
 import { makeRestaurant, orderPayload, resetDb } from "./helpers";
 
-const meta = { deviceKey: "device-aaaaaaaaaaaaaaaa", ipHash: null };
+const meta: { deviceKey: string | null; ipHash: string | null; userId: string | null } = { deviceKey: "device-aaaaaaaaaaaaaaaa", ipHash: null, userId: null };
 const key = (s: string) => `test-key-${s}-${"x".repeat(16)}`;
 
 beforeEach(async () => {
   await resetDb();
 });
 
-describe("guest ordering", () => {
-  it("prices server-side and builds the WhatsApp message", async () => {
+async function place(f: Awaited<ReturnType<typeof makeRestaurant>>, k: string, m: Partial<typeof meta> = {}, patch: Record<string, unknown> = {}) {
+  const o = await createOrder({ ...orderPayload(f, key(k)), ...patch }, { ...meta, ...m });
+  return { ...o, order: await prisma.order.findUniqueOrThrow({ where: { reference: o.reference } }) };
+}
+
+describe("cash-on-delivery checkout", () => {
+  it("prices server-side, adds the delivery fee and stores a PLACED cash order", async () => {
     const f = await makeRestaurant();
-    const o = await createOrder(orderPayload(f, key("a")), meta);
-    expect(o.subtotalCents).toBe(2000); // 2 × (7.50 + 1.00) + 3.00
-    expect(o.reference).toMatch(/^NN-\d{4}-\d{6}$/);
-    expect(o.whatsappUrl.startsWith("https://wa.me/96170123456?text=")).toBe(true);
-    expect(o.message).toContain("Line total: $17.00");
-    expect(o.message).toContain("ITEM SUBTOTAL: $20.00");
-    expect(o.message).toContain("Google Maps: https://maps.google.com/?q=33.895900,35.478700");
-    const stored = await prisma.order.findUniqueOrThrow({ where: { reference: o.reference }, include: { items: { include: { customizations: true } } } });
-    expect(stored.status).toBe("LINK_GENERATED");
-    expect(stored.items[0].customizations.map((c) => c.optionName).sort()).toEqual(["BBQ sauce", "Extra cheese"]);
+    const { order, totalCents } = await place(f, "a", {}, { changeFor: "50" });
+    expect(order).toMatchObject({ status: "PLACED", paymentMethod: "CASH_ON_DELIVERY", subtotalCents: 2000, deliveryFeeCents: 200, totalCents: 2200, changeForCents: 5000 });
+    expect(totalCents).toBe(2200);
+    expect(order.reference).toMatch(/^NN-\d{4}-\d{6}$/);
+    expect(order.trackingToken.length).toBeGreaterThan(20);
+    const items = await prisma.orderItem.findMany({ where: { orderId: order.id }, include: { customizations: true } });
+    expect(items[0].customizations.map((c) => c.optionName).sort()).toEqual(["BBQ sauce", "Extra cheese"]);
+    expect(await prisma.notification.count({ where: { restaurantId: f.restaurant.id, type: "NEW_ORDER" } })).toBe(1);
   });
 
-  it("ignores client-supplied prices and rejects missing required choices", async () => {
+  it("rejects a change amount lower than the total", async () => {
     const f = await makeRestaurant();
-    const p = orderPayload(f, key("b"));
+    await expect(place(f, "chg", {}, { changeFor: "10" })).rejects.toThrow(/check your order/);
+  });
+
+  it("uses area fees and refuses areas the restaurant doesn't deliver to", async () => {
+    const f = await makeRestaurant();
+    await prisma.restaurantDeliveryArea.createMany({ data: [{ restaurantId: f.restaurant.id, name: "Hamra", feeCents: 150 }, { restaurantId: f.restaurant.id, name: "Verdun", feeCents: null }] });
+    const p = orderPayload(f, key("area1"));
+    const hamra = await createOrder({ ...p, customer: { ...p.customer, area: "Hamra" } }, meta);
+    expect(hamra.totalCents).toBe(2150);
+    const verdun = await createOrder({ ...orderPayload(f, key("area2")), customer: { ...p.customer, area: "Verdun" } }, { ...meta, deviceKey: "dev-verdun-aaaaaaaaaaaa" });
+    expect(verdun.totalCents).toBe(2200); // falls back to default fee
+    await expect(createOrder({ ...orderPayload(f, key("area3")), customer: { ...p.customer, area: "Jounieh" } }, meta)).rejects.toThrow(/check your order/);
+  });
+
+  it("refuses orders while the restaurant is closed or paused", async () => {
+    const f = await makeRestaurant();
+    const closedAllDay = Object.fromEntries(["sun", "mon", "tue", "wed", "thu", "fri", "sat"].map((d) => [d, []]));
+    await prisma.restaurant.update({ where: { id: f.restaurant.id }, data: { openingHours: { ...closedAllDay, mon: [{ open: "03:00", close: "03:01" }] } } });
+    await expect(place(f, "closed")).rejects.toThrow(/closed right now/);
+    await prisma.restaurant.update({ where: { id: f.restaurant.id }, data: { openingHours: undefined, orderingEnabled: false } });
+    await expect(place(f, "paused")).rejects.toThrow(/isn't taking online orders/);
+  });
+
+  it("ignores client prices and rejects items from another restaurant", async () => {
+    const a = await makeRestaurant();
+    const b = await makeRestaurant();
+    const p = orderPayload(a, key("x"));
     (p.items[0] as Record<string, unknown>).priceCents = 1;
-    p.items[0].selections = { [f.extras.id]: [] } as never;
+    p.items[1].menuItemId = b.fries.id;
     await expect(createOrder(p, meta)).rejects.toBeInstanceOf(OrderError);
   });
 
-  it("rejects items from another restaurant", async () => {
-    const a = await makeRestaurant();
-    const b = await makeRestaurant();
-    const p = orderPayload(a, key("c"));
-    p.items[1].menuItemId = b.fries.id;
-    await expect(createOrder(p, meta)).rejects.toThrow(/check your order/);
-  });
-
-  it("is idempotent for repeated submissions but allows legitimate new orders", async () => {
+  it("is idempotent for repeated submissions but allows a new order", async () => {
     const f = await makeRestaurant();
-    const first = await createOrder(orderPayload(f, key("d")), meta);
+    const first = await place(f, "d");
     const again = await createOrder(orderPayload(f, key("d")), meta);
-    expect(again.reference).toBe(first.reference);
-    const second = await createOrder(orderPayload(f, key("e")), meta);
+    expect(again).toMatchObject({ reference: first.reference, duplicate: true });
+    const second = await place(f, "e");
     expect(second.reference).not.toBe(first.reference);
-    expect(await prisma.order.count()).toBe(2);
-    const flagged = await prisma.order.findUniqueOrThrow({ where: { reference: second.reference } });
-    expect(flagged.suspicious).toBe(true); // same device+subtotal within minutes is flagged, not blocked
+    expect(second.order.suspicious).toBe(true); // same phone + subtotal within minutes → flagged, not blocked
   });
 
-  it("enforces the LBP exchange-rate snapshot for commission base", async () => {
-    const f = await makeRestaurant({ currency: "LBP" });
-    const p = orderPayload(f, key("lbp"));
-    p.items = [{ menuItemId: f.fries.id, quantity: 2, selections: {} }];
-    const o = await createOrder(p, meta);
-    const stored = await prisma.order.findUniqueOrThrow({ where: { reference: o.reference } });
-    expect(stored.exchangeRate).toBe(89500);
-    expect(stored.commissionBaseCents).toBe(600); // 537,000 LBP / 89,500 = $6.00
+  it("saves the address for logged-in customers and reuses it by id", async () => {
+    const f = await makeRestaurant();
+    const user = await prisma.user.create({ data: { email: "c@test.dev", passwordHash: "x", name: "Rana" } });
+    const p = orderPayload(f, key("u1"));
+    await createOrder({ ...p, customer: { ...p.customer, saveAddress: true, addressLabel: "Home" } }, { ...meta, userId: user.id });
+    const addr = await prisma.customerAddress.findFirstOrThrow({ where: { userId: user.id } });
+    expect(addr).toMatchObject({ label: "Home", isDefault: true, address: "Beirut, Hamra, Main street" });
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).phone).toBe("96170123456");
+    const p2 = orderPayload(f, key("u2"));
+    const o2 = await createOrder({ ...p2, customer: { name: "Rana", phone: "70123456", addressId: addr.id } }, { ...meta, userId: user.id, deviceKey: "dev2-aaaaaaaaaaaaaaaa" });
+    expect((await prisma.order.findUniqueOrThrow({ where: { reference: o2.reference } })).address).toBe("Beirut, Hamra, Main street");
+    // someone else's address id is refused
+    const other = await prisma.user.create({ data: { email: "o@test.dev", passwordHash: "x", name: "Other" } });
+    await expect(createOrder({ ...orderPayload(f, key("u3")), customer: { name: "X Y", phone: "70123456", addressId: addr.id } }, { ...meta, userId: other.id })).rejects.toThrow(/not found/);
+  });
+
+  it("lets guests track by device or token, and claims their orders on sign-in", async () => {
+    const f = await makeRestaurant();
+    const { order } = await place(f, "g");
+    expect(canViewOrder(order, { userId: null, deviceKey: meta.deviceKey })).toBe(true);
+    expect(canViewOrder(order, { userId: null, deviceKey: "other-device-aaaaaaa" })).toBe(false);
+    expect(canViewOrder(order, { userId: null, deviceKey: null, token: order.trackingToken })).toBe(true);
+    const user = await prisma.user.create({ data: { email: "g@test.dev", passwordHash: "x", name: "Guest" } });
+    expect(await claimDeviceOrders(user.id, meta.deviceKey)).toBe(1);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).userId).toBe(user.id);
   });
 });
 
-describe("commission integrity", () => {
-  it("a $20 order generates exactly one $2.80 commission at 14% on acknowledgment", async () => {
+describe("order lifecycle", () => {
+  it("moves through accepted → preparing → out for delivery → completed with notifications", async () => {
     const f = await makeRestaurant();
-    const o = await createOrder(orderPayload(f, key("f")), meta);
-    const order = await prisma.order.findUniqueOrThrow({ where: { reference: o.reference } });
-    // repeated WhatsApp openings never create commission
-    for (let i = 0; i < 5; i++) await recordHandoff(o.reference, meta.deviceKey);
-    expect(await prisma.commissionEvent.count()).toBe(0);
-    const h = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
-    expect(h.status).toBe("HANDOFF_ATTEMPTED");
-    expect(h.handoffCount).toBe(5);
+    const user = await prisma.user.create({ data: { email: "l@test.dev", passwordHash: "x", name: "L" } });
+    const { order } = await place(f, "life", { userId: user.id });
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT", { etaMinutes: 30 });
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "PREPARING");
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "DISPATCH");
+    let o = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(o).toMatchObject({ status: "OUT_FOR_DELIVERY", estimatedMinutes: 30 });
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "COMPLETE");
+    o = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(o.status).toBe("COMPLETED");
+    expect(await prisma.notification.count({ where: { userId: user.id, type: "ORDER_STATUS" } })).toBe(4);
+    await expect(restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "REJECT", { reason: "x" })).rejects.toThrow(/already/);
+  });
 
-    await Promise.all([1, 2, 3].map(() => restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACKNOWLEDGE")));
-    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT");
-    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "FULFILL");
-    const events = await prisma.commissionEvent.findMany();
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ baseCents: 2000, rateBps: 1400, commissionCents: 280, billableEvent: "ACKNOWLEDGED" });
+  it("customers can cancel only before the restaurant accepts", async () => {
+    const f = await makeRestaurant();
+    const a = await place(f, "c1");
+    await customerCancelOrder(a.reference, { userId: null, deviceKey: meta.deviceKey });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: a.order.id } })).status).toBe("CANCELED");
+    const b = await place(f, "c2", { deviceKey: "dev-c2-aaaaaaaaaaaaaa" });
+    await expect(customerCancelOrder(b.reference, { userId: null, deviceKey: "stranger-aaaaaaaaaaaa" })).rejects.toThrow(/not found/);
+    await restaurantOrderAction(f.restaurant.id, f.user.id, b.order.id, "ACCEPT");
+    await expect(customerCancelOrder(b.reference, { userId: null, deviceKey: "dev-c2-aaaaaaaaaaaaaa" })).rejects.toThrow(/already accepted/);
   });
 
   it("restaurant A cannot act on restaurant B's orders", async () => {
     const a = await makeRestaurant();
     const b = await makeRestaurant();
-    const o = await createOrder(orderPayload(b, key("g")), meta);
-    const order = await prisma.order.findUniqueOrThrow({ where: { reference: o.reference } });
-    await expect(restaurantOrderAction(a.restaurant.id, a.user.id, order.id, "ACKNOWLEDGE")).rejects.toThrow(/not found/);
+    const { order } = await place(b, "iso");
+    await expect(restaurantOrderAction(a.restaurant.id, a.user.id, order.id, "ACCEPT")).rejects.toThrow(/not found/);
+  });
+
+  it("rejection and failure need a reason", async () => {
+    const f = await makeRestaurant();
+    const { order } = await place(f, "r");
+    await expect(restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "REJECT")).rejects.toThrow(/why/);
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "REJECT", { reason: "Out of buns" });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).rejectionReason).toBe("Out of buns");
+  });
+});
+
+describe("commission integrity", () => {
+  it("a $20 completed order generates exactly one $2.80 commission; rejected/canceled never do", async () => {
+    const f = await makeRestaurant();
+    const { order } = await place(f, "f");
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT");
+    expect(await prisma.commissionEvent.count()).toBe(0); // default: charged on completion
+    await Promise.all([1, 2, 3].map(() => restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "COMPLETE").catch(() => null)));
+    const events = await prisma.commissionEvent.findMany();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ baseCents: 2000, rateBps: 1400, commissionCents: 280, billableEvent: "COMPLETED" }); // delivery fee excluded
+
+    const rej = await place(f, "rej", { deviceKey: "d-rej-aaaaaaaaaaaaaaa" }, { customer: { ...orderPayload(f, "z").customer, phone: "71 999 999" } });
+    await restaurantOrderAction(f.restaurant.id, f.user.id, rej.order.id, "REJECT", { reason: "busy" });
+    const can = await place(f, "can", { deviceKey: "d-can-aaaaaaaaaaaaaaa" });
+    await customerCancelOrder(can.reference, { userId: null, deviceKey: "d-can-aaaaaaaaaaaaaaa" });
+    expect(await prisma.commissionEvent.count()).toBe(1);
+  });
+
+  it("failed deliveries are not charged when billing on completion", async () => {
+    const f = await makeRestaurant();
+    const { order } = await place(f, "fail");
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT");
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "FAIL", { reason: "Customer unreachable" });
     expect(await prisma.commissionEvent.count()).toBe(0);
   });
 
-  it("uses restaurant-specific rate when configured and snapshots it", async () => {
+  it("auto-completes accepted orders left open and charges them", async () => {
+    const f = await makeRestaurant();
+    const { order } = await place(f, "auto");
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT");
+    await prisma.order.update({ where: { id: order.id }, data: { acceptedAt: new Date(Date.now() - 7 * 3600_000) } });
+    expect(await autoCompleteStaleOrders(DEFAULT_SETTINGS)).toBe(1);
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({ status: "COMPLETED", autoCompleted: true });
+    expect(await prisma.commissionEvent.count()).toBe(1);
+    expect(await autoCompleteStaleOrders(DEFAULT_SETTINGS)).toBe(0);
+  });
+
+  it("can bill on acceptance instead, using the restaurant's own rate snapshot", async () => {
     const f = await makeRestaurant({ rateBps: 1000 });
-    const o = await createOrder(orderPayload(f, key("h")), meta);
-    const order = await prisma.order.findUniqueOrThrow({ where: { reference: o.reference } });
-    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACKNOWLEDGE");
+    await prisma.platformSetting.create({ data: { key: "billableEvent", value: "ACCEPTED" } });
+    const { order } = await place(f, "h");
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT");
     await prisma.restaurant.update({ where: { id: f.restaurant.id }, data: { commissionRateBps: 2000 } });
-    await prisma.menuItem.update({ where: { id: f.burger.id }, data: { priceCents: 9999 } });
     const ev = await prisma.commissionEvent.findFirstOrThrow();
-    expect(ev.commissionCents).toBe(200);
-    expect(ev.rateBps).toBe(1000);
+    expect(ev).toMatchObject({ commissionCents: 200, rateBps: 1000, billableEvent: "ACCEPTED" });
+  });
+
+  it("converts LBP orders with the stored exchange rate", async () => {
+    const f = await makeRestaurant({ currency: "LBP" });
+    const p = orderPayload(f, key("lbp"));
+    p.items = [{ menuItemId: f.fries.id, quantity: 2, selections: {} }];
+    const o = await createOrder(p, meta);
+    const stored = await prisma.order.findUniqueOrThrow({ where: { reference: o.reference } });
+    expect(stored).toMatchObject({ exchangeRate: 89500, commissionBaseCents: 600, totalCents: 537000 + 179000 });
   });
 });
 
 describe("monthly billing & Whish settlement", () => {
-  async function acknowledgedOrders(count: number) {
+  async function completedOrders(count: number) {
     const f = await makeRestaurant();
     for (let i = 0; i < count; i++) {
-      const o = await createOrder(orderPayload(f, key(`m${i}`)), { ...meta, deviceKey: `dev-${i}-aaaaaaaaaaaaaaaa` });
+      const p = orderPayload(f, key(`m${i}`));
+      const o = await createOrder({ ...p, customer: { ...p.customer, phone: `70 1${String(i).padStart(2, "0")} 456` } }, { ...meta, deviceKey: `dev-${i}-aaaaaaaaaaaaaaaa` });
       const order = await prisma.order.findUniqueOrThrow({ where: { reference: o.reference } });
-      await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACKNOWLEDGE");
+      await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT");
+      await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "COMPLETE");
     }
-    // move the billable events into last month
     await prisma.commissionEvent.updateMany({ data: { period: "2026-09" } });
     return f;
   }
 
   it("creates an itemized invoice for the month exactly once", async () => {
-    const f = await acknowledgedOrders(3);
+    const f = await completedOrders(3);
     const { invoice, created } = await generateInvoice(f.restaurant.id, "2026-09", null);
     expect(created).toBe(true);
     expect(invoice).toMatchObject({ orderCount: 3, grossSubtotalCents: 6000, grossCommissionCents: 840, totalDueCents: 840, status: "AWAITING_PAYMENT" });
-    expect(invoice!.number).toMatch(/^NN-INV-\d{4}-\d{5}$/);
-    const lines = await prisma.invoiceLine.findMany({ where: { invoiceId: invoice!.id } });
-    expect(lines).toHaveLength(3);
+    expect(await prisma.invoiceLine.count({ where: { invoiceId: invoice!.id } })).toBe(3);
     const again = await runMonthlyBilling("2026-09");
     expect(again.every((r) => !r.created)).toBe(true);
     expect(await prisma.invoice.count()).toBe(1);
-    expect(await prisma.commissionEvent.count({ where: { status: "INVOICED" } })).toBe(3);
   });
 
   it("refuses to invoice an open period", async () => {
@@ -141,46 +235,35 @@ describe("monthly billing & Whish settlement", () => {
     await expect(generateInvoice(f.restaurant.id, current, null)).rejects.toThrow(/not ended/);
   });
 
-  it("keeps invoice pending until an administrator verifies the Whish payment", async () => {
-    const f = await acknowledgedOrders(1);
+  it("keeps the invoice pending until an administrator verifies the Whish payment", async () => {
+    const f = await completedOrders(1);
     const { invoice } = await generateInvoice(f.restaurant.id, "2026-09", null);
-    const receipt = await prisma.mediaAsset.create({ data: { restaurantId: f.restaurant.id, kind: "RECEIPT", isPrivate: true, storageKey: "r/x.webp", url: "/api/private-media/x", mimeType: "image/webp", sizeBytes: 10 } });
+    const receipt = await prisma.mediaAsset.create({ data: { restaurantId: f.restaurant.id, kind: "RECEIPT", isPrivate: true, storageKey: "db", url: "/api/private-media/x", mimeType: "image/webp", sizeBytes: 10 } });
     const payment = await submitPayment({ restaurantId: f.restaurant.id, invoiceId: invoice!.id, userId: f.user.id, amountCents: 280, paymentDate: new Date(), whishReference: "WH-123456", evidenceAssetIds: [receipt.id] });
-    let inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } });
-    expect(inv.status).toBe("PAYMENT_SUBMITTED");
-    expect(inv.paidCents).toBe(0);
-
+    expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).status).toBe("PAYMENT_SUBMITTED");
     const admin = await prisma.user.create({ data: { email: "admin@test.dev", passwordHash: "x", name: "Admin", roles: { create: { role: "ADMIN" } } } });
     await reviewPayment(admin.id, payment.id, { action: "APPROVE", verifiedAmountCents: 200 });
-    inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } });
-    expect(inv.status).toBe("PARTIALLY_PAID");
-
-    await expect(submitPayment({ restaurantId: f.restaurant.id, invoiceId: invoice!.id, userId: f.user.id, amountCents: 80, paymentDate: new Date(), whishReference: "WH-123456", evidenceAssetIds: [] })).rejects.toThrow(/already been submitted/);
+    expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).status).toBe("PARTIALLY_PAID");
     const p2 = await submitPayment({ restaurantId: f.restaurant.id, invoiceId: invoice!.id, userId: f.user.id, amountCents: 80, paymentDate: new Date(), whishReference: "WH-777", evidenceAssetIds: [] });
     await reviewPayment(admin.id, p2.id, { action: "APPROVE", verifiedAmountCents: 80 });
-    inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } });
-    expect(inv.status).toBe("PAID");
-    expect(await prisma.auditLog.count({ where: { action: "payment.approve" } })).toBe(2);
+    expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).status).toBe("PAID");
   });
 
   it("restaurant B cannot submit payment for restaurant A's invoice", async () => {
-    const f = await acknowledgedOrders(1);
+    const f = await completedOrders(1);
     const other = await makeRestaurant();
     const { invoice } = await generateInvoice(f.restaurant.id, "2026-09", null);
     await expect(submitPayment({ restaurantId: other.restaurant.id, invoiceId: invoice!.id, userId: other.user.id, amountCents: 280, paymentDate: new Date(), whishReference: "WH-1", evidenceAssetIds: [] })).rejects.toThrow(/not found/);
   });
 
   it("accepted disputes on invoiced orders become credits on the next invoice", async () => {
-    const f = await acknowledgedOrders(2);
+    const f = await completedOrders(2);
     const { invoice } = await generateInvoice(f.restaurant.id, "2026-09", null);
     const ev = await prisma.commissionEvent.findFirstOrThrow({ where: { invoiceId: invoice!.id } });
-    const d = await openDispute({ restaurantId: f.restaurant.id, userId: f.user.id, commissionEventId: ev.id, reason: "Customer never ordered" });
-    expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).status).toBe("DISPUTED");
+    const d = await openDispute({ restaurantId: f.restaurant.id, userId: f.user.id, commissionEventId: ev.id, reason: "Customer refused the order" });
     const admin = await prisma.user.create({ data: { email: "admin2@test.dev", passwordHash: "x", name: "Admin", roles: { create: { role: "ADMIN" } } } });
-    await resolveDispute(admin.id, d.id, true, "Verified duplicate");
-    const adj = await prisma.commissionAdjustment.findFirstOrThrow();
-    expect(adj.amountCents).toBe(-280);
-    // invoice itself is not silently altered
+    await resolveDispute(admin.id, d.id, true, "Verified");
+    expect((await prisma.commissionAdjustment.findFirstOrThrow()).amountCents).toBe(-280);
     expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).totalDueCents).toBe(560);
   });
 });

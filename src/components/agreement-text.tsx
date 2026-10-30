@@ -1,43 +1,43 @@
 import { formatRate } from "@/lib/money";
 
 const BILLABLE: Record<string, string> = {
-  ACKNOWLEDGED: "when you acknowledge an order request in your numnum dashboard (for example by entering the order reference you received on WhatsApp)",
-  ACCEPTED: "when you accept an order request in your numnum dashboard",
-  FULFILLED: "when you mark an order request as fulfilled in your numnum dashboard",
-  MESSAGE_CONFIRMED: "when delivery of the customer's WhatsApp message is confirmed through a verified WhatsApp Business integration",
+  ACCEPTED: "when you accept the order in your numnum dashboard",
+  COMPLETED: "when the order is completed — marked delivered or picked up by you, or completed automatically (see section 4)",
 };
 
-export function AgreementText({ platformName, rateBps, billableEvent, dueDays, disputeDays, graceDays, version }: { platformName: string; rateBps: number; billableEvent: string; dueDays: number; disputeDays: number; graceDays: number; version: string }) {
+export function AgreementText({ platformName, rateBps, billableEvent, dueDays, disputeDays, graceDays, version, autoCompleteHours }: { platformName: string; rateBps: number; billableEvent: string; dueDays: number; disputeDays: number; graceDays: number; version: string; autoCompleteHours: number }) {
   const rate = formatRate(rateBps);
   return (
     <div className="space-y-4 text-[15px] leading-relaxed text-ink-soft [&_h3]:mt-5 [&_h3]:font-bold [&_h3]:text-ink">
       <p className="text-xs text-ink-muted">Version {version}</p>
       <h3>1. What {platformName} does</h3>
-      <p>{platformName} shows your dishes to customers through videos and menus and prepares their order as a WhatsApp message to your ordering number. You remain fully responsible for accepting orders, collecting payment from customers, preparing food and delivering it. {platformName} does not process customer payments or deliveries.</p>
+      <p>{platformName} shows your dishes to customers through videos and menus and sends you their orders in your dashboard. Customers pay <b>cash on delivery</b> (or cash at pickup) directly to you. You are responsible for accepting orders, preparing food, delivering it and collecting the cash. {platformName} does not process customer payments or deliver food.</p>
       <h3>2. Commission rate</h3>
       <p>
-        You agree to pay <b>{rate}</b> of the <b>commissionable item subtotal</b> of each qualifying order request. The commissionable subtotal is the sum of menu item prices and selected customization prices as shown on your menu at the moment the order was created. Delivery fees, tips and fees not confirmed in the order are excluded. Rounding is to the nearest cent.
+        You agree to pay <b>{rate}</b> of the <b>item subtotal</b> of each commissionable order: menu item prices plus selected customization prices, as shown on your menu when the order was placed. Delivery fees and tips are excluded. Rounding is to the nearest cent.
       </p>
       <p className="rounded-xl bg-cream p-3 text-sm">
-        Example: a $20.00 order request → {rate} commission = <b>${((2000 * rateBps) / 10000 / 100).toFixed(2)}</b>.
+        Example: an order with a $20.00 item subtotal → {rate} commission = <b>${((2000 * rateBps) / 10000 / 100).toFixed(2)}</b>.
       </p>
-      <h3>3. When commission is charged (billable event)</h3>
+      <h3>3. When commission is charged</h3>
       <p>
-        A commission entry is created exactly once per order request, <b>{BILLABLE[billableEvent] ?? BILLABLE.ACKNOWLEDGED}</b>. Customers opening WhatsApp, video views, likes and clicks are never charged. Each order has a unique reference; the same order cannot be charged twice.
+        A commission entry is created exactly once per order, <b>{BILLABLE[billableEvent] ?? BILLABLE.COMPLETED}</b>. Orders you reject, and orders the customer cancels before you accept them, are never charged. Video views, likes and clicks are never charged.
       </p>
-      <h3>4. Billing cycle</h3>
-      <p>Commission entries accumulate during each calendar month (UTC). At the start of the following month we issue an itemized invoice listing every order reference, its date, subtotal, rate and commission. Entries acknowledged late are included in the next invoice. Issued invoices are never silently changed — corrections are made through documented adjustments or credit notes.</p>
-      <h3>5. Payment terms</h3>
+      <h3>4. Closing orders</h3>
+      <p>Please mark each order as delivered or picked up when you hand it over. An accepted order that is still open {autoCompleteHours} hours after you accepted it is completed automatically. If an order couldn&apos;t be delivered (customer unreachable, refused or wrong address), report it from the order before then, or dispute the entry later (section 7).</p>
+      <h3>5. Billing cycle</h3>
+      <p>Commission entries accumulate during each calendar month (UTC). At the start of the following month we issue an itemized invoice listing every order reference, its date, item subtotal, rate and commission. Issued invoices are never silently changed — corrections are made through documented adjustments or credit notes.</p>
+      <h3>6. Payment terms</h3>
       <p>
-        Invoices are due <b>{dueDays} days</b> after issue and are paid manually via Whish Money / Whish Pay to the recipient details shown in your dashboard, quoting the invoice number. After paying, submit the transfer reference and receipt in your dashboard. An invoice is marked paid only after {platformName} verifies that the funds were received; a screenshot alone is not proof of payment.
+        Invoices are due <b>{dueDays} days</b> after issue and are paid manually via Whish Money / Whish Pay to the recipient details shown in your dashboard, quoting the invoice number. After paying, submit the transfer reference and receipt in your dashboard. An invoice is marked paid only after {platformName} verifies that the funds were received.
       </p>
-      <h3>6. Disputes</h3>
-      <p>You can review every order reference in your statement and dispute an entry within <b>{disputeDays} days</b> of the entry or invoice date (for example, if you never received the WhatsApp message, the order was a duplicate, or it was fraudulent). Disputed entries are excluded from invoicing until reviewed. Accepted disputes are voided or credited on your next invoice.</p>
-      <h3>7. Late payment</h3>
+      <h3>7. Disputes</h3>
+      <p>You can review every order reference in your statement and dispute an entry within <b>{disputeDays} days</b> of the entry or invoice date (for example: the order wasn&apos;t delivered, the customer refused to pay, or it was a duplicate or fake order). Disputed entries are excluded from invoicing until reviewed. Accepted disputes are voided or credited on your next invoice.</p>
+      <h3>8. Late payment</h3>
       <p>After a grace period of {graceDays} days past the due date, {platformName} may send warnings and, following its review policy, restrict promoted content or new reels, or temporarily suspend your profile. Accounts are never restricted automatically for an invoice with a payment awaiting verification or an open dispute.</p>
-      <h3>8. Honest use</h3>
-      <p>You agree to acknowledge genuine order requests you receive, not to divert {platformName} customers to avoid commission, and to keep menu prices accurate. {platformName} monitors acknowledgment and rejection patterns and may review accounts with unusual activity.</p>
-      <h3>9. Changes</h3>
+      <h3>9. Honest use</h3>
+      <p>You agree to process genuine orders through {platformName}, not to move {platformName} customers to other channels to avoid commission, to keep menu prices and delivery fees accurate, and to use customer contact details only to fulfill their orders. {platformName} monitors rejection and failed-delivery patterns and may review accounts with unusual activity.</p>
+      <h3>10. Changes</h3>
       <p>We will notify you at least 30 days before any change to your commission rate or these terms. Changes never apply retroactively to existing commission entries.</p>
     </div>
   );

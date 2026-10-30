@@ -69,7 +69,7 @@ You already have Stream from Hireel. Reuse the same **Account ID** and the same 
 
 ## Part 6: Hourly billing job: 3 minutes
 
-It issues the monthly invoices on the 1st, sends payment reminders and finishes video processing.
+It issues the monthly invoices on the 1st, sends payment reminders, auto-completes orders restaurants forgot to close, and finishes video processing.
 
 1. hPanel → **Advanced** → **Cron Jobs** → **Create**.
 2. Run it **every hour** (e.g. minute `7`).
@@ -83,15 +83,15 @@ curl -fsS -H "Authorization: Bearer YOUR_CRON_SECRET" https://yourdomain.com/api
 
 1. Open `https://yourdomain.com/login` and sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 2. **Admin → Settings → Whish Money / Whish Pay recipient**: enter the name, Whish number and instructions restaurants will pay to.
-3. Check **Commission** (14%, charged when a restaurant acknowledges an order) and **Invoicing** (due days, reminders).
+3. Check **Commission** (14%, charged on completed orders; open orders auto-complete after 6 hours) and **Invoicing** (due days, reminders).
 4. Restaurants sign up at `https://yourdomain.com/business`. Approve them in **Admin → Restaurants**.
 
 ## Part 8: Test on real phones
 
 1. **iPhone (Safari) and Android (Chrome):** open the site. Add it to the home screen (Share → Add to Home Screen on iPhone; the Install prompt on Android).
 2. As a restaurant (or a demo owner, e.g. `owner@burgerhouse.demo` / `demo1234` if you used `SEED_DEMO`): import a menu, upload photos, and record a reel with the phone camera. The reel shows "Processing" for about a minute, then goes live.
-3. As a customer: watch the reel, order the dish, and check that WhatsApp opens with the full order.
-4. Back in the restaurant dashboard: **Order requests** → enter the order reference → **Acknowledge**.
+3. As a customer: watch the reel, order the dish, check out with **cash on delivery**, and keep the tracking page open.
+4. In the restaurant dashboard → **Orders**: tap **Turn on sound**, accept the new order with a time, then **Out for delivery** and **Delivered · cash collected**. The customer's page updates within ~15 seconds.
 
 ### Notes
 

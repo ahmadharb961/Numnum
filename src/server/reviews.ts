@@ -9,15 +9,22 @@ export class ReviewError extends Error {
   status = 400;
 }
 
+/**
+ * Evidence a review is from a real customer: the reviewer's own orders (by account,
+ * or by an order reference placed with their phone). Never labeled as verified otherwise.
+ */
 async function evidenceFor(user: CurrentUser, restaurantId: string, reference: string | null | undefined, menuItemId?: string): Promise<{ evidence: ReviewEvidence; orderId: string | null }> {
-  if (!reference || !user.phone) return { evidence: "UNVERIFIED", orderId: null };
-  const order = await prisma.order.findFirst({ where: { reference: reference.trim().toUpperCase(), restaurantId, customerPhone: user.phone }, include: { items: { select: { menuItemId: true } } } });
-  if (!order) throw new ReviewError("We couldn't match that order reference to your phone number");
-  if (menuItemId && !order.items.some((i) => i.menuItemId === menuItemId)) throw new ReviewError("That order doesn't include this item");
-  // Only restaurant-confirmed orders count as evidence; never label as verified purchase otherwise.
-  if (order.fulfilledAt) return { evidence: "FULFILLED_ORDER", orderId: order.id };
-  if (order.acknowledgedAt) return { evidence: "ACKNOWLEDGED_ORDER", orderId: order.id };
-  return { evidence: "UNVERIFIED", orderId: order.id };
+  const mine = { OR: [{ userId: user.id }, ...(user.phone ? [{ customerPhone: user.phone }] : [])] };
+  const where = { restaurantId, ...mine, ...(menuItemId ? { items: { some: { menuItemId } } } : {}) };
+  if (reference) {
+    const order = await prisma.order.findFirst({ where: { ...where, reference: reference.trim().toUpperCase() } });
+    if (!order) throw new ReviewError("We couldn't match that order reference to your account or phone number");
+  }
+  const completed = await prisma.order.findFirst({ where: { ...where, status: "COMPLETED", ...(reference ? { reference: reference.trim().toUpperCase() } : {}) }, orderBy: { createdAt: "desc" } });
+  if (completed) return { evidence: "COMPLETED_ORDER", orderId: completed.id };
+  const accepted = await prisma.order.findFirst({ where: { ...where, acceptedAt: { not: null }, status: { notIn: ["CANCELED", "REJECTED"] }, ...(reference ? { reference: reference.trim().toUpperCase() } : {}) }, orderBy: { createdAt: "desc" } });
+  if (accepted) return { evidence: "ACCEPTED_ORDER", orderId: accepted.id };
+  return { evidence: "UNVERIFIED", orderId: null };
 }
 
 function checkLimits(userId: string) {
@@ -82,7 +89,7 @@ export async function submitRestaurantReview(user: CurrentUser, input: { restaur
 }
 
 export function evidenceLabel(e: ReviewEvidence): string | null {
-  if (e === "FULFILLED_ORDER") return "Ordered via numnum · fulfilled";
-  if (e === "ACKNOWLEDGED_ORDER") return "Ordered via numnum";
+  if (e === "COMPLETED_ORDER") return "Verified order";
+  if (e === "ACCEPTED_ORDER") return "Ordered on numnum";
   return null;
 }

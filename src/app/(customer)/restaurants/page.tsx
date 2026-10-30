@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/misc";
 import { facets, searchRestaurants } from "@/server/search";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Restaurants", description: "Restaurants in Lebanon taking WhatsApp orders on numnum." };
+export const metadata: Metadata = { title: "Restaurants", description: "Restaurants in Lebanon delivering through numnum — cash on delivery." };
 export const dynamic = "force-dynamic";
 
 export default async function RestaurantsPage({ searchParams }: { searchParams: Promise<{ area?: string; open?: string }> }) {

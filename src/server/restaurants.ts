@@ -20,10 +20,11 @@ export async function onboardingChecklist(restaurantId: string): Promise<Checkli
     include: { _count: { select: { menuItems: { where: { archived: false } }, reels: true } } },
   });
   const withPhotos = await prisma.menuItem.count({ where: { restaurantId, archived: false, images: { some: {} } } });
+  const deliveryAreas = await prisma.restaurantDeliveryArea.count({ where: { restaurantId, feeCents: { not: null } } });
   return [
     { key: "info", label: "Restaurant information", done: !!(r.displayName && r.address && r.description && r.logoUrl), href: "/dashboard/settings" },
-    { key: "whatsapp", label: "WhatsApp ordering number", done: !!r.whatsappNumber, href: "/dashboard/settings#ordering" },
-    { key: "fulfillment", label: "Delivery & pickup settings", done: r.deliveryEnabled || r.pickupEnabled, href: "/dashboard/settings#ordering" },
+    { key: "phone", label: "Restaurant phone for order questions", done: !!r.phone, href: "/dashboard/settings" },
+    { key: "fulfillment", label: "Delivery fees & pickup settings", done: r.pickupEnabled || (r.deliveryEnabled && (r.deliveryFeeCents != null || deliveryAreas > 0)), href: "/dashboard/settings#ordering" },
     { key: "menu", label: "Upload your menu", done: r._count.menuItems > 0, href: "/dashboard/menu/import" },
     { key: "photos", label: "Add menu photos", done: r._count.menuItems > 0 && withPhotos >= Math.ceil(r._count.menuItems / 2), href: "/dashboard/menu/photos" },
     { key: "agreement", label: "Accept the commission agreement", done: !!r.agreementAcceptedAt, href: "/dashboard/agreement" },

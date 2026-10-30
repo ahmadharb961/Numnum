@@ -70,7 +70,7 @@ export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: stri
         <Field label="Area" error={fe.area} htmlFor="area">
           <input id="area" name="area" className="input" placeholder="Hamra, Beirut" />
         </Field>
-        <Field label="WhatsApp ordering number" error={fe.phone} hint="Orders will be sent to this number. You can change it later." htmlFor="phone">
+        <Field label="Restaurant phone" error={fe.phone} hint="Customers and numnum call this number about orders. You can change it later." htmlFor="phone">
           <input id="phone" name="phone" type="tel" required className="input" placeholder="70 123 456" />
         </Field>
         <Field label="Your name" error={fe.ownerName} htmlFor="ownerName">
@@ -94,7 +94,7 @@ export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: stri
           <Link href="/privacy" className="font-semibold text-brand-600 underline" target="_blank">
             Privacy Policy
           </Link>
-          . I&apos;ll review the commission agreement before enabling WhatsApp ordering.
+          . I&apos;ll review the commission agreement before enabling online ordering.
         </span>
       </label>
       {fe.terms && <p className="text-xs font-medium text-red-600">{fe.terms}</p>}

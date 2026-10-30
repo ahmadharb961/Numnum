@@ -59,7 +59,7 @@ export async function previewInvoice(restaurantId: string, period: string) {
 /**
  * Generates and issues the monthly invoice for one restaurant. Idempotent per
  * (restaurant, period). Includes all un-invoiced ACCRUED commission events up
- * to and including the period (late acknowledgments roll into the next
+ * to and including the period (late completions roll into the next
  * invoice) and all approved, unapplied adjustments. A net credit is carried
  * forward as a documented adjustment instead of producing a negative invoice.
  */

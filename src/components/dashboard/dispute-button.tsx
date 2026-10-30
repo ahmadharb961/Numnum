@@ -9,7 +9,7 @@ import { Alert } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
-const REASONS = ["Order was never received on WhatsApp", "Duplicate of another order", "Customer canceled before preparation", "Wrong amount", "Test or fraudulent order", "Other"];
+const REASONS = ["Order wasn't actually delivered (auto-completed)", "Customer refused or didn't pay", "Duplicate of another order", "Wrong amount", "Fake or prank order", "Other"];
 
 export function DisputeButton({ commissionEventId, invoiceId, label = "Dispute", small }: { commissionEventId?: string; invoiceId?: string; label?: string; small?: boolean }) {
   const [open, setOpen] = useState(false);

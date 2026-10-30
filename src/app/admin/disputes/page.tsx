@@ -62,7 +62,7 @@ export default async function DisputesPage({ searchParams }: { searchParams: Pro
                   </div>
                   <div className="mt-1 text-xs text-ink-muted">Items: {o.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}</div>
                   <div className="mt-1 text-xs text-ink-muted">
-                    Device repeat orders flagged: {o.suspicious ? o.suspiciousReason : "no"} · WhatsApp opened {o.handoffCount}×
+                    Status: {o.status.toLowerCase().replace(/_/g, " ")}{o.autoCompleted ? " (auto-completed)" : ""} · duplicate flag: {o.suspicious ? o.suspiciousReason : "no"}{o.failureReason ? ` · failure: ${o.failureReason}` : ""}
                   </div>
                   <details className="mt-1 text-xs">
                     <summary className="cursor-pointer text-ink-muted">Order event log</summary>

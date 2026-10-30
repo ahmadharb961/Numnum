@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "dark" | "outline" | "whatsapp";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "dark" | "outline";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
@@ -11,7 +11,6 @@ const variants: Record<Variant, string> = {
   danger: "bg-red-600 text-white hover:bg-red-700",
   dark: "bg-ink text-white hover:bg-ink-soft",
   outline: "border border-black/15 bg-white text-ink hover:bg-black/[0.03]",
-  whatsapp: "bg-[#25D366] text-white hover:bg-[#1ebe5b] shadow-sm shadow-[#25D366]/30",
 };
 const sizes: Record<Size, string> = {
   sm: "h-9 px-3.5 text-sm rounded-lg",

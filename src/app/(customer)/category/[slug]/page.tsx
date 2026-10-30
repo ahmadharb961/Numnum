@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const c = await prisma.foodCategory.findUnique({ where: { slug: (await params).slug } });
   if (!c) return {};
-  return { title: `${c.name} in Lebanon`, description: `Watch ${c.name.toLowerCase()} reels and order from restaurants on WhatsApp.`, alternates: { canonical: `/category/${c.slug}` } };
+  return { title: `${c.name} in Lebanon`, description: `Watch ${c.name.toLowerCase()} reels and order with cash on delivery.`, alternates: { canonical: `/category/${c.slug}` } };
 }
 
 export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {

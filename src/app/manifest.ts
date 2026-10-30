@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "numnum — food reels & WhatsApp ordering",
+    name: "numnum — food reels & delivery",
     short_name: "numnum",
-    description: "Watch food reels from Lebanese restaurants and order on WhatsApp.",
+    description: "Watch food reels from Lebanese restaurants and order with cash on delivery.",
     start_url: "/",
     scope: "/",
     display: "standalone",

@@ -35,6 +35,8 @@ model User {
   lastLoginAt  DateTime?
 
   roles         UserRole[]
+  orders        Order[]
+  addresses     CustomerAddress[]
   sessions      Session[]
   staff         RestaurantStaff[]
   itemReviews   ItemReview[]
@@ -67,6 +69,26 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+model CustomerAddress {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String // Home, Work…
+  area      String?
+  address   String
+  building  String?
+  notes     String?
+  latitude  Float?
+  longitude Float?
+  mapsUrl   String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("customer_addresses")
 }
 
 // ───────────────────────── Restaurants ─────────────────────────
@@ -102,7 +124,6 @@ model Restaurant {
   description         String?
   cuisine             String?
   phone               String?
-  whatsappNumber      String? // E.164 without '+', e.g. 9613123456
   email               String?
   address             String?
   area                String?
@@ -126,7 +147,8 @@ model Restaurant {
   agreementAcceptedAt DateTime?
   agreementVersion    String?
   agreementAcceptedBy String?
-  orderingEnabled     Boolean            @default(false)
+  orderingEnabled     Boolean            @default(false) // "accepting orders" switch
+  avgPrepMinutes      Int                @default(30)
   restrictReels       Boolean            @default(false)
   restrictPromotion   Boolean            @default(false)
   ratingAvg           Float              @default(0)
@@ -523,8 +545,8 @@ enum ReviewStatus {
 
 enum ReviewEvidence {
   UNVERIFIED
-  ACKNOWLEDGED_ORDER
-  FULFILLED_ORDER
+  ACCEPTED_ORDER
+  COMPLETED_ORDER
 }
 
 model ItemReview {
@@ -583,26 +605,32 @@ enum Fulfillment {
 }
 
 enum OrderStatus {
-  DRAFT
-  VALIDATED
-  LINK_GENERATED
-  HANDOFF_ATTEMPTED
-  MESSAGE_CONFIRMED
-  ACKNOWLEDGED
-  ACCEPTED
-  REJECTED
-  FULFILLED
-  CANCELED
-  DISPUTED
+  PLACED // waiting for the restaurant
+  ACCEPTED // restaurant confirmed, ETA given
+  PREPARING
+  OUT_FOR_DELIVERY
+  READY_FOR_PICKUP
+  COMPLETED // delivered / picked up, cash collected
+  REJECTED // restaurant declined before accepting
+  CANCELED // customer (before acceptance) or admin canceled
+  FAILED // restaurant reported a failed delivery / no-show
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY
 }
 
 model Order {
-  id                  String                         @id @default(cuid())
-  reference           String                         @unique
-  idempotencyKey      String                         @unique
+  id                  String           @id @default(cuid())
+  reference           String           @unique
+  idempotencyKey      String           @unique
+  trackingToken       String           @unique // lets a guest open their order page from any device
   restaurantId        String
-  status              OrderStatus                    @default(VALIDATED)
+  userId              String? // set when ordered while logged in (or claimed later from the same device)
+  status              OrderStatus      @default(PLACED)
   fulfillment         Fulfillment
+  paymentMethod       PaymentMethod    @default(CASH_ON_DELIVERY)
+  changeForCents      Int? // customer pays with a larger bill; driver brings change
   customerName        String
   customerPhone       String
   address             String?
@@ -614,38 +642,41 @@ model Order {
   deliveryArea        String?
   currency            String
   subtotalCents       Int
-  deliveryFeeCents    Int?
-  totalCents          Int?
+  deliveryFeeCents    Int              @default(0)
+  totalCents          Int // cash to collect
   // Commission base is always stored in USD cents
   commissionBaseCents Int
   exchangeRate        Float? // LBP per USD applied at order time, when currency != USD
-  whatsappNumber      String
   restaurantName      String
-  message             String
+  restaurantPhone     String?
+  estimatedMinutes    Int?
   deviceKey           String?
   ipHash              String?
-  handoffCount        Int                            @default(0)
-  linkGeneratedAt     DateTime?
-  handoffAt           DateTime?
-  messageConfirmedAt  DateTime?
-  acknowledgedAt      DateTime?
   acceptedAt          DateTime?
+  preparingAt         DateTime?
+  dispatchedAt        DateTime? // out for delivery / ready for pickup
+  completedAt         DateTime?
+  autoCompleted       Boolean          @default(false)
   rejectedAt          DateTime?
   rejectionReason     String?
-  fulfilledAt         DateTime?
   canceledAt          DateTime?
-  suspicious          Boolean                        @default(false)
+  canceledBy          String? // CUSTOMER | ADMIN
+  cancelReason        String?
+  failedAt            DateTime?
+  failureReason       String?
+  suspicious          Boolean          @default(false)
   suspiciousReason    String?
-  createdAt           DateTime                       @default(now())
-  updatedAt           DateTime                       @updatedAt
-  restaurant          Restaurant                     @relation(fields: [restaurantId], references: [id])
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  restaurant          Restaurant       @relation(fields: [restaurantId], references: [id])
+  user                User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   items               OrderItem[]
   events              OrderEvent[]
-  acknowledgment      RestaurantOrderAcknowledgment?
   commission          CommissionEvent?
 
-  @@index([restaurantId, createdAt])
-  @@index([status])
+  @@index([restaurantId, status, createdAt])
+  @@index([userId, createdAt])
+  @@index([deviceKey])
   @@index([customerPhone])
   @@map("orders")
 }
@@ -696,17 +727,6 @@ model OrderEvent {
   @@index([orderId])
   @@index([type, createdAt])
   @@map("order_events")
-}
-
-model RestaurantOrderAcknowledgment {
-  id        String   @id @default(cuid())
-  orderId   String   @unique
-  userId    String
-  method    String // LIST | REFERENCE_LOOKUP
-  createdAt DateTime @default(now())
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@map("restaurant_order_acknowledgments")
 }
 
 // ───────────────────────── Commission & Billing ─────────────────────────

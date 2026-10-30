@@ -76,8 +76,8 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
       <div className="grid gap-5 lg:grid-cols-2">
         <Section title="Business">
           <dl className="grid grid-cols-[140px_1fr] gap-y-1.5 text-sm">
-            <dt className="text-ink-muted">WhatsApp</dt>
-            <dd>{r.whatsappNumber ? formatPhone(r.whatsappNumber) : "—"}</dd>
+            <dt className="text-ink-muted">Ordering</dt>
+            <dd>{r.orderingEnabled ? "Accepting orders" : "Paused"} · prep ~{r.avgPrepMinutes} min · {r.deliveryEnabled ? `delivery ${r.deliveryFeeCents != null ? `(${(r.deliveryFeeCents / 100).toFixed(2)} ${r.currency})` : ""}` : "no delivery"}{r.pickupEnabled ? " · pickup" : ""}</dd>
             <dt className="text-ink-muted">Phone</dt>
             <dd>{r.phone ? formatPhone(r.phone) : "—"}</dd>
             <dt className="text-ink-muted">Email</dt>

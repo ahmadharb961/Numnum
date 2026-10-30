@@ -25,15 +25,11 @@ async function sweep(page, paths, errors) {
   console.log("owner landed:", new URL(page.url()).pathname);
 
   if (!process.env.SKIP) {
-  await page.goto("/dashboard/orders");
+  await page.goto("/dashboard/orders?tab=active");
   await page.screenshot({ path: SHOTS + "/10-orders.png" });
-  const ref = (await page.locator("button span.font-mono").first().textContent()).trim();
-  await page.fill("input[placeholder='NN-2026-000125']", ref);
-  await page.locator("form").getByRole("button", { name: /Acknowledge/ }).click();
-  await page.waitForURL(/tab=active/);
-  console.log("acknowledged", ref, "visible in active:", await page.locator(`text=${ref}`).count());
+  console.log("in-progress orders visible:", await page.locator("button span.font-mono").count());
 
-  await page.goto("/dashboard/menu/import");
+  await page.goto("/dashboard/menu/import", { waitUntil: "networkidle" });
   await page.setInputFiles("input[type=file]", (process.env.FIXTURES || D + "/fixtures") + "/menu150.csv");
   await page.waitForSelector("text=Match your columns", { timeout: 20000 });
   await page.getByRole("button", { name: /Validate/ }).click();
@@ -44,7 +40,7 @@ async function sweep(page, paths, errors) {
   await page.waitForSelector("text=Menu imported", { timeout: 60000 });
   console.log("import result:", await page.locator("text=/created ·/").first().textContent());
 
-  await page.goto("/dashboard/menu/photos");
+  await page.goto("/dashboard/menu/photos", { waitUntil: "networkidle" });
   await page.setInputFiles("input[type=file][multiple]", (process.env.FIXTURES || D + "/fixtures") + "/photos150.zip");
   await page.waitForSelector("text=Items still missing photos", { timeout: 60000 });
   console.log("match counts [matched, unmatched, dup, unsupported, missing]:", await page.locator(".card .tabular").allTextContents());
@@ -54,7 +50,7 @@ async function sweep(page, paths, errors) {
   console.log("upload failures:", await page.locator("td .text-red-600").count());
   }
 
-  await sweep(page, ["/dashboard", "/dashboard/menu", "/dashboard/customizations", "/dashboard/reels", "/dashboard/reels/new", "/dashboard/reviews", "/dashboard/billing", "/dashboard/settings", "/dashboard/staff", "/dashboard/verification", "/dashboard/agreement", "/dashboard/publish", "/dashboard/notifications", "/dashboard/menu/items/new"], errors);
+  await sweep(page, ["/dashboard", "/dashboard/menu", "/dashboard/customizations", "/dashboard/reels", "/dashboard/reels/new", "/dashboard/reviews", "/dashboard/billing", "/dashboard/orders", "/dashboard/orders?tab=closed", "/dashboard/settings", "/dashboard/staff", "/dashboard/verification", "/dashboard/agreement", "/dashboard/publish", "/dashboard/notifications", "/dashboard/menu/items/new"], errors);
   await page.goto("/dashboard/billing");
   await page.screenshot({ path: SHOTS + "/13-billing.png", fullPage: true });
   const invId = (await page.locator("a[href^='/dashboard/billing/']").first().getAttribute("href")).split("/").pop();

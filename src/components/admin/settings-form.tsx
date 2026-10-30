@@ -6,7 +6,7 @@ import { saveSettingsAction } from "@/actions/admin";
 import type { Settings } from "@/server/settings";
 import { Section } from "@/components/dashboard/page";
 import { Button } from "@/components/ui/button";
-import { Alert, Field } from "@/components/ui/misc";
+import { Field } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 
 export function SettingsForm({ initial }: { initial: Settings }) {
@@ -45,36 +45,29 @@ export function SettingsForm({ initial }: { initial: Settings }) {
       </Section>
 
       <Section title="Commission">
-        <Alert tone="blue" className="mb-4">
-          Clicking WhatsApp is never proof that a message was sent. Restaurant acknowledgment is the recommended billable event unless a verified WhatsApp Business integration provides delivery evidence.
-        </Alert>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Default commission rate (%)">
             <input className="input" inputMode="decimal" value={s.defaultCommissionRateBps / 100} onChange={(e) => setS({ ...s, defaultCommissionRateBps: Math.round(num(e.target.value) * 100) })} />
           </Field>
-          <Field label="Billable event">
+          <Field label="Charge commission when">
             <select className="input" value={s.billableEvent} onChange={(e) => setS({ ...s, billableEvent: e.target.value as Settings["billableEvent"] })}>
-              <option value="ACKNOWLEDGED">Restaurant acknowledges request</option>
-              <option value="ACCEPTED">Restaurant accepts order</option>
-              <option value="FULFILLED">Restaurant marks fulfilled</option>
-              <option value="MESSAGE_CONFIRMED" disabled={!s.whatsappBusinessIntegration}>
-                WhatsApp message delivery confirmed (requires integration)
-              </option>
+              <option value="COMPLETED">The order is completed (recommended)</option>
+              <option value="ACCEPTED">The restaurant accepts the order</option>
             </select>
           </Field>
           <Field label="Agreement version">
             <input className="input" value={s.agreementVersion} onChange={(e) => setS({ ...s, agreementVersion: e.target.value })} />
           </Field>
+          <Field label="Auto-complete open orders after (hours)" hint="Accepted orders the restaurant never closes are completed automatically">
+            <input className="input" type="number" min={1} max={72} value={s.autoCompleteHours} onChange={(e) => setS({ ...s, autoCompleteHours: num(e.target.value) })} />
+          </Field>
         </div>
-        <label className="mt-3 flex items-center gap-3 text-sm">
-          <input type="checkbox" checked={s.whatsappBusinessIntegration} onChange={(e) => setS({ ...s, whatsappBusinessIntegration: e.target.checked })} className="h-5 w-5 accent-brand-500" /> A verified WhatsApp Business messaging integration is live and records delivery evidence
-        </label>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <Field label="Suspicious rejection threshold (%)" hint="Flags restaurants that rarely acknowledge requests">
+          <Field label="Suspicious rejection threshold (%)" hint="Flags restaurants with many rejected or undelivered orders">
             <input className="input" value={Math.round(s.suspiciousRejectRate * 100)} onChange={(e) => setS({ ...s, suspiciousRejectRate: num(e.target.value) / 100 })} />
           </Field>
         </div>
-        <Button className="mt-4" loading={pending} onClick={() => save(["defaultCommissionRateBps", "billableEvent", "agreementVersion", "whatsappBusinessIntegration", "suspiciousRejectRate"])}>
+        <Button className="mt-4" loading={pending} onClick={() => save(["defaultCommissionRateBps", "billableEvent", "agreementVersion", "autoCompleteHours", "suspiciousRejectRate"])}>
           Save commission settings
         </Button>
       </Section>

@@ -30,7 +30,7 @@ export function AcceptAgreement() {
         <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} className="mt-0.5 h-5 w-5 accent-brand-500" />I have read and accept the commission agreement on behalf of my restaurant.
       </label>
       <Button size="lg" disabled={!checked} loading={pending} onClick={() => run(acceptAgreementAction)}>
-        Accept and enable WhatsApp ordering
+        Accept and enable online ordering
       </Button>
     </div>
   );

@@ -13,7 +13,7 @@ export default async function PublishPage() {
   const ctx = await requireRestaurant("OWNER");
   const r = ctx.restaurant;
   const [steps, s] = await Promise.all([onboardingChecklist(r.id), getSettings()]);
-  const required = steps.filter((x) => ["whatsapp", "menu", "agreement"].includes(x.key));
+  const required = steps.filter((x) => ["phone", "menu", "agreement"].includes(x.key));
   const ready = required.every((x) => x.done);
   return (
     <DashPage title="Publish your restaurant">
@@ -26,7 +26,7 @@ export default async function PublishPage() {
               <Link href={x.href} className="flex items-center gap-3 text-sm">
                 {x.done ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <Circle className="h-5 w-5 text-ink-muted/40" />}
                 <span className={x.done ? "" : "font-semibold"}>{x.label}</span>
-                {["whatsapp", "menu", "agreement"].includes(x.key) && !x.done && <span className="text-xs font-semibold text-brand-600">required</span>}
+                {["phone", "menu", "agreement"].includes(x.key) && !x.done && <span className="text-xs font-semibold text-brand-600">required</span>}
               </Link>
             </li>
           ))}

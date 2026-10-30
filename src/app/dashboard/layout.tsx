@@ -4,6 +4,7 @@ import { prisma } from "@/server/db";
 import { DashboardNav } from "@/components/dashboard/nav";
 import { Alert } from "@/components/ui/misc";
 import Link from "next/link";
+import { NewOrderAlert } from "@/components/dashboard/new-order-alert";
 
 export const metadata: Metadata = { title: { default: "Dashboard", template: "%s · numnum for restaurants" }, robots: { index: false } };
 
@@ -12,12 +13,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const r = ctx.restaurant;
   const [unread, pendingOrders] = await Promise.all([
     prisma.notification.count({ where: { restaurantId: r.id, audience: "RESTAURANT", readAt: null } }),
-    prisma.order.count({ where: { restaurantId: r.id, status: { in: ["LINK_GENERATED", "HANDOFF_ATTEMPTED", "MESSAGE_CONFIRMED"] }, createdAt: { gte: new Date(Date.now() - 7 * 86400_000) } } }),
+    prisma.order.count({ where: { restaurantId: r.id, status: "PLACED" } }),
   ]);
   return (
     <div className="min-h-dvh bg-cream">
       <DashboardNav restaurantName={r.displayName} slug={r.slug} role={ctx.staffRole} memberships={ctx.memberships} currentId={r.id} unread={unread} pendingOrders={pendingOrders} />
       <div className="lg:pl-64">
+        <div className="flex justify-end px-4 pt-3 lg:px-8">
+          <NewOrderAlert initialCount={pendingOrders} />
+        </div>
         {r.status === "SUSPENDED" && (
           <div className="px-4 pt-4 lg:px-8">
             <Alert tone="red">

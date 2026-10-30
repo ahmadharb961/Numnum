@@ -6,15 +6,15 @@ import { getCurrentUser } from "@/server/auth";
 import { buttonClass } from "@/components/ui/button";
 import { formatRate } from "@/lib/money";
 
-export const metadata: Metadata = { title: "numnum for restaurants", description: "Turn food videos into WhatsApp orders. No setup fees — pay a commission only on order requests you acknowledge." };
+export const metadata: Metadata = { title: "numnum for restaurants", description: "Turn food videos into delivery orders. No setup fees — pay a commission only on completed orders." };
 
 export default async function BusinessPage() {
   const [s, user] = await Promise.all([getSettings(), getCurrentUser()]);
   const steps = [
     { icon: Upload, title: "Import your menu", body: "Upload a CSV and drop in a ZIP of photos named by SKU. 150 items in minutes." },
     { icon: Film, title: "Post food reels", body: "Short vertical videos linked to dishes, with live prices and a one-tap Order button." },
-    { icon: MessageCircle, title: "Get WhatsApp orders", body: "Customers send a complete, itemized order straight to your WhatsApp. You confirm, collect payment and deliver." },
-    { icon: Receipt, title: "One monthly invoice", body: `Pay ${formatRate(s.defaultCommissionRateBps)} on order requests you acknowledge — never on views or clicks.` },
+    { icon: MessageCircle, title: "Receive orders instantly", body: "Orders arrive in your dashboard with a sound alert. Accept with a ready time, deliver, and collect cash on delivery." },
+    { icon: Receipt, title: "One monthly invoice", body: `Pay ${formatRate(s.defaultCommissionRateBps)} on completed orders only — never on views, clicks, rejected or canceled orders.` },
     { icon: Wallet, title: "Settle via Whish", body: "Pay your monthly invoice with Whish Money and upload the receipt. Simple." },
     { icon: BadgeCheck, title: "Get verified", body: "Earn the verified badge by confirming your business identity." },
   ];
@@ -30,14 +30,14 @@ export default async function BusinessPage() {
       </header>
       <section className="container-app pb-10 pt-8 text-center">
         <p className="text-sm font-bold uppercase tracking-widest text-brand-600">For restaurants in Lebanon</p>
-        <h1 className="mt-3 text-4xl font-black leading-tight tracking-tight">Turn food videos into WhatsApp orders.</h1>
-        <p className="mx-auto mt-3 max-w-md text-ink-muted">No setup fees, no delivery fleet, no payment terminal. Customers discover your dishes, customize them, and send the order to your WhatsApp.</p>
+        <h1 className="mt-3 text-4xl font-black leading-tight tracking-tight">Turn food videos into delivery orders.</h1>
+        <p className="mx-auto mt-3 max-w-md text-ink-muted">No setup fees and no payment terminal. Customers discover your dishes in short videos, customize them, and order — paying you cash on delivery.</p>
         <div className="mt-6 flex justify-center gap-3">
           <Link href="/business/register" className={buttonClass("primary", "lg")}>
             Register your restaurant
           </Link>
         </div>
-        <p className="mt-3 text-xs text-ink-muted">{formatRate(s.defaultCommissionRateBps)} commission on acknowledged order requests · billed monthly</p>
+        <p className="mt-3 text-xs text-ink-muted">{formatRate(s.defaultCommissionRateBps)} commission on completed orders · billed monthly</p>
       </section>
       <section className="container-app grid gap-3 pb-16 sm:grid-cols-2">
         {steps.map((st) => (

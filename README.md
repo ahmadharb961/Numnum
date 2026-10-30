@@ -1,10 +1,10 @@
 # numnum
 
-Video-first food discovery and WhatsApp ordering for Lebanon — a mobile-first web app (installable PWA), not a native app.
+Video-first food discovery and delivery ordering for Lebanon — a mobile-first web app (installable PWA), not a native app. Payment is **cash on delivery** only.
 
-**Customer flow:** watch food reels → open the dish → customize → add to cart → enter delivery details → send the order to the restaurant on WhatsApp. No account, no online payment.
+**Customer flow:** watch food reels → open the dish → customize → add to cart → checkout as a guest or logged in (saved addresses) → delivery or pickup → cash on delivery → place order → live tracking. Accounts are optional and add order history, saved addresses, saved items and reorder.
 
-**Restaurant flow:** register → import menu (CSV) → upload photos (ZIP / bulk, matched by SKU) → upload reels linked to dishes → acknowledge order requests → review monthly commission invoice → pay via Whish → upload proof.
+**Restaurant flow:** register → import menu (CSV) → upload photos (ZIP / bulk, matched by SKU) → upload reels linked to dishes → receive orders with a sound alert → accept with an ETA → preparing → out for delivery / ready → completed (cash collected) → review the monthly commission invoice → pay via Whish → upload proof.
 
 **Admin:** restaurant approval and verification, moderation, commission ledger, monthly invoicing, Whish payment reconciliation, disputes, adjustments, global settings, audit log.
 
@@ -28,8 +28,8 @@ Video-first food discovery and WhatsApp ordering for Lebanon — a mobile-first 
 | Prices never trusted from the browser | `src/server/orders.ts` → `priceCart()` re-prices from DB and re-validates customizations (`src/lib/customization.ts`, shared with the UI) |
 | Immutable financial snapshots | `orders`, `order_items`, `order_item_customizations` store names/prices at order time; commission events store base, rate and amount |
 | Money is integer minor units | `src/lib/money.ts` (`calcCommission` = base × bps / 10000, half-up to the cent). LBP menus use an explicit admin-set exchange rate stored on each order |
-| WhatsApp opening ≠ message sent | Order states: `LINK_GENERATED` → `HANDOFF_ATTEMPTED` → (`MESSAGE_CONFIRMED` only with a verified integration) → `ACKNOWLEDGED` → `ACCEPTED` / `REJECTED` → `FULFILLED` |
-| Billable event (default: restaurant acknowledgment) | `src/server/commission.ts` → `ensureCommission()`; configurable in Admin → Settings |
+| Order lifecycle | `PLACED` → `ACCEPTED` (ETA) → `PREPARING` → `OUT_FOR_DELIVERY` / `READY_FOR_PICKUP` → `COMPLETED`; exits `REJECTED` (restaurant, with reason), `CANCELED` (customer before acceptance, or admin), `FAILED` (not delivered). See `src/server/orders.ts` |
+| Billable event (default: completed orders) | `src/server/commission.ts` → `ensureCommission()`; Admin → Settings can switch to accepted orders. Accepted orders left open are auto-completed after N hours (`autoCompleteStaleOrders`, run by `/api/cron`) |
 | Exactly one commission per order | Unique index on `commission_events.orderId` + `INSERT … ON CONFLICT DO NOTHING`; orders use an idempotency key, so repeated taps or refreshes return the same order |
 | Monthly invoices, never silently edited | `src/server/billing.ts` → `generateInvoice()` (unique per restaurant + period, sequential numbers). Corrections are adjustment/credit lines |
 | Payment is "submitted", never auto-"paid" | `submitPayment()` → `PAYMENT_SUBMITTED`; only `reviewPayment()` by an admin adds verified money |
@@ -66,9 +66,9 @@ npm run typecheck
 npm run test:e2e    # Playwright browser journeys against a running, demo-seeded server on :3000
 ```
 
-Covered: commission math (a $20 order → $2.80 at 14%), exactly-once commission under concurrent acknowledgments, repeated WhatsApp handoffs creating no commission, idempotent order submission, client-price tampering, cross-restaurant item injection, restaurant isolation for orders/invoices/payments, monthly invoicing (idempotent, refuses open periods), Whish approval and partial payments, dispute credits, CSV validation including Arabic/UTF-8 and encodings, SKU photo matching for 150 files, feed diversity.
+Covered: commission math (a $20 order → $2.80 at 14%, delivery fee excluded), exactly-once commission under concurrent completions, no commission on rejected/canceled/failed orders, auto-completion, billing on acceptance with rate snapshots, delivery fees by area, closed/paused restaurants, change-for validation, saved addresses (and refusing another user's address), guest tracking by device/token and claiming guest orders on sign-in, cancellation rules, tenant isolation, idempotent order submission, client-price tampering, monthly invoicing, Whish approval and partial payments, dispute credits, Cloudflare Stream status sync, images stored in Postgres, CSV validation (Arabic/UTF-8), SKU photo matching, feed diversity.
 
-The E2E scripts cover the full guest order journey to the WhatsApp deep link, a 150-item CSV import, a 150-photo ZIP upload, acknowledgment by order reference, admin payment verification, and an error sweep of every dashboard and admin page.
+The E2E scripts cover: guest order from a reel to cash-on-delivery checkout and live tracking; the restaurant accepting, dispatching and completing it while the customer page updates; guest cancellation; sign-up claiming guest orders; a logged-in checkout with a saved address; a 150-item CSV import and re-import; a 150-photo ZIP upload; admin payment verification; tenant isolation; and an error sweep of every dashboard and admin page.
 
 ## Putting it online (Hostinger)
 
@@ -85,7 +85,7 @@ Follow **[docs/SETUP.md](docs/SETUP.md)**. It's the same setup as Hireel: Hostin
 
 ```
 prisma/            schema, migrations, seed
-src/lib/           pure, tested logic (money, phone, customization, WhatsApp message, CSV import, image matching, ranking, hours)
+src/lib/           pure, tested logic (money, phone, customization, order statuses, CSV import, image matching, ranking, hours)
 src/server/        server-only services (auth, orders, commission, billing, media, storage, feed, search, reviews, jobs)
 src/actions/       server actions for dashboards (authorized + audited)
 src/app/(customer) mobile customer app (reels, explore, restaurants, item, cart, checkout, saved)

@@ -22,7 +22,7 @@ export function RestaurantAdminForm(p: { id: string; commissionRate: string; res
       </Field>
       <div className="space-y-2 text-sm font-semibold">
         <label className="flex items-center gap-3">
-          <input type="checkbox" checked={ordering} onChange={(e) => setOrdering(e.target.checked)} className="h-5 w-5 accent-brand-500" /> WhatsApp ordering enabled
+          <input type="checkbox" checked={ordering} onChange={(e) => setOrdering(e.target.checked)} className="h-5 w-5 accent-brand-500" /> Online ordering enabled
         </label>
         <label className="flex items-center gap-3">
           <input type="checkbox" checked={reels} onChange={(e) => setReels(e.target.checked)} className="h-5 w-5 accent-brand-500" /> Restrict new reels

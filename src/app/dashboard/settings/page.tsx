@@ -25,18 +25,18 @@ export default async function SettingsPage() {
           r={{ displayName: r.displayName, businessName: r.businessName, description: r.description ?? "", cuisine: r.cuisine ?? "", phone: r.phone ? formatPhone(r.phone) : "", email: r.email ?? "", address: r.address ?? "", area: r.area ?? "", city: r.city ?? "", mapsUrl: r.mapsUrl ?? "", latitude: r.latitude?.toString() ?? "", longitude: r.longitude?.toString() ?? "", logoUrl: r.logoUrl ?? "", coverUrl: r.coverUrl ?? "", ...social }}
         />
       </Section>
-      <Section id="ordering" title="WhatsApp ordering, delivery & pickup">
+      <Section id="ordering" title="Online ordering, delivery & pickup">
         {canAccess(ctx.staffRole, "OWNER") ? (
           <>
             {!r.agreementAcceptedAt && (
               <Alert className="mb-4">
-                Accept the <Link href="/dashboard/agreement" className="font-semibold underline">commission agreement</Link> to switch on WhatsApp ordering.
+                Accept the <Link href="/dashboard/agreement" className="font-semibold underline">commission agreement</Link> to switch on online ordering.
               </Alert>
             )}
             <OrderingForm
               agreementAccepted={!!r.agreementAcceptedAt}
               currencies={settings.supportedCurrencies}
-              r={{ whatsappNumber: r.whatsappNumber ? formatPhone(r.whatsappNumber) : "", deliveryEnabled: r.deliveryEnabled, pickupEnabled: r.pickupEnabled, requireMapsLocation: r.requireMapsLocation, deliveryFee: fmt(r.deliveryFeeCents), minOrder: fmt(r.minOrderCents), currency: r.currency, orderingEnabled: r.orderingEnabled, areas: areas.map((a) => (a.feeCents != null ? `${a.name}: ${fmt(a.feeCents)}` : a.name)).join("\n") }}
+              r={{ avgPrepMinutes: String(r.avgPrepMinutes), deliveryEnabled: r.deliveryEnabled, pickupEnabled: r.pickupEnabled, requireMapsLocation: r.requireMapsLocation, deliveryFee: fmt(r.deliveryFeeCents), minOrder: fmt(r.minOrderCents), currency: r.currency, orderingEnabled: r.orderingEnabled, areas: areas.map((a) => (a.feeCents != null ? `${a.name}: ${fmt(a.feeCents)}` : a.name)).join("\n") }}
             />
           </>
         ) : (

@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bike, Check, Loader2, LocateFixed, MapPin, MessageCircle, ShoppingBag, AlertTriangle } from "lucide-react";
+import { Banknote, Bike, Check, Clock, Loader2, LocateFixed, MapPin, Plus, ShoppingBag, AlertTriangle } from "lucide-react";
 import { useCart, lineTotal } from "./cart";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, minorDigits } from "@/lib/money";
 import { normalizePhone } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ type Info = {
   id: string;
   displayName: string;
   slug: string;
+  phone: string | null;
   currency: string;
   deliveryEnabled: boolean;
   pickupEnabled: boolean;
@@ -24,15 +25,20 @@ type Info = {
   deliveryFeeCents: number | null;
   minOrderCents: number | null;
   orderingEnabled: boolean;
+  openNow: boolean | null;
+  avgPrepMinutes: number;
+  address: string | null;
   deliveryAreas: { name: string; feeCents: number | null }[];
 };
 
-type Quote = { subtotalCents: number; currency: string; errors: Record<string, string>; lines: { menuItemId: string; name: string; quantity: number; unitTotalCents: number; lineTotalCents: number }[] };
-
+type Quote = { subtotalCents: number; deliveryFeeCents: number | null; totalCents: number | null; currency: string; errors: Record<string, string>; lines: { lineTotalCents: number }[] };
+type SavedAddress = { id: string; label: string; area: string | null; address: string; building: string | null; notes: string | null; hasLocation: boolean; isDefault: boolean };
+type Profile = { user: { name: string; phone: string | null } | null; addresses: SavedAddress[] };
 type Details = { name: string; phone: string; address: string; building: string; area: string; notes: string; mapsUrl: string; latitude: number | null; longitude: number | null };
 
 const DETAILS_KEY = "nn_details_v1";
-const STEPS = ["Method", "Details", "Confirm"] as const;
+const RECENT_KEY = "nn_recent_orders_v2";
+const STEPS = ["Method", "Details", "Review & pay"] as const;
 
 function newKey() {
   const a = new Uint8Array(18);
@@ -45,29 +51,47 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
   const router = useRouter();
   const [info, setInfo] = useState<Info | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [step, setStep] = useState(0);
   const [method, setMethod] = useState<"DELIVERY" | "PICKUP" | null>(null);
+  const [addressId, setAddressId] = useState<string | null>(null); // saved address, or null for a new one
   const [d, setD] = useState<Details>({ name: "", phone: "", address: "", building: "", area: "", notes: "", mapsUrl: "", latitude: null, longitude: null });
+  const [saveAddress, setSaveAddress] = useState(true);
+  const [addressLabel, setAddressLabel] = useState("");
   const [remember, setRemember] = useState(false);
+  const [changeFor, setChangeFor] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
+  const [placing, setPlacing] = useState(false);
+  const [placeError, setPlaceError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
-  const [consented, setConsented] = useState(false);
 
+  // Prefill: account profile + saved addresses, or details remembered on this device (guests).
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(DETAILS_KEY);
-      if (saved) {
-        setD((p) => ({ ...p, ...JSON.parse(saved) }));
-        setRemember(true);
-      }
-    } catch {}
+    fetch("/api/account/checkout-profile")
+      .then((r) => r.json())
+      .then((p: Profile) => {
+        setProfile(p);
+        if (p.user) {
+          setD((x) => ({ ...x, name: x.name || p.user!.name, phone: x.phone || p.user!.phone || "" }));
+          const def = p.addresses.find((a) => a.isDefault) ?? p.addresses[0];
+          if (def) setAddressId(def.id);
+        } else {
+          try {
+            const saved = localStorage.getItem(DETAILS_KEY);
+            if (saved) {
+              setD((x) => ({ ...x, ...JSON.parse(saved) }));
+              setRemember(true);
+            }
+          } catch {}
+        }
+      })
+      .catch(() => setProfile({ user: null, addresses: [] }));
   }, []);
 
   useEffect(() => {
     if (!cart) return;
+    track("checkout_started", { restaurantId: cart.restaurantId });
     fetch(`/api/restaurants/${cart.restaurantId}/checkout`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((i: Info) => {
@@ -80,11 +104,18 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
 
   const items = useMemo(() => cart?.lines.map((l) => ({ menuItemId: l.menuItemId, quantity: l.quantity, selections: l.selections, note: l.note, reelId: l.reelId })) ?? [], [cart]);
   const localSubtotal = cart?.lines.reduce((s, l) => s + lineTotal(l), 0) ?? 0;
+  const savedAddress = profile?.addresses.find((a) => a.id === addressId) ?? null;
+  const area = method === "DELIVERY" ? (savedAddress ? savedAddress.area : d.area) : null;
+  const feeForArea = (name: string | null) => {
+    if (!info) return null;
+    if (info.deliveryAreas.length) {
+      const a = info.deliveryAreas.find((x) => x.name.toLowerCase() === (name ?? "").toLowerCase());
+      return a ? (a.feeCents ?? info.deliveryFeeCents) : null;
+    }
+    return info.deliveryFeeCents;
+  };
 
-  const area = info?.deliveryAreas.find((a) => a.name === d.area);
-  const deliveryFee = method === "DELIVERY" ? (area ? area.feeCents : info?.deliveryAreas.length ? null : info?.deliveryFeeCents ?? null) : null;
-
-  // Idempotency key per checkout attempt: survives refresh & double taps; a new cart gets a new key.
+  // Idempotency key per checkout attempt: survives refresh & double taps; a changed cart gets a new key.
   const cartSig = useMemo(() => JSON.stringify(items) + method, [items, method]);
   const idemKey = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -113,40 +144,47 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
       </Center>
     );
 
+  const currency = cart.currency;
+  const loggedIn = !!profile?.user;
+
   function validateDetails() {
     const e: Record<string, string> = {};
     if (d.name.trim().length < 2) e.name = "Enter your full name";
     const p = normalizePhone(d.phone);
     if (!p.ok) e.phone = p.error;
-    if (method === "DELIVERY") {
+    if (method === "DELIVERY" && !savedAddress) {
       if (info?.deliveryAreas.length && !d.area) e.area = "Choose your area";
       if (d.address.trim().length < 4) e.address = "Enter your delivery address";
-      if (info?.requireMapsLocation && !d.mapsUrl && d.latitude == null) e.mapsUrl = "This restaurant needs your Google Maps location";
+      if (info?.requireMapsLocation && !d.mapsUrl && d.latitude == null) e.mapsUrl = "This restaurant needs your location on the map";
+      if (d.mapsUrl && d.latitude == null && !/^https?:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|goo\.gl\/maps|maps\.app\.goo\.gl)/i.test(d.mapsUrl)) e.mapsUrl = "Paste a Google Maps link (maps.google.com or maps.app.goo.gl)";
     }
-    if (d.mapsUrl && !/^https?:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|goo\.gl\/maps|maps\.app\.goo\.gl)/i.test(d.mapsUrl)) e.mapsUrl = "Paste a Google Maps link (maps.google.com or maps.app.goo.gl)";
+    if (method === "DELIVERY" && savedAddress && info?.deliveryAreas.length && feeForArea(savedAddress.area) == null) e.addressId = `${info.displayName} doesn't deliver to ${savedAddress.area ?? "this address"}`;
+    if (method === "DELIVERY" && !savedAddress && d.area && feeForArea(d.area) == null) e.area = "This restaurant doesn't deliver to that area";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
-  async function goConfirm() {
+  async function goReview() {
     if (!validateDetails()) return;
     try {
-      if (remember) localStorage.setItem(DETAILS_KEY, JSON.stringify({ name: d.name, phone: d.phone, address: d.address, building: d.building, area: d.area }));
-      else localStorage.removeItem(DETAILS_KEY);
+      if (!loggedIn) {
+        if (remember) localStorage.setItem(DETAILS_KEY, JSON.stringify({ name: d.name, phone: d.phone, address: d.address, building: d.building, area: d.area }));
+        else localStorage.removeItem(DETAILS_KEY);
+      }
     } catch {}
     track("order_details_completed", { restaurantId: cart!.restaurantId });
     setStep(2);
     setQuote(null);
+    setPlaceError(null);
     try {
-      setQuote(await api<Quote>("/api/cart/quote", { restaurantId: cart!.restaurantId, items }));
+      setQuote(await api<Quote>("/api/cart/quote", { restaurantId: cart!.restaurantId, items, fulfillment: method, area }));
     } catch (e) {
-      setSendError((e as Error).message);
+      setPlaceError((e as Error).message);
     }
   }
 
   function locate() {
     if (!navigator.geolocation) return setErrors((e) => ({ ...e, mapsUrl: "Location isn't available on this device" }));
-    setConsented(true);
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -163,50 +201,52 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
     );
   }
 
-  async function send() {
-    setSending(true);
-    setSendError(null);
+  async function placeOrder() {
+    setPlacing(true);
+    setPlaceError(null);
     try {
-      const order = await api<{ reference: string; whatsappUrl: string }>("/api/orders", {
+      const delivery = method === "DELIVERY";
+      const order = await api<{ reference: string; trackingToken: string }>("/api/orders", {
         idempotencyKey: idemKey,
         restaurantId: cart!.restaurantId,
         fulfillment: method,
         items,
+        changeFor: changeFor.trim() || null,
         customer: {
           name: d.name.trim(),
           phone: d.phone,
-          address: method === "DELIVERY" ? d.address.trim() : null,
-          building: method === "DELIVERY" ? d.building.trim() || null : null,
-          area: method === "DELIVERY" ? d.area || null : null,
+          addressId: delivery && savedAddress ? savedAddress.id : null,
+          address: delivery && !savedAddress ? d.address.trim() : null,
+          building: delivery && !savedAddress ? d.building.trim() || null : null,
+          area: delivery && !savedAddress ? d.area || null : null,
           notes: d.notes.trim() || null,
-          mapsUrl: d.latitude == null ? d.mapsUrl || null : null,
-          latitude: d.latitude,
-          longitude: d.longitude,
+          mapsUrl: delivery && !savedAddress && d.latitude == null ? d.mapsUrl || null : null,
+          latitude: delivery && !savedAddress ? d.latitude : null,
+          longitude: delivery && !savedAddress ? d.longitude : null,
+          saveAddress: delivery && loggedIn && !savedAddress && saveAddress,
+          addressLabel: addressLabel.trim() || null,
         },
       });
-      // Record the handoff attempt (not proof of sending), then hand over to WhatsApp.
       try {
-        await api(`/api/orders/${order.reference}/handoff`);
-      } catch {}
-      try {
-        const recent = JSON.parse(localStorage.getItem("nn_recent_orders") || "[]") as string[];
-        localStorage.setItem("nn_recent_orders", JSON.stringify([order.reference, ...recent.filter((r) => r !== order.reference)].slice(0, 10)));
+        const recent = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]") as { ref: string; t: string }[];
+        localStorage.setItem(RECENT_KEY, JSON.stringify([{ ref: order.reference, t: order.trackingToken }, ...recent.filter((r) => r.ref !== order.reference)].slice(0, 20)));
         sessionStorage.removeItem("nn_idem");
       } catch {}
       clear();
-      window.history.replaceState(null, "", `/order/${order.reference}?sent=1`);
-      window.location.assign(order.whatsappUrl);
+      router.replace(`/order/${order.reference}?t=${order.trackingToken}&placed=1`);
     } catch (e) {
       const err = e as Error & { fieldErrors?: Record<string, string> };
-      setSendError(err.message + (err.fieldErrors ? `: ${Object.values(err.fieldErrors)[0]}` : ""));
-      setSending(false);
+      setPlaceError(err.message + (err.fieldErrors ? `: ${Object.values(err.fieldErrors)[0]}` : ""));
+      setPlacing(false);
     }
   }
 
-  const currency = cart.currency;
   const subtotal = quote?.subtotalCents ?? localSubtotal;
+  const fee = method === "DELIVERY" ? (quote ? quote.deliveryFeeCents : feeForArea(area)) : 0;
+  const total = fee == null ? null : subtotal + fee;
   const quoteChanged = quote && quote.subtotalCents !== localSubtotal;
   const below = info?.minOrderCents && subtotal < info.minOrderCents;
+  const unitLabel = currency === "LBP" ? "LBP" : "$";
 
   return (
     <main className="pb-nav">
@@ -216,15 +256,19 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
           {STEPS.map((s, i) => (
             <li key={s} className="flex flex-1 items-center gap-2">
               <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold", i < step ? "bg-emerald-500 text-white" : i === step ? "bg-ink text-white" : "bg-black/10 text-ink-muted")}>{i < step ? <Check className="h-4 w-4" /> : i + 1}</span>
-              <span className={cn("text-sm font-semibold", i === step ? "text-ink" : "text-ink-muted")}>{s}</span>
+              <span className={cn("whitespace-nowrap text-sm font-semibold", i === step ? "text-ink" : "text-ink-muted")}>{s}</span>
               {i < STEPS.length - 1 && <span className="h-px flex-1 bg-black/10" />}
             </li>
           ))}
         </ol>
 
         {infoError && <Alert tone="red">{infoError}</Alert>}
-        {info && !info.orderingEnabled && <Alert tone="amber">{info.displayName} hasn&apos;t enabled WhatsApp ordering yet.</Alert>}
-
+        {info && !info.orderingEnabled && <Alert tone="amber">{info.displayName} isn&apos;t taking online orders right now.</Alert>}
+        {info && info.orderingEnabled && info.openNow === false && (
+          <Alert tone="amber" className="mb-4">
+            <Clock className="mr-1 inline h-4 w-4" /> {info.displayName} is closed right now. You can place your order when it opens.
+          </Alert>
+        )}
         {!info && !infoError && (
           <div className="grid place-items-center py-16">
             <Spinner className="text-brand-500" />
@@ -235,10 +279,17 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
           <div className="space-y-3">
             <h2 className="text-lg font-extrabold">How would you like your order?</h2>
             {info.deliveryEnabled && (
-              <MethodCard active={method === "DELIVERY"} onClick={() => setMethod("DELIVERY")} icon={<Bike className="h-6 w-6" />} title="Delivery" body={info.deliveryFeeCents != null && !info.deliveryAreas.length ? `Delivery fee ${formatMoney(info.deliveryFeeCents, currency)}` : "The restaurant confirms the delivery fee"} />
+              <MethodCard
+                active={method === "DELIVERY"}
+                onClick={() => setMethod("DELIVERY")}
+                icon={<Bike className="h-6 w-6" />}
+                title="Delivery"
+                body={info.deliveryAreas.length ? `Fee depends on your area · about ${info.avgPrepMinutes + 15} min` : `${info.deliveryFeeCents ? `Delivery fee ${formatMoney(info.deliveryFeeCents, currency)}` : "Free delivery"} · about ${info.avgPrepMinutes + 15} min`}
+              />
             )}
-            {info.pickupEnabled && <MethodCard active={method === "PICKUP"} onClick={() => setMethod("PICKUP")} icon={<ShoppingBag className="h-6 w-6" />} title="Pickup" body="Collect your order from the restaurant" />}
-            <Button size="lg" block disabled={!method} onClick={() => setStep(1)} className="mt-4">
+            {info.pickupEnabled && <MethodCard active={method === "PICKUP"} onClick={() => setMethod("PICKUP")} icon={<ShoppingBag className="h-6 w-6" />} title="Pickup" body={`Ready in about ${info.avgPrepMinutes} min${info.address ? ` · ${info.address}` : ""}`} />}
+            {!info.deliveryEnabled && !info.pickupEnabled && <Alert tone="amber">This restaurant hasn&apos;t set up delivery or pickup yet.</Alert>}
+            <Button size="lg" block disabled={!method || info.openNow === false} onClick={() => setStep(1)} className="mt-4">
               Continue
             </Button>
           </div>
@@ -249,77 +300,119 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
-              void goConfirm();
+              void goReview();
             }}
             noValidate
           >
-            <h2 className="text-lg font-extrabold">{method === "DELIVERY" ? "Delivery details" : "Pickup details"}</h2>
-            <Field label="Full name" error={errors.name} htmlFor="name">
-              <input id="name" className="input" autoComplete="name" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} />
-            </Field>
-            <Field label="Phone number" error={errors.phone} hint="Lebanese numbers like 70 123 456, or include your country code" htmlFor="phone">
-              <input id="phone" className="input" type="tel" inputMode="tel" autoComplete="tel" placeholder="70 123 456" value={d.phone} onChange={(e) => setD({ ...d, phone: e.target.value })} />
-            </Field>
+            {!loggedIn && profile && (
+              <div className="rounded-2xl bg-white p-3.5 text-sm">
+                Ordering as a guest. <Link href="/login?next=/checkout" className="font-semibold text-brand-600">Log in</Link> or{" "}
+                <Link href="/account/register?next=/checkout" className="font-semibold text-brand-600">create an account</Link> to save addresses and see your order history.
+              </div>
+            )}
+            <h2 className="text-lg font-extrabold">Your details</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Full name" error={errors.name} htmlFor="name">
+                <input id="name" className="input" autoComplete="name" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} />
+              </Field>
+              <Field label="Phone number" error={errors.phone} hint="The restaurant or driver may call you" htmlFor="phone">
+                <input id="phone" className="input" type="tel" inputMode="tel" autoComplete="tel" placeholder="70 123 456" value={d.phone} onChange={(e) => setD({ ...d, phone: e.target.value })} />
+              </Field>
+            </div>
+
             {method === "DELIVERY" && (
               <>
-                {info.deliveryAreas.length > 0 && (
-                  <Field label="Area" error={errors.area} htmlFor="area">
-                    <select id="area" className="input" value={d.area} onChange={(e) => setD({ ...d, area: e.target.value })}>
-                      <option value="">Choose your area</option>
-                      {info.deliveryAreas.map((a) => (
-                        <option key={a.name} value={a.name}>
-                          {a.name}
-                          {a.feeCents != null ? ` · ${formatMoney(a.feeCents, currency)}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                <h2 className="pt-2 text-lg font-extrabold">Delivery address</h2>
+                {profile?.addresses.length ? (
+                  <div className="space-y-2" role="radiogroup" aria-label="Saved addresses">
+                    {profile.addresses.map((a) => {
+                      const aFee = feeForArea(a.area);
+                      return (
+                        <button key={a.id} type="button" role="radio" aria-checked={addressId === a.id} onClick={() => setAddressId(a.id)} className={cn("flex w-full items-start gap-3 rounded-2xl border-2 bg-white p-3.5 text-left", addressId === a.id ? "border-brand-500" : "border-transparent")}>
+                          <MapPin className={cn("mt-0.5 h-5 w-5 shrink-0", addressId === a.id ? "text-brand-500" : "text-ink-muted")} />
+                          <span className="min-w-0 flex-1 text-sm">
+                            <span className="font-bold">{a.label}</span>
+                            <span className="block text-ink-soft">{[a.area, a.address, a.building].filter(Boolean).join(", ")}</span>
+                            {aFee == null && info.deliveryAreas.length > 0 && <span className="block text-xs font-semibold text-red-600">Outside this restaurant&apos;s delivery areas</span>}
+                          </span>
+                          {aFee != null && <span className="tabular text-xs font-semibold text-ink-muted">{aFee ? `+${formatMoney(aFee, currency)}` : "Free"}</span>}
+                        </button>
+                      );
+                    })}
+                    <button type="button" onClick={() => setAddressId(null)} className={cn("flex w-full items-center gap-3 rounded-2xl border-2 bg-white p-3.5 text-left text-sm font-semibold", addressId === null ? "border-brand-500" : "border-dashed border-black/15")}>
+                      <Plus className="h-5 w-5" /> Use a new address
+                    </button>
+                    {errors.addressId && <p className="text-xs font-medium text-red-600">{errors.addressId}</p>}
+                  </div>
+                ) : null}
+
+                {!savedAddress && (
+                  <div className="space-y-4">
+                    {info.deliveryAreas.length > 0 && (
+                      <Field label="Area" error={errors.area} htmlFor="area">
+                        <select id="area" className="input" value={d.area} onChange={(e) => setD({ ...d, area: e.target.value })}>
+                          <option value="">Choose your area</option>
+                          {info.deliveryAreas.map((a) => (
+                            <option key={a.name} value={a.name}>
+                              {a.name} · {(a.feeCents ?? info.deliveryFeeCents) ? formatMoney((a.feeCents ?? info.deliveryFeeCents)!, currency) : "free"}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    )}
+                    <Field label="Street address" error={errors.address} htmlFor="address">
+                      <textarea id="address" className="input min-h-[80px]" autoComplete="street-address" placeholder="Street, landmark, city" value={d.address} onChange={(e) => setD({ ...d, address: e.target.value })} />
+                    </Field>
+                    <Field label="Building & floor (optional)" htmlFor="building">
+                      <input id="building" className="input" placeholder="Bldg. Azar, 3rd floor" value={d.building} onChange={(e) => setD({ ...d, building: e.target.value })} />
+                    </Field>
+                    <div>
+                      <div className="label">
+                        Location on the map {info.requireMapsLocation ? <span className="text-brand-600">(required)</span> : <span className="font-normal text-ink-muted">(optional, helps the driver)</span>}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" onClick={locate} loading={locating} className="shrink-0">
+                          <LocateFixed className="h-4 w-4" /> Use my location
+                        </Button>
+                        <input className="input" placeholder="or paste a Google Maps link" value={d.latitude != null ? "" : d.mapsUrl} onChange={(e) => setD({ ...d, mapsUrl: e.target.value, latitude: null, longitude: null })} />
+                      </div>
+                      {d.latitude != null && (
+                        <div className="mt-2 overflow-hidden rounded-xl border border-black/10">
+                          <iframe title="Your location" className="h-40 w-full" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={mapsKey ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${d.latitude},${d.longitude}&zoom=16` : `https://maps.google.com/maps?q=${d.latitude},${d.longitude}&z=16&output=embed`} />
+                          <div className="flex items-center justify-between bg-white px-3 py-2 text-xs">
+                            <span className="inline-flex items-center gap-1 text-emerald-700">
+                              <MapPin className="h-3.5 w-3.5" /> Location pinned
+                            </span>
+                            <button type="button" className="font-semibold text-ink-muted" onClick={() => setD({ ...d, latitude: null, longitude: null, mapsUrl: "" })}>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {errors.mapsUrl && <p className="mt-1 text-xs font-medium text-red-600">{errors.mapsUrl}</p>}
+                    </div>
+                    {loggedIn && (
+                      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-3 text-sm">
+                        <label className="flex items-center gap-2 font-semibold">
+                          <input type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} className="h-5 w-5 accent-brand-500" /> Save to my addresses
+                        </label>
+                        {saveAddress && <input className="input h-10 w-40 text-sm" placeholder="Label (Home, Work…)" value={addressLabel} onChange={(e) => setAddressLabel(e.target.value)} />}
+                      </div>
+                    )}
+                  </div>
                 )}
-                <Field label="Delivery address" error={errors.address} htmlFor="address">
-                  <textarea id="address" className="input min-h-[80px]" autoComplete="street-address" placeholder="Street, landmark, city" value={d.address} onChange={(e) => setD({ ...d, address: e.target.value })} />
-                </Field>
-                <Field label="Building & floor (optional)" htmlFor="building">
-                  <input id="building" className="input" placeholder="Bldg. Azar, 3rd floor" value={d.building} onChange={(e) => setD({ ...d, building: e.target.value })} />
-                </Field>
               </>
             )}
-            <div>
-              <div className="label">
-                Google Maps location {info.requireMapsLocation && method === "DELIVERY" ? <span className="text-brand-600">(required)</span> : <span className="font-normal text-ink-muted">(optional)</span>}
-              </div>
-              {!consented && d.latitude == null && <p className="mb-2 text-xs text-ink-muted">We only use your location to create a map link for the restaurant. It&apos;s sent in your WhatsApp message and not used for anything else.</p>}
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={locate} loading={locating} className="shrink-0">
-                  <LocateFixed className="h-4 w-4" /> Use my location
-                </Button>
-                <input className="input" placeholder="or paste a Google Maps link" value={d.latitude != null ? "" : d.mapsUrl} onChange={(e) => setD({ ...d, mapsUrl: e.target.value, latitude: null, longitude: null })} />
-              </div>
-              {d.latitude != null && (
-                <div className="mt-2 overflow-hidden rounded-xl border border-black/10">
-                  {mapsKey ? (
-                    <iframe title="Your location" className="h-40 w-full" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={`https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${d.latitude},${d.longitude}&zoom=16`} />
-                  ) : (
-                    <iframe title="Your location" className="h-40 w-full" loading="lazy" src={`https://maps.google.com/maps?q=${d.latitude},${d.longitude}&z=16&output=embed`} />
-                  )}
-                  <div className="flex items-center justify-between bg-white px-3 py-2 text-xs">
-                    <span className="inline-flex items-center gap-1 text-emerald-700">
-                      <MapPin className="h-3.5 w-3.5" /> Location pinned
-                    </span>
-                    <button type="button" className="font-semibold text-ink-muted" onClick={() => setD({ ...d, latitude: null, longitude: null, mapsUrl: "" })}>
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              )}
-              {errors.mapsUrl && <p className="mt-1 text-xs font-medium text-red-600">{errors.mapsUrl}</p>}
-            </div>
-            <Field label={method === "DELIVERY" ? "Delivery notes (optional)" : "Pickup instructions (optional)"} htmlFor="notes">
-              <textarea id="notes" className="input min-h-[72px]" maxLength={400} placeholder={method === "DELIVERY" ? "Ring the bell twice, call on arrival…" : "I'll arrive around 8pm"} value={d.notes} onChange={(e) => setD({ ...d, notes: e.target.value })} />
+
+            <Field label={method === "DELIVERY" ? "Notes for the driver (optional)" : "Pickup notes (optional)"} htmlFor="notes">
+              <textarea id="notes" className="input min-h-[72px]" maxLength={400} placeholder={method === "DELIVERY" ? "Ring twice, call on arrival…" : "I'll arrive around 8pm"} value={d.notes} onChange={(e) => setD({ ...d, notes: e.target.value })} />
             </Field>
-            <label className="flex items-center gap-3 text-sm">
-              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-5 w-5 accent-brand-500" />
-              Remember my details on this device
-            </label>
+            {!loggedIn && (
+              <label className="flex items-center gap-3 text-sm">
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-5 w-5 accent-brand-500" />
+                Remember my details on this device
+              </label>
+            )}
             <div className="grid grid-cols-3 gap-3 pt-2">
               <Button type="button" variant="outline" onClick={() => setStep(0)}>
                 Back
@@ -333,67 +426,83 @@ export function Checkout({ mapsKey }: { mapsKey: string }) {
 
         {info && info.orderingEnabled && step === 2 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-extrabold">Confirm your order</h2>
             <div className="card p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Restaurant</div>
-              <div className="font-bold">{info.displayName}</div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Order from</div>
+                  <div className="font-bold">{info.displayName}</div>
+                </div>
+                <span className="rounded-full bg-black/5 px-2.5 py-1 text-xs font-bold">{method === "DELIVERY" ? "Delivery" : "Pickup"}</span>
+              </div>
               <div className="mt-3 divide-y divide-black/5">
-                {cart.lines.map((l, i) => {
-                  const q = quote?.lines[i];
-                  return (
-                    <div key={l.key} className="py-2.5 text-sm">
-                      <div className="flex justify-between gap-3">
-                        <span className="font-semibold">
-                          {l.quantity} × {l.name}
-                        </span>
-                        <span className="tabular font-semibold">{formatMoney(q?.lineTotalCents ?? lineTotal(l), currency)}</span>
-                      </div>
-                      {l.summary.length > 0 && <div className="mt-0.5 text-xs text-ink-muted">{l.summary.join(" · ")}</div>}
-                      {l.note && <div className="mt-0.5 text-xs italic text-ink-muted">“{l.note}”</div>}
-                      {quote?.errors[`items.${i}`] && <div className="mt-1 text-xs font-semibold text-red-600">{quote.errors[`items.${i}`]}</div>}
+                {cart.lines.map((l, i) => (
+                  <div key={l.key} className="py-2.5 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="font-semibold">
+                        {l.quantity} × {l.name}
+                      </span>
+                      <span className="tabular font-semibold">{formatMoney(quote?.lines[i]?.lineTotalCents ?? lineTotal(l), currency)}</span>
                     </div>
-                  );
-                })}
+                    {l.summary.length > 0 && <div className="mt-0.5 text-xs text-ink-muted">{l.summary.join(" · ")}</div>}
+                    {l.note && <div className="mt-0.5 text-xs italic text-ink-muted">“{l.note}”</div>}
+                    {quote?.errors[`items.${i}`] && <div className="mt-1 text-xs font-semibold text-red-600">{quote.errors[`items.${i}`]}</div>}
+                  </div>
+                ))}
               </div>
               <div className="mt-2 space-y-1.5 border-t border-black/10 pt-3 text-sm">
-                <Row label="Item subtotal" value={quote ? formatMoney(subtotal, currency) : <Loader2 className="h-4 w-4 animate-spin" />} bold />
-                {method === "DELIVERY" && <Row label="Delivery fee" value={deliveryFee != null ? formatMoney(deliveryFee, currency) : "To be confirmed"} />}
-                <Row label="Final total" value={method === "PICKUP" ? formatMoney(subtotal, currency) : deliveryFee != null ? formatMoney(subtotal + deliveryFee, currency) : "To be confirmed"} bold />
+                <Row label="Subtotal" value={quote ? formatMoney(subtotal, currency) : <Loader2 className="h-4 w-4 animate-spin" />} />
+                {method === "DELIVERY" && <Row label="Delivery fee" value={fee == null ? "—" : fee === 0 ? "Free" : formatMoney(fee, currency)} />}
+                <Row label="Total" value={total == null ? "—" : formatMoney(total, currency)} bold />
               </div>
-              {method === "DELIVERY" && deliveryFee == null && <p className="mt-2 text-xs text-ink-muted">The restaurant will confirm the delivery fee and final payable amount on WhatsApp.</p>}
             </div>
+
+            <div className="card p-4 text-sm">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{method === "DELIVERY" ? "Deliver to" : "Pickup by"}</div>
+              <div className="font-semibold">
+                {d.name} · {d.phone}
+              </div>
+              {method === "DELIVERY" && <div className="mt-1 text-ink-soft">{savedAddress ? `${savedAddress.label}: ${[savedAddress.area, savedAddress.address, savedAddress.building].filter(Boolean).join(", ")}` : [d.area, d.address, d.building].filter(Boolean).join(", ")}</div>}
+              {d.notes && <div className="mt-1 text-xs text-ink-muted">Note: {d.notes}</div>}
+              <button className="mt-2 text-xs font-semibold text-brand-600" onClick={() => setStep(1)}>
+                Edit details
+              </button>
+            </div>
+
+            <div className="card p-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">Payment</div>
+              <div className="flex items-center gap-3 rounded-xl border-2 border-brand-500 bg-brand-50/40 p-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-brand-500 text-white">
+                  <Banknote className="h-5 w-5" />
+                </span>
+                <div className="flex-1">
+                  <div className="font-bold">{method === "DELIVERY" ? "Cash on delivery" : "Cash at pickup"}</div>
+                  <div className="text-xs text-ink-muted">Pay {total == null ? "the total" : formatMoney(total, currency)} in cash when you receive your order</div>
+                </div>
+                <Check className="h-5 w-5 text-brand-600" />
+              </div>
+              <label className="mt-3 block">
+                <span className="label">Paying with a bigger bill? (optional)</span>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink-muted">{unitLabel}</span>
+                  <input className={cn("input", currency === "LBP" ? "pl-12" : "pl-8")} inputMode={minorDigits(currency) ? "decimal" : "numeric"} placeholder={currency === "LBP" ? "e.g. 1,000,000" : "e.g. 50"} value={changeFor} onChange={(e) => setChangeFor(e.target.value)} />
+                </div>
+                <span className="mt-1 block text-xs text-ink-muted">So the {method === "DELIVERY" ? "driver" : "restaurant"} can bring change.</span>
+              </label>
+            </div>
+
             {quoteChanged && (
               <Alert tone="amber">
                 <AlertTriangle className="mr-1 inline h-4 w-4" /> Prices were updated by the restaurant. The totals above are the current prices.
               </Alert>
             )}
             {below && <Alert tone="amber">Minimum order is {formatMoney(info.minOrderCents!, currency)}.</Alert>}
-            <div className="card p-4 text-sm">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{method === "DELIVERY" ? "Delivery to" : "Pickup by"}</div>
-              <div className="font-semibold">{d.name}</div>
-              <div>{d.phone}</div>
-              {method === "DELIVERY" && (
-                <div className="mt-1 text-ink-soft">
-                  {[d.area, d.address, d.building].filter(Boolean).join(", ")}
-                </div>
-              )}
-              {(d.mapsUrl || d.latitude != null) && <div className="mt-1 text-xs text-emerald-700">📍 Google Maps location included</div>}
-              {d.notes && <div className="mt-1 text-xs text-ink-muted">Note: {d.notes}</div>}
-              <button className="mt-2 text-xs font-semibold text-brand-600" onClick={() => setStep(1)}>
-                Edit details
-              </button>
-            </div>
-            {sendError && <Alert tone="red">{sendError}</Alert>}
-            <p className="text-xs leading-relaxed text-ink-muted">
-              Tapping the button opens WhatsApp with your order pre-written to {info.displayName}. <b>Press Send in WhatsApp</b> to place it. Your name, phone, address and location are shared with the restaurant. There&apos;s no online payment — pay the restaurant directly. See our{" "}
-              <Link href="/privacy" className="underline">
-                privacy policy
-              </Link>
-              .
-            </p>
-            <Button size="lg" block onClick={send} loading={sending} disabled={!quote || Object.keys(quote.errors).length > 0 || !!below} variant="whatsapp">
-              <MessageCircle className="h-5 w-5" /> Send order via WhatsApp
+            {placeError && <Alert tone="red">{placeError}</Alert>}
+            <Button size="lg" block onClick={placeOrder} loading={placing} disabled={!quote || Object.keys(quote.errors).length > 0 || !!below || total == null}>
+              Place order{total != null ? ` · ${formatMoney(total, currency)}` : ""}
             </Button>
+            <p className="text-center text-xs text-ink-muted">
+              By placing your order you agree to our <Link href="/terms" className="underline">terms</Link>. Your name, phone and address are shared with {info.displayName} to deliver your order.
+            </p>
             {quote && Object.keys(quote.errors).length > 0 && (
               <Button variant="outline" block onClick={() => router.push("/cart")}>
                 Fix cart
@@ -413,8 +522,8 @@ function Center({ children }: { children: React.ReactNode }) {
 function Row({ label, value, bold }: { label: string; value: React.ReactNode; bold?: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-ink-muted">{label}</span>
-      <span className={cn("tabular", bold && "font-bold")}>{value}</span>
+      <span className={bold ? "font-bold" : "text-ink-muted"}>{label}</span>
+      <span className={cn("tabular", bold && "text-base font-extrabold")}>{value}</span>
     </div>
   );
 }

@@ -10,7 +10,7 @@ export default async function CommissionAgreementPage() {
   return (
     <div>
       <h1 className="mb-4 text-2xl font-black">Restaurant commission agreement</h1>
-      <AgreementText platformName={s.platformName} rateBps={s.defaultCommissionRateBps} billableEvent={s.billableEvent} dueDays={s.invoiceDueDays} disputeDays={s.disputeWindowDays} graceDays={s.graceDays} version={s.agreementVersion} />
+      <AgreementText platformName={s.platformName} rateBps={s.defaultCommissionRateBps} billableEvent={s.billableEvent} dueDays={s.invoiceDueDays} disputeDays={s.disputeWindowDays} graceDays={s.graceDays} version={s.agreementVersion} autoCompleteHours={s.autoCompleteHours} />
     </div>
   );
 }

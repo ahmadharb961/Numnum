@@ -39,7 +39,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         </div>
       }
     >
-      {sp.welcome && <Alert tone="green" className="mb-5">Welcome to numnum! Follow the steps below to start receiving WhatsApp orders.</Alert>}
+      {sp.welcome && <Alert tone="green" className="mb-5">Welcome to numnum! Follow the steps below to start receiving orders.</Alert>}
       {done < steps.length && (
         <Section title="Get set up" description={`${done} of ${steps.length} done`}>
           <div className="mb-3 h-2 overflow-hidden rounded-full bg-black/5">
@@ -70,15 +70,15 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
       <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-muted">Orders (last {days} days)</h2>
       <div className="mb-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="WhatsApp order initiations" value={o.period.whatsappHandoffs} sub={`${o.period.linksGenerated} orders prepared`} />
-        <StatCard label="Acknowledged by you" value={o.period.acknowledged} sub={`of ${o.period.orderRequests} requests`} />
-        <StatCard label="Commissionable requests" value={o.period.commissionable} sub={formatMoney(o.period.commissionableSubtotalCents) + " subtotal"} />
+        <StatCard label="Orders received" value={o.period.placed} sub={`${o.period.completed} completed · ${o.period.rejected} rejected · ${o.period.canceled} canceled`} />
+        <StatCard label="Cash sales (completed)" value={formatMoney(o.period.salesCents, o.rating.currency)} tone="green" />
+        <StatCard label="Avg. time to accept" value={o.period.avgAcceptMinutes != null ? `${Math.round(o.period.avgAcceptMinutes)} min` : "—"} sub={o.period.failed ? `${o.period.failed} not delivered` : "Faster acceptance = happier customers"} />
         {owner ? <StatCard label="Estimated commission" value={formatMoney(o.period.commissionCents)} tone="brand" sub={<Link href="/dashboard/billing" className="text-brand-600">Billing →</Link>} /> : <StatCard label="Rating" value={o.rating.ratingCount ? o.rating.ratingAvg.toFixed(1) : "—"} />}
       </div>
-      <p className="mb-5 text-xs text-ink-muted">WhatsApp initiations count customers who opened WhatsApp with an order — they are not confirmed orders. Only requests you acknowledge are commissionable.</p>
+      <p className="mb-5 text-xs text-ink-muted">Commission applies to completed orders only. Rejected and canceled orders are never charged.</p>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Section title="Top dishes" description={`By quantity in acknowledged orders, last ${days} days`}>
+        <Section title="Top dishes" description={`By quantity in completed orders, last ${days} days`}>
           {o.topItems.length ? (
             <ol className="space-y-2 text-sm">
               {o.topItems.map((t, i) => (
@@ -92,7 +92,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
               ))}
             </ol>
           ) : (
-            <p className="text-sm text-ink-muted">No acknowledged orders yet.</p>
+            <p className="text-sm text-ink-muted">No completed orders yet.</p>
           )}
           <div className="mt-4 flex items-center gap-2 text-sm">
             <span className="text-ink-muted">Restaurant rating:</span>

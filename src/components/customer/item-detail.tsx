@@ -269,14 +269,14 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
             </Button>
           </div>
         ) : (
-          <div className="py-3 text-center text-sm font-semibold text-ink-muted">{!item.available ? "This item is currently unavailable" : "This restaurant isn't taking WhatsApp orders yet"}</div>
+          <div className="py-3 text-center text-sm font-semibold text-ink-muted">{!item.available ? "This item is currently unavailable" : "This restaurant isn't taking online orders right now"}</div>
         )}
       </div>
 
       <Sheet open={conflict} onClose={() => setConflict(false)} title="Start a new cart?">
         <div className="space-y-4 p-5">
           <p className="text-sm text-ink-soft">
-            Your cart has items from <b>{cart.cart?.restaurantName}</b>. Orders go to one restaurant at a time on WhatsApp. Replace your cart with this item from <b>{item.restaurant.name}</b>?
+            Your cart has items from <b>{cart.cart?.restaurantName}</b>. Each order goes to one restaurant. Replace your cart with this item from <b>{item.restaurant.name}</b>?
           </p>
           <div className="grid grid-cols-2 gap-3">
             <Button variant="outline" onClick={() => setConflict(false)}>
@@ -331,7 +331,7 @@ function ItemReviews({ item }: { item: PublicItem }) {
             </div>
             <div className="mt-0.5 flex items-center gap-2">
               <Stars value={r.rating} size={13} />
-              {r.evidence !== "UNVERIFIED" && <Badge tone="green">{r.evidence === "FULFILLED_ORDER" ? "Ordered · fulfilled" : "Ordered via numnum"}</Badge>}
+              {r.evidence !== "UNVERIFIED" && <Badge tone="green">{r.evidence === "COMPLETED_ORDER" ? "Verified order" : "Ordered on numnum"}</Badge>}
             </div>
             {r.body && <p className="mt-2 text-sm text-ink-soft">{r.body}</p>}
             {r.photoUrl && (

@@ -1,20 +1,23 @@
 import { z } from "zod";
-import { priceCart, orderInputSchema } from "@/server/orders";
+import { priceCart, orderInputSchema, deliveryFeeFor } from "@/server/orders";
 import { errorResponse, json, limit, readJson } from "@/server/http";
 import { prisma } from "@/server/db";
 
-const schema = z.object({ restaurantId: z.string().min(1), items: orderInputSchema.shape.items });
+const schema = z.object({ restaurantId: z.string().min(1), items: orderInputSchema.shape.items, fulfillment: z.enum(["DELIVERY", "PICKUP"]).optional(), area: z.string().max(80).optional().nullable() });
 
-/** Authoritative server-side quote shown before confirming. */
+/** Authoritative server-side quote shown before placing the order. */
 export async function POST(req: Request) {
   try {
     await limit("quote", 60, 60_000);
-    const { restaurantId, items } = schema.parse(await readJson(req));
-    const r = await prisma.restaurant.findFirst({ where: { id: restaurantId, status: "ACTIVE" }, select: { id: true } });
+    const { restaurantId, items, fulfillment, area } = schema.parse(await readJson(req));
+    const r = await prisma.restaurant.findFirst({ where: { id: restaurantId, status: "ACTIVE" }, include: { deliveryAreas: true } });
     if (!r) return json({ error: "This restaurant is not available" }, 404);
     const priced = await priceCart(restaurantId, items);
+    const deliveryFeeCents = fulfillment === "DELIVERY" ? deliveryFeeFor(r, area) : 0;
     return json({
       subtotalCents: priced.subtotalCents,
+      deliveryFeeCents,
+      totalCents: deliveryFeeCents == null ? null : priced.subtotalCents + deliveryFeeCents,
       currency: priced.currency,
       errors: priced.fieldErrors,
       lines: priced.lines.map((l) => ({ menuItemId: l.menuItemId, name: l.name, quantity: l.quantity, unitTotalCents: l.unitTotalCents, lineTotalCents: l.lineTotalCents })),

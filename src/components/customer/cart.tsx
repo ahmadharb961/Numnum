@@ -38,6 +38,8 @@ type CartCtx = {
   updateLine: (key: string, patch: Partial<Omit<CartLine, "key">>) => void;
   remove: (key: string) => void;
   clear: () => void;
+  /** Replaces the whole cart (used by "Order again"). */
+  replaceWith: (restaurant: AddInput["restaurant"], lines: Omit<CartLine, "key">[]) => void;
 };
 
 const STORAGE_KEY = "nn_cart_v1";
@@ -107,6 +109,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       },
       remove: (key) => cart && persist({ ...cart, lines: cart.lines.filter((l) => l.key !== key) }),
       clear: () => persist(null),
+      replaceWith: (restaurant, lines) => {
+        const merged: CartLine[] = [];
+        for (const l of lines) {
+          const key = selectionSignature(l.menuItemId, l.selections, l.note ?? "");
+          const ex = merged.find((m) => m.key === key);
+          if (ex) ex.quantity = Math.min(50, ex.quantity + l.quantity);
+          else merged.push({ ...l, key });
+        }
+        persist({ restaurantId: restaurant.id, restaurantName: restaurant.name, restaurantSlug: restaurant.slug, currency: restaurant.currency, lines: merged });
+      },
     }),
     [cart, ready, add, persist],
   );

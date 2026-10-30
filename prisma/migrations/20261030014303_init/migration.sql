@@ -32,13 +32,16 @@ CREATE TYPE "SavedType" AS ENUM ('REEL', 'ITEM', 'RESTAURANT');
 CREATE TYPE "ReviewStatus" AS ENUM ('VISIBLE', 'HIDDEN', 'REMOVED');
 
 -- CreateEnum
-CREATE TYPE "ReviewEvidence" AS ENUM ('UNVERIFIED', 'ACKNOWLEDGED_ORDER', 'FULFILLED_ORDER');
+CREATE TYPE "ReviewEvidence" AS ENUM ('UNVERIFIED', 'ACCEPTED_ORDER', 'COMPLETED_ORDER');
 
 -- CreateEnum
 CREATE TYPE "Fulfillment" AS ENUM ('DELIVERY', 'PICKUP');
 
 -- CreateEnum
-CREATE TYPE "OrderStatus" AS ENUM ('DRAFT', 'VALIDATED', 'LINK_GENERATED', 'HANDOFF_ATTEMPTED', 'MESSAGE_CONFIRMED', 'ACKNOWLEDGED', 'ACCEPTED', 'REJECTED', 'FULFILLED', 'CANCELED', 'DISPUTED');
+CREATE TYPE "OrderStatus" AS ENUM ('PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'READY_FOR_PICKUP', 'COMPLETED', 'REJECTED', 'CANCELED', 'FAILED');
+
+-- CreateEnum
+CREATE TYPE "PaymentMethod" AS ENUM ('CASH_ON_DELIVERY');
 
 -- CreateEnum
 CREATE TYPE "CommissionStatus" AS ENUM ('ACCRUED', 'INVOICED', 'DISPUTED', 'VOIDED');
@@ -99,6 +102,25 @@ CREATE TABLE "sessions" (
 );
 
 -- CreateTable
+CREATE TABLE "customer_addresses" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "area" TEXT,
+    "address" TEXT NOT NULL,
+    "building" TEXT,
+    "notes" TEXT,
+    "latitude" DOUBLE PRECISION,
+    "longitude" DOUBLE PRECISION,
+    "mapsUrl" TEXT,
+    "isDefault" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "customer_addresses_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "restaurants" (
     "id" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
@@ -107,7 +129,6 @@ CREATE TABLE "restaurants" (
     "description" TEXT,
     "cuisine" TEXT,
     "phone" TEXT,
-    "whatsappNumber" TEXT,
     "email" TEXT,
     "address" TEXT,
     "area" TEXT,
@@ -132,6 +153,7 @@ CREATE TABLE "restaurants" (
     "agreementVersion" TEXT,
     "agreementAcceptedBy" TEXT,
     "orderingEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "avgPrepMinutes" INTEGER NOT NULL DEFAULT 30,
     "restrictReels" BOOLEAN NOT NULL DEFAULT false,
     "restrictPromotion" BOOLEAN NOT NULL DEFAULT false,
     "ratingAvg" DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -207,6 +229,16 @@ CREATE TABLE "media_assets" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "media_assets_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "media_blobs" (
+    "id" TEXT NOT NULL,
+    "assetId" TEXT NOT NULL,
+    "variant" TEXT NOT NULL,
+    "data" BYTEA NOT NULL,
+
+    CONSTRAINT "media_blobs_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -343,6 +375,7 @@ CREATE TABLE "reels" (
     "durationSec" DOUBLE PRECISION,
     "featured" BOOLEAN NOT NULL DEFAULT false,
     "sponsored" BOOLEAN NOT NULL DEFAULT false,
+    "autoPublish" BOOLEAN NOT NULL DEFAULT false,
     "viewCount" INTEGER NOT NULL DEFAULT 0,
     "uniqueViewers" INTEGER NOT NULL DEFAULT 0,
     "likeCount" INTEGER NOT NULL DEFAULT 0,
@@ -438,9 +471,13 @@ CREATE TABLE "orders" (
     "id" TEXT NOT NULL,
     "reference" TEXT NOT NULL,
     "idempotencyKey" TEXT NOT NULL,
+    "trackingToken" TEXT NOT NULL,
     "restaurantId" TEXT NOT NULL,
-    "status" "OrderStatus" NOT NULL DEFAULT 'VALIDATED',
+    "userId" TEXT,
+    "status" "OrderStatus" NOT NULL DEFAULT 'PLACED',
     "fulfillment" "Fulfillment" NOT NULL,
+    "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'CASH_ON_DELIVERY',
+    "changeForCents" INTEGER,
     "customerName" TEXT NOT NULL,
     "customerPhone" TEXT NOT NULL,
     "address" TEXT,
@@ -452,25 +489,27 @@ CREATE TABLE "orders" (
     "deliveryArea" TEXT,
     "currency" TEXT NOT NULL,
     "subtotalCents" INTEGER NOT NULL,
-    "deliveryFeeCents" INTEGER,
-    "totalCents" INTEGER,
+    "deliveryFeeCents" INTEGER NOT NULL DEFAULT 0,
+    "totalCents" INTEGER NOT NULL,
     "commissionBaseCents" INTEGER NOT NULL,
     "exchangeRate" DOUBLE PRECISION,
-    "whatsappNumber" TEXT NOT NULL,
     "restaurantName" TEXT NOT NULL,
-    "message" TEXT NOT NULL,
+    "restaurantPhone" TEXT,
+    "estimatedMinutes" INTEGER,
     "deviceKey" TEXT,
     "ipHash" TEXT,
-    "handoffCount" INTEGER NOT NULL DEFAULT 0,
-    "linkGeneratedAt" TIMESTAMP(3),
-    "handoffAt" TIMESTAMP(3),
-    "messageConfirmedAt" TIMESTAMP(3),
-    "acknowledgedAt" TIMESTAMP(3),
     "acceptedAt" TIMESTAMP(3),
+    "preparingAt" TIMESTAMP(3),
+    "dispatchedAt" TIMESTAMP(3),
+    "completedAt" TIMESTAMP(3),
+    "autoCompleted" BOOLEAN NOT NULL DEFAULT false,
     "rejectedAt" TIMESTAMP(3),
     "rejectionReason" TEXT,
-    "fulfilledAt" TIMESTAMP(3),
     "canceledAt" TIMESTAMP(3),
+    "canceledBy" TEXT,
+    "cancelReason" TEXT,
+    "failedAt" TIMESTAMP(3),
+    "failureReason" TEXT,
     "suspicious" BOOLEAN NOT NULL DEFAULT false,
     "suspiciousReason" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -519,17 +558,6 @@ CREATE TABLE "order_events" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "order_events_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "restaurant_order_acknowledgments" (
-    "id" TEXT NOT NULL,
-    "orderId" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "method" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "restaurant_order_acknowledgments_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -772,6 +800,9 @@ CREATE UNIQUE INDEX "sessions_tokenHash_key" ON "sessions"("tokenHash");
 CREATE INDEX "sessions_userId_idx" ON "sessions"("userId");
 
 -- CreateIndex
+CREATE INDEX "customer_addresses_userId_idx" ON "customer_addresses"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "restaurants_slug_key" ON "restaurants"("slug");
 
 -- CreateIndex
@@ -803,6 +834,9 @@ CREATE INDEX "media_assets_restaurantId_kind_idx" ON "media_assets"("restaurantI
 
 -- CreateIndex
 CREATE INDEX "media_assets_restaurantId_checksum_idx" ON "media_assets"("restaurantId", "checksum");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "media_blobs_assetId_variant_key" ON "media_blobs"("assetId", "variant");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "food_categories_slug_key" ON "food_categories"("slug");
@@ -874,10 +908,16 @@ CREATE UNIQUE INDEX "orders_reference_key" ON "orders"("reference");
 CREATE UNIQUE INDEX "orders_idempotencyKey_key" ON "orders"("idempotencyKey");
 
 -- CreateIndex
-CREATE INDEX "orders_restaurantId_createdAt_idx" ON "orders"("restaurantId", "createdAt");
+CREATE UNIQUE INDEX "orders_trackingToken_key" ON "orders"("trackingToken");
 
 -- CreateIndex
-CREATE INDEX "orders_status_idx" ON "orders"("status");
+CREATE INDEX "orders_restaurantId_status_createdAt_idx" ON "orders"("restaurantId", "status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "orders_userId_createdAt_idx" ON "orders"("userId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "orders_deviceKey_idx" ON "orders"("deviceKey");
 
 -- CreateIndex
 CREATE INDEX "orders_customerPhone_idx" ON "orders"("customerPhone");
@@ -893,9 +933,6 @@ CREATE INDEX "order_events_orderId_idx" ON "order_events"("orderId");
 
 -- CreateIndex
 CREATE INDEX "order_events_type_createdAt_idx" ON "order_events"("type", "createdAt");
-
--- CreateIndex
-CREATE UNIQUE INDEX "restaurant_order_acknowledgments_orderId_key" ON "restaurant_order_acknowledgments"("orderId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "commission_events_orderId_key" ON "commission_events"("orderId");
@@ -964,6 +1001,9 @@ ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_userId_fkey" FOREIGN KEY ("u
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "customer_addresses" ADD CONSTRAINT "customer_addresses_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "restaurant_staff" ADD CONSTRAINT "restaurant_staff_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -980,6 +1020,9 @@ ALTER TABLE "media_assets" ADD CONSTRAINT "media_assets_restaurantId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "media_assets" ADD CONSTRAINT "media_assets_verificationId_fkey" FOREIGN KEY ("verificationId") REFERENCES "restaurant_verifications"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "media_blobs" ADD CONSTRAINT "media_blobs_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "media_assets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "menu_categories" ADD CONSTRAINT "menu_categories_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1048,6 +1091,9 @@ ALTER TABLE "restaurant_reviews" ADD CONSTRAINT "restaurant_reviews_userId_fkey"
 ALTER TABLE "orders" ADD CONSTRAINT "orders_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "orders" ADD CONSTRAINT "orders_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1058,9 +1104,6 @@ ALTER TABLE "order_item_customizations" ADD CONSTRAINT "order_item_customization
 
 -- AddForeignKey
 ALTER TABLE "order_events" ADD CONSTRAINT "order_events_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "restaurant_order_acknowledgments" ADD CONSTRAINT "restaurant_order_acknowledgments_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "commission_events" ADD CONSTRAINT "commission_events_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

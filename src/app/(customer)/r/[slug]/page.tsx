@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const data = await getPublicRestaurant((await params).slug);
   if (!data) return { title: "Restaurant not found" };
   const r = data.restaurant;
-  const description = r.description?.slice(0, 160) || `Watch reels and order from ${r.displayName} on WhatsApp.`;
+  const description = r.description?.slice(0, 160) || `Watch reels and order from ${r.displayName} with cash on delivery.`;
   return {
     title: `${r.displayName}${r.area ? ` · ${r.area}` : ""}`,
     description,
@@ -119,7 +119,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           <Badge tone={r.pickupEnabled ? "brand" : "gray"}>
             <ShoppingBag className="h-3.5 w-3.5" /> {r.pickupEnabled ? "Pickup" : "No pickup"}
           </Badge>
-          {!r.orderingEnabled && <Badge tone="amber">WhatsApp ordering not enabled yet</Badge>}
+          {!r.orderingEnabled && <Badge tone="amber">Not taking online orders right now</Badge>}
         </div>
 
         <details className="mt-3 rounded-2xl bg-white px-4 py-3 text-sm">

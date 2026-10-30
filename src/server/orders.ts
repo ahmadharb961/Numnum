@@ -2,14 +2,17 @@ import "server-only";
 import { z } from "zod";
 import type { Fulfillment, OrderStatus, Prisma } from "@prisma/client";
 import { prisma, type Tx } from "./db";
-import { getSettings } from "./settings";
+import { getSettings, type Settings } from "./settings";
 import { nextCounter } from "./counters";
 import { ensureCommission, isUniqueViolation } from "./commission";
-import { notifyRestaurant } from "./notifications";
+import { notifyRestaurant, notifyUser } from "./notifications";
+import { sendEmail } from "./email";
+import { randomToken } from "./crypto";
 import { validateSelections, unitPrice, type CustomizationGroupDef } from "@/lib/customization";
 import { normalizePhone } from "@/lib/phone";
-import { toUsdCents } from "@/lib/money";
-import { buildOrderMessage, buildWhatsAppLink, type MessageLine } from "@/lib/whatsapp";
+import { formatMoney, parseAmount, toUsdCents } from "@/lib/money";
+import { isOpenAt, type OpeningHours } from "@/lib/hours";
+import { STATUS_META, type OrderStatusKey } from "@/lib/order-status";
 
 export class OrderError extends Error {
   status = 400;
@@ -37,9 +40,11 @@ export const orderInputSchema = z.object({
     )
     .min(1)
     .max(MAX_LINES),
+  changeFor: z.string().trim().max(20).optional().nullable(),
   customer: z.object({
     name: z.string().trim().min(2, "Enter your full name").max(80),
     phone: z.string().trim().min(6, "Enter your phone number").max(30),
+    addressId: z.string().optional().nullable(),
     address: z.string().trim().max(300).optional().nullable(),
     building: z.string().trim().max(120).optional().nullable(),
     area: z.string().trim().max(80).optional().nullable(),
@@ -47,6 +52,8 @@ export const orderInputSchema = z.object({
     mapsUrl: z.string().trim().max(500).optional().nullable(),
     latitude: z.number().min(-90).max(90).optional().nullable(),
     longitude: z.number().min(-180).max(180).optional().nullable(),
+    saveAddress: z.boolean().optional(),
+    addressLabel: z.string().trim().max(40).optional().nullable(),
   }),
 });
 
@@ -67,11 +74,16 @@ export function normalizeMapsUrl(url: string | null | undefined, lat?: number | 
   }
 }
 
-type PricedLine = MessageLine & {
+type PricedLine = {
   menuItemId: string;
   sku: string;
+  name: string;
+  quantity: number;
+  unitBaseCents: number;
   unitOptionsCents: number;
   unitTotalCents: number;
+  lineTotalCents: number;
+  specialInstructions: string | null;
   chosen: { groupName: string; optionName: string; optionId: string | null; priceDeltaCents: number }[];
 };
 
@@ -110,7 +122,6 @@ export async function priceCart(restaurantId: string, items: OrderInput["items"]
       return;
     }
     const unitTotal = unitPrice(m.priceCents, v.unitOptionsCents);
-    const textGroups = new Set(groups.filter((g) => g.type === "TEXT").map((g) => g.id));
     lines.push({
       menuItemId: m.id,
       sku: m.sku,
@@ -120,7 +131,6 @@ export async function priceCart(restaurantId: string, items: OrderInput["items"]
       unitOptionsCents: v.unitOptionsCents,
       unitTotalCents: unitTotal,
       lineTotalCents: unitTotal * it.quantity,
-      customizations: v.chosen.map((c) => ({ groupName: c.groupName, optionName: c.optionName, priceDeltaCents: c.priceDeltaCents, isText: textGroups.has(c.groupId) })),
       chosen: v.chosen,
       specialInstructions: it.note?.trim() || null,
     });
@@ -129,9 +139,19 @@ export async function priceCart(restaurantId: string, items: OrderInput["items"]
   return { lines, subtotalCents, fieldErrors, currency: menuItems[0]?.currency ?? "USD" };
 }
 
-export type CreatedOrder = { reference: string; whatsappUrl: string; message: string; subtotalCents: number; currency: string; deliveryFeeCents: number | null; restaurantSlug: string; duplicateOf?: boolean };
+/** Delivery fee for an area: area-specific fee, else the restaurant default. null = delivery not available there. */
+export function deliveryFeeFor(r: { deliveryFeeCents: number | null; deliveryAreas: { name: string; feeCents: number | null }[] }, area: string | null | undefined): number | null {
+  if (r.deliveryAreas.length) {
+    const a = area ? r.deliveryAreas.find((x) => x.name.toLowerCase() === area.toLowerCase()) : null;
+    if (!a) return null;
+    return a.feeCents ?? r.deliveryFeeCents;
+  }
+  return r.deliveryFeeCents;
+}
 
-export async function createOrder(raw: unknown, meta: { deviceKey: string | null; ipHash: string | null }): Promise<CreatedOrder> {
+export type CreatedOrder = { reference: string; trackingToken: string; totalCents: number; currency: string; duplicate: boolean };
+
+export async function createOrder(raw: unknown, meta: { deviceKey: string | null; ipHash: string | null; userId: string | null }): Promise<CreatedOrder> {
   const parsed = orderInputSchema.safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -141,113 +161,106 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   const input = parsed.data;
 
   // Idempotency: the same submission (double tap / refresh / retry) returns the same order.
-  const existing = await prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey }, include: { restaurant: { select: { slug: true } } } });
+  const existing = await prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
   if (existing) {
     if (existing.restaurantId !== input.restaurantId) throw new OrderError("Invalid order submission");
-    return toCreated(existing, existing.restaurant.slug, true);
+    return { reference: existing.reference, trackingToken: existing.trackingToken, totalCents: existing.totalCents, currency: existing.currency, duplicate: true };
   }
 
   const settings = await getSettings();
   const restaurant = await prisma.restaurant.findUnique({ where: { id: input.restaurantId }, include: { deliveryAreas: true } });
   if (!restaurant || restaurant.status !== "ACTIVE") throw new OrderError("This restaurant is not accepting orders right now");
-  if (!restaurant.orderingEnabled || !restaurant.agreementAcceptedAt || !restaurant.whatsappNumber) throw new OrderError("This restaurant has not enabled WhatsApp ordering yet");
+  if (!restaurant.orderingEnabled || !restaurant.agreementAcceptedAt) throw new OrderError("This restaurant isn't taking online orders right now");
+  if (isOpenAt(restaurant.openingHours as OpeningHours) === false) throw new OrderError(`${restaurant.displayName} is closed right now`);
   if (input.fulfillment === "DELIVERY" && !restaurant.deliveryEnabled) throw new OrderError("Delivery is not available from this restaurant", { fulfillment: "Delivery not available" });
   if (input.fulfillment === "PICKUP" && !restaurant.pickupEnabled) throw new OrderError("Pickup is not available from this restaurant", { fulfillment: "Pickup not available" });
 
-  const c = input.customer;
+  // A logged-in customer may use one of their saved addresses.
+  const c = { ...input.customer };
+  if (c.addressId) {
+    if (!meta.userId) throw new OrderError("Please log in to use a saved address");
+    const saved = await prisma.customerAddress.findFirst({ where: { id: c.addressId, userId: meta.userId } });
+    if (!saved) throw new OrderError("Saved address not found", { "customer.addressId": "Choose another address" });
+    Object.assign(c, { address: saved.address, building: saved.building, area: saved.area, mapsUrl: saved.mapsUrl, latitude: saved.latitude, longitude: saved.longitude, notes: c.notes || saved.notes });
+  }
+
   const fieldErrors: Record<string, string> = {};
   const phone = normalizePhone(c.phone);
   if (!phone.ok) fieldErrors["customer.phone"] = phone.error;
   const mapsUrl = normalizeMapsUrl(c.mapsUrl, c.latitude, c.longitude);
-  if (c.mapsUrl && !mapsUrl) fieldErrors["customer.mapsUrl"] = "Enter a valid Google Maps link";
+  if (c.mapsUrl && !mapsUrl && c.latitude == null) fieldErrors["customer.mapsUrl"] = "Enter a valid Google Maps link";
+  let deliveryFeeCents = 0;
   if (input.fulfillment === "DELIVERY") {
     if (!c.address || c.address.length < 4) fieldErrors["customer.address"] = "Enter your delivery address";
-    if (restaurant.requireMapsLocation && !mapsUrl) fieldErrors["customer.mapsUrl"] = "This restaurant requires your Google Maps location";
+    if (restaurant.requireMapsLocation && !mapsUrl) fieldErrors["customer.mapsUrl"] = "This restaurant needs your location on the map";
+    const fee = deliveryFeeFor(restaurant, c.area);
+    if (fee == null) fieldErrors["customer.area"] = restaurant.deliveryAreas.length ? "This restaurant doesn't deliver to that area" : "Delivery fees aren't set up yet — choose pickup";
+    else deliveryFeeCents = fee;
   }
 
   const priced = await priceCart(restaurant.id, input.items);
   Object.assign(fieldErrors, priced.fieldErrors);
   if (Object.keys(fieldErrors).length) throw new OrderError("Please check your order details", fieldErrors);
-  if (restaurant.minOrderCents && priced.subtotalCents < restaurant.minOrderCents) throw new OrderError("Your order is below the restaurant's minimum order");
-
-  let deliveryFeeCents: number | null = null;
-  if (input.fulfillment === "DELIVERY") {
-    const area = c.area ? restaurant.deliveryAreas.find((a) => a.name.toLowerCase() === c.area!.toLowerCase()) : null;
-    deliveryFeeCents = area?.feeCents ?? (restaurant.deliveryAreas.length && !area ? null : restaurant.deliveryFeeCents);
-  }
+  if (restaurant.minOrderCents && priced.subtotalCents < restaurant.minOrderCents) throw new OrderError(`Minimum order is ${formatMoney(restaurant.minOrderCents, restaurant.currency)}`);
 
   const currency = restaurant.currency;
+  const totalCents = priced.subtotalCents + deliveryFeeCents;
+  let changeForCents: number | null = null;
+  if (input.changeFor) {
+    changeForCents = parseAmount(input.changeFor, currency);
+    if (changeForCents === null || changeForCents < totalCents) throw new OrderError("Please check your order details", { changeFor: `Enter a bill amount of at least ${formatMoney(totalCents, currency)}` });
+  }
   const exchangeRate = currency === "USD" ? null : settings.lbpPerUsd;
   const commissionBaseCents = toUsdCents(priced.subtotalCents, currency, exchangeRate);
+  const e164 = (phone as { e164: string }).e164;
 
   try {
     const order = await prisma.$transaction(async (tx) => {
       const year = new Date().getUTCFullYear();
       const seq = await nextCounter(tx, `order:${year}`);
       const reference = `NN-${year}-${String(seq).padStart(6, "0")}`;
-      const message = buildOrderMessage({
-        platformName: settings.platformName,
-        reference,
-        restaurantName: restaurant.displayName,
-        currency,
-        customer: {
-          name: c.name,
-          phone: (phone as { e164: string }).e164,
-          fulfillment: input.fulfillment,
-          address: c.address,
-          building: c.building,
-          area: c.area,
-          notes: c.notes,
-          mapsUrl,
-        },
-        lines: priced.lines,
-        subtotalCents: priced.subtotalCents,
-        deliveryFeeCents,
-      });
 
-      // Duplicate heuristic: same device, same restaurant & subtotal within 3 minutes.
+      // Duplicate heuristic: same device/phone, same restaurant & subtotal within 3 minutes → flag for review (not blocked).
       let suspicious = false;
       let suspiciousReason: string | null = null;
-      if (meta.deviceKey) {
-        const dup = await tx.order.findFirst({
-          where: { restaurantId: restaurant.id, deviceKey: meta.deviceKey, subtotalCents: priced.subtotalCents, createdAt: { gte: new Date(Date.now() - 3 * 60_000) } },
-          select: { reference: true },
-        });
-        if (dup) {
-          suspicious = true;
-          suspiciousReason = `Possible duplicate of ${dup.reference}`;
-        }
+      const dup = await tx.order.findFirst({
+        where: { restaurantId: restaurant.id, subtotalCents: priced.subtotalCents, createdAt: { gte: new Date(Date.now() - 3 * 60_000) }, OR: [{ customerPhone: e164 }, ...(meta.deviceKey ? [{ deviceKey: meta.deviceKey }] : [])] },
+        select: { reference: true },
+      });
+      if (dup) {
+        suspicious = true;
+        suspiciousReason = `Possible duplicate of ${dup.reference}`;
       }
 
-      const now = new Date();
       const created = await tx.order.create({
         data: {
           reference,
           idempotencyKey: input.idempotencyKey,
+          trackingToken: randomToken(18),
           restaurantId: restaurant.id,
-          status: "LINK_GENERATED",
+          userId: meta.userId,
+          status: "PLACED",
           fulfillment: input.fulfillment as Fulfillment,
+          changeForCents,
           customerName: c.name,
-          customerPhone: (phone as { e164: string }).e164,
+          customerPhone: e164,
           address: input.fulfillment === "DELIVERY" ? c.address : null,
           building: input.fulfillment === "DELIVERY" ? c.building || null : null,
           deliveryArea: input.fulfillment === "DELIVERY" ? c.area || null : null,
           notes: c.notes || null,
-          mapsUrl,
-          latitude: c.latitude ?? null,
-          longitude: c.longitude ?? null,
+          mapsUrl: input.fulfillment === "DELIVERY" ? mapsUrl : null,
+          latitude: input.fulfillment === "DELIVERY" ? c.latitude ?? null : null,
+          longitude: input.fulfillment === "DELIVERY" ? c.longitude ?? null : null,
           currency,
           subtotalCents: priced.subtotalCents,
           deliveryFeeCents,
-          totalCents: input.fulfillment === "PICKUP" ? priced.subtotalCents : deliveryFeeCents != null ? priced.subtotalCents + deliveryFeeCents : null,
+          totalCents,
           commissionBaseCents,
           exchangeRate,
-          whatsappNumber: restaurant.whatsappNumber!,
           restaurantName: restaurant.displayName,
-          message,
+          restaurantPhone: restaurant.phone,
           deviceKey: meta.deviceKey,
           ipHash: meta.ipHash,
-          linkGeneratedAt: now,
           suspicious,
           suspiciousReason,
           items: {
@@ -264,148 +277,172 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
               customizations: { create: l.chosen.map((ch) => ({ groupName: ch.groupName, optionName: ch.optionName, optionId: ch.optionId, priceDeltaCents: ch.priceDeltaCents })) },
             })),
           },
-          events: {
-            create: [
-              { type: "VALIDATED", actorType: "CUSTOMER", createdAt: now },
-              { type: "LINK_GENERATED", actorType: "CUSTOMER", createdAt: now },
-            ],
-          },
+          events: { create: [{ type: "PLACED", actorType: "CUSTOMER", actorId: meta.userId }] },
         },
       });
 
+      if (meta.userId) {
+        // Remember the delivery address and phone for next time.
+        if (input.fulfillment === "DELIVERY" && c.saveAddress && !c.addressId && c.address) {
+          const count = await tx.customerAddress.count({ where: { userId: meta.userId } });
+          if (count < 20) {
+            await tx.customerAddress.create({ data: { userId: meta.userId, label: c.addressLabel?.trim() || (count === 0 ? "Home" : `Address ${count + 1}`), area: c.area || null, address: c.address, building: c.building || null, notes: c.notes || null, latitude: c.latitude ?? null, longitude: c.longitude ?? null, mapsUrl, isDefault: count === 0 } });
+          }
+        }
+        await tx.user.updateMany({ where: { id: meta.userId, phone: null }, data: { phone: e164 } });
+      }
+
       const reelIds = Array.from(new Set(input.items.map((i) => i.reelId).filter(Boolean))) as string[];
-      await tx.analyticsEvent.create({ data: { type: "whatsapp_link_generated", restaurantId: restaurant.id, orderId: created.id, deviceKey: meta.deviceKey, data: { reelIds } } });
+      await tx.analyticsEvent.create({ data: { type: "order_placed", restaurantId: restaurant.id, orderId: created.id, deviceKey: meta.deviceKey, data: { reelIds } } });
       if (reelIds.length) await tx.reel.updateMany({ where: { id: { in: reelIds }, restaurantId: restaurant.id }, data: { orderInits: { increment: 1 } } });
-      await notifyRestaurant(restaurant.id, { type: "ORDER_REQUEST", title: `New order request ${reference}`, body: `${c.name} · ${priced.lines.length} item(s). Acknowledge it once you receive the WhatsApp message.`, link: `/dashboard/orders?ref=${reference}` }, tx);
+      await notifyRestaurant(
+        restaurant.id,
+        { type: "NEW_ORDER", title: `New order ${reference} · ${formatMoney(totalCents, currency)}`, body: `${c.name} · ${input.fulfillment === "DELIVERY" ? "Delivery" : "Pickup"} · cash on delivery`, link: `/dashboard/orders?ref=${reference}` },
+        tx,
+      );
       return created;
     });
-    return toCreated(order, restaurant.slug, false);
+    return { reference: order.reference, trackingToken: order.trackingToken, totalCents: order.totalCents, currency: order.currency, duplicate: false };
   } catch (e) {
     if (isUniqueViolation(e)) {
-      const again = await prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey }, include: { restaurant: { select: { slug: true } } } });
-      if (again) return toCreated(again, again.restaurant.slug, true);
+      const again = await prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+      if (again) return { reference: again.reference, trackingToken: again.trackingToken, totalCents: again.totalCents, currency: again.currency, duplicate: true };
     }
     throw e;
   }
 }
 
-function toCreated(o: { reference: string; whatsappNumber: string; message: string; subtotalCents: number; currency: string; deliveryFeeCents: number | null }, slug: string, duplicateOf: boolean): CreatedOrder {
-  return {
-    reference: o.reference,
-    whatsappUrl: buildWhatsAppLink(o.whatsappNumber, o.message),
-    message: o.message,
-    subtotalCents: o.subtotalCents,
-    currency: o.currency,
-    deliveryFeeCents: o.deliveryFeeCents,
-    restaurantSlug: slug,
-    duplicateOf,
-  };
+// ───── lifecycle ─────
+
+export type RestaurantOrderAction = "ACCEPT" | "REJECT" | "PREPARING" | "DISPATCH" | "COMPLETE" | "FAIL";
+
+const ALLOWED_FROM: Record<RestaurantOrderAction, OrderStatus[]> = {
+  ACCEPT: ["PLACED"],
+  REJECT: ["PLACED"],
+  PREPARING: ["ACCEPTED"],
+  DISPATCH: ["ACCEPTED", "PREPARING"],
+  COMPLETE: ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"],
+  FAIL: ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"],
+};
+
+async function notifyCustomer(tx: Tx, order: { id: string; userId: string | null; reference: string; restaurantName: string; trackingToken: string }, status: OrderStatusKey, extra?: string) {
+  if (!order.userId) return;
+  const title = `${order.restaurantName}: ${STATUS_META[status].customer}`;
+  await notifyUser(order.userId, { type: "ORDER_STATUS", title, body: extra, link: `/order/${order.reference}` }, tx);
+  const u = await tx.user.findUnique({ where: { id: order.userId }, select: { email: true } });
+  if (u?.email) void sendEmail(u.email, `Order ${order.reference} — ${STATUS_META[status].label}`, `${title}${extra ? `\n${extra}` : ""}\n\n${process.env.APP_URL ?? ""}/order/${order.reference}?t=${order.trackingToken}`);
 }
-
-/** Customer opened WhatsApp. This is a handoff attempt — NOT proof the message was sent. Never billable. */
-export async function recordHandoff(reference: string, deviceKey: string | null) {
-  const order = await prisma.order.findUnique({ where: { reference } });
-  if (!order) throw new OrderError("Order not found");
-  if (order.deviceKey && deviceKey && order.deviceKey !== deviceKey) throw new OrderError("Order not found");
-  const first = !order.handoffAt;
-  await prisma.$transaction(async (tx) => {
-    await tx.order.update({
-      where: { id: order.id },
-      data: {
-        handoffCount: { increment: 1 },
-        handoffAt: order.handoffAt ?? new Date(),
-        status: order.status === "LINK_GENERATED" ? "HANDOFF_ATTEMPTED" : undefined,
-      },
-    });
-    await tx.orderEvent.create({ data: { orderId: order.id, type: first ? "WHATSAPP_HANDOFF_ATTEMPTED" : "WHATSAPP_HANDOFF_REPEATED", actorType: "CUSTOMER" } });
-    if (first) await tx.analyticsEvent.create({ data: { type: "whatsapp_handoff", restaurantId: order.restaurantId, orderId: order.id, deviceKey } });
-  });
-  return { whatsappUrl: buildWhatsAppLink(order.whatsappNumber, order.message) };
-}
-
-const PRE_ACK: OrderStatus[] = ["LINK_GENERATED", "HANDOFF_ATTEMPTED", "MESSAGE_CONFIRMED", "VALIDATED"];
-
-export type RestaurantOrderAction = "ACKNOWLEDGE" | "ACCEPT" | "REJECT" | "FULFILL";
 
 /**
- * Restaurant lifecycle transitions. Scoped by restaurantId for tenant isolation.
- * Acknowledgment is the default billable event; the commission is created exactly once.
+ * Restaurant lifecycle transitions, scoped by restaurantId for tenant isolation.
+ * Commission is created exactly once when the configured billable milestone is reached.
  */
-export async function restaurantOrderAction(
-  restaurantId: string,
-  userId: string,
-  orderId: string,
-  action: RestaurantOrderAction,
-  opts: { reason?: string; method?: "LIST" | "REFERENCE_LOOKUP" } = {},
-) {
+export async function restaurantOrderAction(restaurantId: string, userId: string, orderId: string, action: RestaurantOrderAction, opts: { reason?: string; etaMinutes?: number } = {}) {
   const settings = await getSettings();
   return prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM orders WHERE id = ${orderId} AND "restaurantId" = ${restaurantId} FOR UPDATE`;
     if (!rows.length) throw new OrderError("Order not found");
-    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { restaurant: { select: { avgPrepMinutes: true } } } });
+    const target: Record<RestaurantOrderAction, OrderStatus> = { ACCEPT: "ACCEPTED", REJECT: "REJECTED", PREPARING: "PREPARING", DISPATCH: order.fulfillment === "DELIVERY" ? "OUT_FOR_DELIVERY" : "READY_FOR_PICKUP", COMPLETE: "COMPLETED", FAIL: "FAILED" };
+    if (order.status === target[action]) return order; // idempotent
+    if (!ALLOWED_FROM[action].includes(order.status)) throw new OrderError(`This order is already ${STATUS_META[order.status].label.toLowerCase()}`);
     const now = new Date();
-    const data: Prisma.OrderUpdateInput = {};
-    const events: string[] = [];
-
-    const doAck = async () => {
-      if (order.acknowledgedAt) return;
-      data.acknowledgedAt = now;
-      data.status = "ACKNOWLEDGED";
-      events.push("RESTAURANT_ACKNOWLEDGED");
-      await tx.restaurantOrderAcknowledgment.create({ data: { orderId, userId, method: opts.method ?? "LIST" } });
-    };
-
+    const data: Prisma.OrderUpdateInput = { status: target[action] };
+    let extra: string | undefined;
     switch (action) {
-      case "ACKNOWLEDGE":
-        if (!PRE_ACK.includes(order.status) && !order.acknowledgedAt) throw new OrderError(`Cannot acknowledge an order that is ${order.status.toLowerCase()}`);
-        if (order.acknowledgedAt) return order; // idempotent
-        await doAck();
-        break;
-      case "ACCEPT":
-        if (order.acceptedAt) return order;
-        if (![...PRE_ACK, "ACKNOWLEDGED"].includes(order.status)) throw new OrderError(`Cannot accept an order that is ${order.status.toLowerCase()}`);
-        await doAck();
+      case "ACCEPT": {
+        const eta = Math.round(opts.etaMinutes ?? order.restaurant.avgPrepMinutes);
+        if (!Number.isFinite(eta) || eta < 5 || eta > 240) throw new OrderError("Choose a time between 5 and 240 minutes");
         data.acceptedAt = now;
-        data.status = "ACCEPTED";
-        events.push("RESTAURANT_ACCEPTED");
+        data.estimatedMinutes = eta;
+        extra = `Estimated ${order.fulfillment === "DELIVERY" ? "delivery" : "ready"} time: about ${eta} minutes.`;
         break;
+      }
       case "REJECT":
-        if (![...PRE_ACK, "ACKNOWLEDGED"].includes(order.status)) throw new OrderError(`Cannot reject an order that is ${order.status.toLowerCase()}`);
+        if (!opts.reason?.trim()) throw new OrderError("Tell the customer why");
         data.rejectedAt = now;
-        data.rejectionReason = opts.reason?.slice(0, 300) || null;
-        data.status = "REJECTED";
-        events.push("RESTAURANT_REJECTED");
+        data.rejectionReason = opts.reason.trim().slice(0, 300);
+        extra = data.rejectionReason as string;
         break;
-      case "FULFILL":
-        if (order.fulfilledAt) return order;
-        if (!["ACKNOWLEDGED", "ACCEPTED"].includes(order.status)) throw new OrderError("Accept the order before marking it fulfilled");
-        if (!order.acceptedAt) {
-          data.acceptedAt = now;
-          events.push("RESTAURANT_ACCEPTED");
-        }
-        data.fulfilledAt = now;
-        data.status = "FULFILLED";
-        events.push("RESTAURANT_FULFILLED");
+      case "PREPARING":
+        data.preparingAt = now;
+        break;
+      case "DISPATCH":
+        data.preparingAt = order.preparingAt ?? now;
+        data.dispatchedAt = now;
+        break;
+      case "COMPLETE":
+        data.completedAt = now;
+        break;
+      case "FAIL":
+        if (!opts.reason?.trim()) throw new OrderError("Explain what happened");
+        data.failedAt = now;
+        data.failureReason = opts.reason.trim().slice(0, 300);
         break;
     }
-
     const updated = await tx.order.update({ where: { id: orderId }, data });
-    for (const type of events) {
-      await tx.orderEvent.create({ data: { orderId, type, actorType: "RESTAURANT", actorId: userId, data: type === "RESTAURANT_REJECTED" ? { reason: opts.reason ?? null } : undefined } });
-      await tx.analyticsEvent.create({ data: { type: type.toLowerCase(), restaurantId, orderId } });
-    }
+    await tx.orderEvent.create({ data: { orderId, type: target[action], actorType: "RESTAURANT", actorId: userId, data: opts.reason || opts.etaMinutes ? { reason: opts.reason ?? null, etaMinutes: opts.etaMinutes ?? null } : undefined } });
+    await tx.analyticsEvent.create({ data: { type: `order_${target[action].toLowerCase()}`, restaurantId, orderId } });
+    await notifyCustomer(tx, updated, target[action], extra);
     await ensureCommission(tx, orderId, settings);
     return updated;
   });
 }
 
-/** Admin override: cancel or mark an order disputed (commission handled via disputes/adjustments). */
-export async function adminSetOrderStatus(adminId: string, orderId: string, status: "CANCELED" | "DISPUTED", note: string) {
+export type OrderViewer = { userId: string | null; deviceKey: string | null; token?: string | null };
+
+/** Customers can see an order they placed: same account, same device, or the private tracking link. */
+export function canViewOrder(order: { userId: string | null; deviceKey: string | null; trackingToken: string }, v: OrderViewer) {
+  return (!!order.userId && order.userId === v.userId) || (!!order.deviceKey && order.deviceKey === v.deviceKey) || (!!v.token && v.token === order.trackingToken);
+}
+
+/** Customers may cancel only while the restaurant hasn't accepted yet. */
+export async function customerCancelOrder(reference: string, viewer: OrderViewer, reason?: string) {
   return prisma.$transaction(async (tx) => {
-    const order = await tx.order.update({ where: { id: orderId }, data: { status, canceledAt: status === "CANCELED" ? new Date() : undefined } });
-    await tx.orderEvent.create({ data: { orderId, type: `ADMIN_${status}`, actorType: "ADMIN", actorId: adminId, data: { note } } });
-    // un-invoiced commission on a canceled order is voided; invoiced ones require a credit adjustment
-    if (status === "CANCELED") await tx.commissionEvent.updateMany({ where: { orderId, status: "ACCRUED" }, data: { status: "VOIDED" } });
+    const order = await tx.order.findUnique({ where: { reference } });
+    if (!order || !canViewOrder(order, viewer)) throw new OrderError("Order not found");
+    if (order.status === "CANCELED") return order;
+    if (order.status !== "PLACED") throw new OrderError("The restaurant already accepted this order. Please call them to change it.");
+    const updated = await tx.order.update({ where: { id: order.id }, data: { status: "CANCELED", canceledAt: new Date(), canceledBy: "CUSTOMER", cancelReason: reason?.slice(0, 300) || null } });
+    await tx.orderEvent.create({ data: { orderId: order.id, type: "CANCELED", actorType: "CUSTOMER", actorId: viewer.userId, data: { reason: reason ?? null } } });
+    await notifyRestaurant(order.restaurantId, { type: "ORDER_CANCELED", title: `Order ${order.reference} was canceled by the customer`, link: `/dashboard/orders?ref=${order.reference}` }, tx);
+    return updated;
+  });
+}
+
+/**
+ * Accepted orders that the restaurant never closed are completed automatically
+ * after the configured number of hours, so commission can't be avoided by
+ * leaving orders open. Restaurants can still report a failed delivery earlier.
+ */
+export async function autoCompleteStaleOrders(settingsIn?: Settings, now = new Date()) {
+  const settings = settingsIn ?? (await getSettings());
+  const cutoff = new Date(now.getTime() - settings.autoCompleteHours * 3600_000);
+  const stale = await prisma.order.findMany({ where: { status: { in: ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"] }, acceptedAt: { lt: cutoff } }, select: { id: true } });
+  for (const { id } of stale) {
+    await prisma.$transaction(async (tx) => {
+      const o = await tx.order.update({ where: { id }, data: { status: "COMPLETED", completedAt: now, autoCompleted: true } });
+      await tx.orderEvent.create({ data: { orderId: id, type: "AUTO_COMPLETED", actorType: "SYSTEM", data: { afterHours: settings.autoCompleteHours } } });
+      await notifyRestaurant(o.restaurantId, { type: "ORDER_AUTO_COMPLETED", title: `Order ${o.reference} was marked completed automatically`, body: `It stayed open for more than ${settings.autoCompleteHours} hours. If it wasn't delivered, open a dispute from Billing.`, link: `/dashboard/orders?ref=${o.reference}` }, tx);
+      await ensureCommission(tx, id, settings);
+    });
+  }
+  return stale.length;
+}
+
+/** Admin override: cancel an order record (un-invoiced commission is voided; invoiced needs a credit). */
+export async function adminCancelOrder(adminId: string, orderId: string, note: string) {
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.update({ where: { id: orderId }, data: { status: "CANCELED", canceledAt: new Date(), canceledBy: "ADMIN", cancelReason: note } });
+    await tx.orderEvent.create({ data: { orderId, type: "ADMIN_CANCELED", actorType: "ADMIN", actorId: adminId, data: { note } } });
+    await tx.commissionEvent.updateMany({ where: { orderId, status: "ACCRUED" }, data: { status: "VOIDED" } });
     return order;
   });
+}
+
+/** After sign-in, guest orders placed from this device join the account's order history. */
+export async function claimDeviceOrders(userId: string, deviceKey: string | null) {
+  if (!deviceKey) return 0;
+  const r = await prisma.order.updateMany({ where: { deviceKey, userId: null }, data: { userId } });
+  return r.count;
 }

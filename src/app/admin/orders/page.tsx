@@ -4,7 +4,7 @@ import { prisma } from "@/server/db";
 import { DashPage } from "@/components/dashboard/page";
 import { ActionButton } from "@/components/admin/action-button";
 import { Badge } from "@/components/ui/misc";
-import { adminOrderStatusAction, clearSuspiciousAction } from "@/actions/admin";
+import { adminCancelOrderAction, clearSuspiciousAction } from "@/actions/admin";
 import { formatMoney } from "@/lib/money";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -14,15 +14,15 @@ export default async function AdminOrders({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const where: Prisma.OrderWhereInput = {
-    ...(sp.f === "suspicious" ? { suspicious: true } : sp.f === "unacked" ? { acknowledgedAt: null, status: { in: ["LINK_GENERATED", "HANDOFF_ATTEMPTED"] } } : sp.f === "billable" ? { commission: { isNot: null } } : {}),
+    ...(sp.f === "suspicious" ? { suspicious: true } : sp.f === "waiting" ? { status: "PLACED" as const } : sp.f === "failed" ? { status: { in: ["FAILED", "REJECTED"] as ("FAILED" | "REJECTED")[] } } : sp.f === "billable" ? { commission: { isNot: null } } : {}),
     ...(sp.q ? { OR: [{ reference: { contains: sp.q.toUpperCase() } }, { restaurantName: { contains: sp.q, mode: "insensitive" } }] } : {}),
   };
   const [orders, total, funnel] = await Promise.all([
     prisma.order.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * 50, take: 50, include: { commission: { select: { commissionCents: true, status: true } }, events: { orderBy: { createdAt: "asc" }, select: { type: true, createdAt: true } } } }),
     prisma.order.count({ where }),
-    Promise.all([prisma.order.count(), prisma.order.count({ where: { handoffAt: { not: null } } }), prisma.order.count({ where: { acknowledgedAt: { not: null } } }), prisma.order.count({ where: { acceptedAt: { not: null } } }), prisma.order.count({ where: { fulfilledAt: { not: null } } }), prisma.commissionEvent.count({ where: { status: { not: "VOIDED" } } })]),
+    Promise.all([prisma.order.count(), prisma.order.count({ where: { acceptedAt: { not: null } } }), prisma.order.count({ where: { status: "COMPLETED" } }), prisma.order.count({ where: { status: "REJECTED" } }), prisma.order.count({ where: { status: { in: ["CANCELED", "FAILED"] } } }), prisma.commissionEvent.count({ where: { status: { not: "VOIDED" } } })]),
   ]);
-  const labels = ["Prepared requests", "WhatsApp handoffs", "Acknowledged", "Accepted", "Fulfilled", "Commissionable"];
+  const labels = ["Orders placed", "Accepted", "Completed", "Rejected", "Canceled / failed", "Commissionable"];
   return (
     <DashPage title="Order records" description="Customer contact details are only shown to the receiving restaurant.">
       <div className="mb-5 grid grid-cols-3 gap-2 lg:grid-cols-6">
@@ -41,7 +41,8 @@ export default async function AdminOrders({ searchParams }: { searchParams: Prom
         {[
           ["", "All"],
           ["suspicious", "Suspicious"],
-          ["unacked", "Unacknowledged"],
+          ["waiting", "Waiting for restaurant"],
+          ["failed", "Rejected / failed"],
           ["billable", "Commissionable"],
         ].map(([k, l]) => (
           <Link key={k} href={`/admin/orders${k ? `?f=${k}` : ""}`} className={cn("chip h-9 text-xs", (sp.f ?? "") === k && "chip-active")}>
@@ -58,7 +59,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: Prom
               <th>Created</th>
               <th>Subtotal</th>
               <th>Status</th>
-              <th>Handoffs</th>
+              <th>Total</th>
               <th>Commission</th>
               <th />
             </tr>
@@ -90,12 +91,12 @@ export default async function AdminOrders({ searchParams }: { searchParams: Prom
                 <td>
                   <Badge>{o.status.toLowerCase().replace(/_/g, " ")}</Badge>
                 </td>
-                <td>{o.handoffCount}</td>
+                <td className="tabular">{formatMoney(o.totalCents, o.currency)}</td>
                 <td className="text-xs">{o.commission ? `${formatMoney(o.commission.commissionCents)} · ${o.commission.status.toLowerCase()}` : "—"}</td>
                 <td className="whitespace-nowrap">
                   {o.suspicious && <ActionButton action={clearSuspiciousAction.bind(null, o.id)}>Clear flag</ActionButton>}
-                  {!["CANCELED", "DISPUTED"].includes(o.status) && (
-                    <ActionButton variant="ghost" action={adminOrderStatusAction.bind(null, o.id, "CANCELED")} prompt="Why cancel this order record? (un-invoiced commission is voided)">
+                  {o.status !== "CANCELED" && (
+                    <ActionButton variant="ghost" action={adminCancelOrderAction.bind(null, o.id)} prompt="Why cancel this order record? (un-invoiced commission is voided)">
                       Cancel
                     </ActionButton>
                   )}

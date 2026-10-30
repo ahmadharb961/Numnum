@@ -22,7 +22,7 @@ export default async function AgreementPage() {
       )}
       {outdated && <Alert className="mb-4">The agreement has been updated since you accepted version {r.agreementVersion}. Please review and accept the new version.</Alert>}
       <Section title="Terms">
-        <AgreementText platformName={s.platformName} rateBps={r.commissionRateBps ?? s.defaultCommissionRateBps} billableEvent={s.billableEvent} dueDays={s.invoiceDueDays} disputeDays={s.disputeWindowDays} graceDays={s.graceDays} version={s.agreementVersion} />
+        <AgreementText platformName={s.platformName} rateBps={r.commissionRateBps ?? s.defaultCommissionRateBps} billableEvent={s.billableEvent} dueDays={s.invoiceDueDays} disputeDays={s.disputeWindowDays} graceDays={s.graceDays} version={s.agreementVersion} autoCompleteHours={s.autoCompleteHours} />
         {(!r.agreementAcceptedAt || outdated) && <div className="mt-6">{ctx.staffRole === "OWNER" ? <AcceptAgreement /> : <p className="text-sm text-ink-muted">Only the restaurant owner can accept the agreement.</p>}</div>}
       </Section>
     </DashPage>

@@ -6,6 +6,8 @@ import { z } from "zod";
 import { prisma } from "@/server/db";
 import { createSession, destroySession, hashPassword, validatePassword, verifyPassword, RESTAURANT_COOKIE } from "@/server/auth";
 import { mergeDeviceIntoUser } from "@/server/engagement";
+import { claimDeviceOrders } from "@/server/orders";
+import { deviceId } from "@/server/request";
 import { rateLimit } from "@/server/rate-limit";
 import { clientIp } from "@/server/request";
 import { normalizePhone } from "@/lib/phone";
@@ -30,6 +32,7 @@ export async function loginAction(_: FormState, form: FormData): Promise<FormSta
   if (!user || user.disabled || !(await verifyPassword(password, user.passwordHash))) return { error: "Incorrect email or password" };
   await createSession(user.id, (await headers()).get("user-agent"));
   await mergeDeviceIntoUser(user.id);
+  await claimDeviceOrders(user.id, await deviceId());
   const roles = user.roles.map((r) => r.role);
   const fallback = roles.includes("ADMIN") ? "/admin" : user.staff.length ? "/dashboard" : "/";
   redirect(safeNext(form.get("next"), fallback));
@@ -65,7 +68,8 @@ export async function registerCustomerAction(_: FormState, form: FormData): Prom
   const user = await prisma.user.create({ data: { email, name, phone, passwordHash: await hashPassword(password), roles: { create: { role: "CUSTOMER" } } } });
   await createSession(user.id, (await headers()).get("user-agent"));
   await mergeDeviceIntoUser(user.id);
-  redirect(safeNext(form.get("next"), "/saved"));
+  await claimDeviceOrders(user.id, await deviceId());
+  redirect(safeNext(form.get("next"), "/account"));
 }
 
 const restaurantSchema = z.object({
@@ -108,7 +112,6 @@ export async function registerRestaurantAction(_: FormState, form: FormData): Pr
         businessName: d.businessName,
         displayName: d.displayName,
         phone: phone.e164,
-        whatsappNumber: phone.e164,
         email: d.email,
         cuisine: d.cuisine || null,
         area: d.area || null,

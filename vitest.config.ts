@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
 
-const testDb = process.env.TEST_DATABASE_URL || "postgresql://numnum:numnum@localhost:5432/numnum_test";
+const testDb = process.env.TEST_DATABASE_URL || "postgresql://numnum:numnum@localhost:5432/numnum_cod_test";
 
 export default defineConfig({
   resolve: {

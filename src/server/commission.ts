@@ -4,19 +4,9 @@ import { periodOf } from "@/lib/utils";
 import type { Tx } from "./db";
 import type { BillableEvent, Settings } from "./settings";
 
-/** Has the order reached the configured billable milestone? */
-export function reachedBillable(order: Pick<Order, "acknowledgedAt" | "acceptedAt" | "fulfilledAt" | "messageConfirmedAt">, ev: BillableEvent, settings: Pick<Settings, "whatsappBusinessIntegration">): Date | null {
-  switch (ev) {
-    case "ACKNOWLEDGED":
-      return order.acknowledgedAt;
-    case "ACCEPTED":
-      return order.acceptedAt;
-    case "FULFILLED":
-      return order.fulfilledAt;
-    case "MESSAGE_CONFIRMED":
-      // Only valid when a verified WhatsApp Business integration provides delivery evidence.
-      return settings.whatsappBusinessIntegration ? order.messageConfirmedAt : order.acknowledgedAt;
-  }
+/** When has the order reached the configured billable milestone? */
+export function reachedBillable(order: Pick<Order, "acceptedAt" | "completedAt">, ev: BillableEvent): Date | null {
+  return ev === "ACCEPTED" ? order.acceptedAt : order.completedAt;
 }
 
 /**
@@ -26,9 +16,9 @@ export function reachedBillable(order: Pick<Order, "acknowledgedAt" | "acceptedA
  */
 export async function ensureCommission(tx: Tx, orderId: string, settings: Settings) {
   const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { restaurant: { select: { commissionRateBps: true } } } });
-  const at = reachedBillable(order, settings.billableEvent, settings);
+  const at = reachedBillable(order, settings.billableEvent);
   if (!at) return null;
-  if (order.status === "CANCELED") return null;
+  if (order.status === "CANCELED" || order.status === "REJECTED") return null;
   const rateBps = order.restaurant.commissionRateBps ?? settings.defaultCommissionRateBps;
   const commissionCents = calcCommission(order.commissionBaseCents, rateBps);
   const inserted = await tx.$executeRaw`
