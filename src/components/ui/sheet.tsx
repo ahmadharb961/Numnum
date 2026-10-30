@@ -22,7 +22,7 @@ export function Sheet({ open, onClose, title, children, className, full }: { ope
   }, [open, onClose]);
   if (!open || typeof document === "undefined") return null;
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={title}>
+    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" style={{ bottom: "calc(0px - var(--vp-gap))" }} role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 animate-fade-in bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
       <div
         ref={ref}

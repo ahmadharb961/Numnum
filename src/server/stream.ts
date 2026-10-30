@@ -42,6 +42,18 @@ export async function createTusUpload(opts: { uploadLength: string; fileName: st
   return { location, uid };
 }
 
+/** Uploads a video file from the server (used by the demo seed); returns the Stream uid. */
+export async function uploadVideoToStream(file: Buffer, fileName: string): Promise<string> {
+  if (!streamConfigured()) throw new Error("STREAM_NOT_CONFIGURED");
+  const form = new FormData();
+  form.append("file", new Blob([new Uint8Array(file)], { type: "video/mp4" }), fileName);
+  const res = await fetch(api(), { method: "POST", headers: auth(), body: form });
+  const json = (await res.json().catch(() => null)) as { result?: { uid?: string } } | null;
+  const uid = json?.result?.uid;
+  if (!res.ok || !uid) throw new Error(`STREAM_UPLOAD_FAILED ${res.status}`);
+  return uid;
+}
+
 type CloudflareVideo = { readyToStream?: boolean; status?: { state?: string; errorReasonText?: string }; duration?: number; playback?: { hls?: string } };
 export type StreamVideoInfo = { ready: boolean; failed: boolean; error: string | null; durationSec: number | null; hls: string | null };
 

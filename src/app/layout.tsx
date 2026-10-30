@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { CartProvider } from "@/components/customer/cart";
-import { ServiceWorker } from "@/components/sw-register";
+import { ServiceWorker, ViewportFix } from "@/components/sw-register";
 
 const appUrl = process.env.APP_URL || "http://localhost:3000";
 
@@ -37,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CartProvider>{children}</CartProvider>
         </ToastProvider>
         <ServiceWorker />
+        <ViewportFix />
       </body>
     </html>
   );

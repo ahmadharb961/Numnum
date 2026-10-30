@@ -98,7 +98,7 @@ curl -fsS -H "Authorization: Bearer YOUR_CRON_SECRET" https://yourdomain.com/api
 
 ### Notes
 
-- Demo restaurants have no reels on Hostinger, because demo videos are generated with ffmpeg, which Hostinger doesn't have. Upload a few real food videos from the dashboard.
+- **Demo data (`SEED_DEMO=true`):** 6 restaurants (Beirut, Jounieh, Tripoli) with full menus, photos, customizations and 17 reels. The reels are uploaded to your Cloudflare Stream during the deploy and go live within a minute or two. Demo restaurants are always open so you can order during a pitch. Logins: `owner@burgerhouse.demo`, `owner@manousheh.demo`, `owner@shawarma.demo`, `owner@forno.demo`, `owner@beanbar.demo`, `owner@ashta.demo` (customer: `customer@numnum.demo`), password `demo1234`. Redeploying keeps them and only adds what's missing. Replace the demo reels with real food videos from each restaurant's dashboard for the best impression.
 - To remove demo data later, use a fresh Neon database (or ask me for a cleanup script).
 - Photos are stored in Neon. Roughly 150 real menu photos take about 15–20 MB (they are resized to 1200 px WebP), so the free tier covers the first restaurants. Neon's paid plan is needed when you reach a few hundred restaurants.
 

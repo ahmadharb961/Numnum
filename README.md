@@ -51,7 +51,7 @@ SEED_DEMO=true npm run db:seed   # demo data; omit SEED_DEMO for categories + ad
 npm run dev
 ```
 
-The demo seed builds generated photos and videos, runs real orders through the order/commission/billing services, and issues an invoice with a pending Whish payment.
+The demo seed loads pre-rendered photos and reels from `prisma/demo/` (regenerate with `npm run demo:media` after editing `prisma/demo-data.ts`; uploaded to Cloudflare Stream when configured), runs real orders through the order/commission/billing services, and issues an invoice with a pending Whish payment.
 
 | Demo login | Password |
 | --- | --- |

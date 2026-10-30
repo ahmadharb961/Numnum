@@ -21,7 +21,7 @@ export function BottomNav() {
   return (
     <nav
       className={cn("fixed inset-x-0 bottom-0 z-50 border-t backdrop-blur-xl", dark ? "border-white/10 bg-black/90 text-white" : "border-black/5 bg-white/95 text-ink")}
-      style={{ paddingBottom: "var(--safe-bottom)" }}
+      style={{ paddingBottom: "var(--safe-bottom)", bottom: "calc(0px - var(--vp-gap))" }}
       aria-label="Main"
     >
       <ul className="mx-auto grid h-[var(--nav-h)] max-w-screen-sm grid-cols-5">

@@ -3,8 +3,8 @@
 // creates demo restaurants, menus, generated photos and videos, orders that flow
 // through the real order/commission/billing services, reviews and invoices.
 // Demo content is for development and demo environments only.
-import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -17,6 +17,8 @@ import { generateInvoice, submitPayment } from "../src/server/billing";
 import { submitItemReview, submitRestaurantReview } from "../src/server/reviews";
 import { updateSetting, DEFAULT_SETTINGS } from "../src/server/settings";
 import { previousPeriod } from "../src/lib/utils";
+import { streamConfigured, syncStreamReels, uploadVideoToStream } from "../src/server/stream";
+import { DEMOS, PALETTES, type Demo } from "./demo-data";
 
 const CATEGORIES = [
   ["burgers", "Burgers", "برغر", "🍔"],
@@ -62,16 +64,11 @@ async function seedBase() {
   return admin;
 }
 
-// ───── demo media generation ─────
+// ───── demo media ─────
 
-const PALETTES = [
-  ["#ff7438", "#7f2111"],
-  ["#f6b73c", "#a14a0a"],
-  ["#62b36f", "#1d5a2c"],
-  ["#e8505b", "#6e1423"],
-  ["#c08552", "#4b2e19"],
-  ["#5aa9e6", "#1b3a5c"],
-];
+const DEMO_DIR = path.join(__dirname, "demo");
+// Bump when the committed demo media changes, so existing demo restaurants get refreshed images.
+const DEMO_MEDIA_VERSION = 2;
 
 function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -89,131 +86,66 @@ async function foodImage(name: string, emoji: string, idx: number) {
   return sharp(Buffer.from(svg)).jpeg({ quality: 85 }).toBuffer();
 }
 
-function demoVideo(label: string, idx: number, dir: string) {
-  const [a, b] = PALETTES[idx % PALETTES.length];
-  const file = path.join(dir, `reel-${idx}.mp4`);
-  const text = label.replace(/[':\\]/g, "");
-  execFileSync("ffmpeg", [
-    "-y", "-loglevel", "error",
-    "-f", "lavfi", "-i", `gradients=s=720x1280:c0=${a.replace("#", "0x")}:c1=${b.replace("#", "0x")}:speed=0.03:d=6:r=30`,
-    "-f", "lavfi", "-i", "sine=frequency=220:duration=6",
-    "-vf", `drawtext=text='${text}':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=h*0.42+sin(t*2)*30:font='Inter':borderw=3:bordercolor=black@0.25,drawtext=text='numnum demo reel':fontcolor=white@0.8:fontsize=32:x=(w-text_w)/2:y=h*0.52`,
-    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", file,
-  ]);
-  return file;
+/** Pre-rendered demo image (scripts/demo-media.ts), or a generated placeholder if missing. */
+async function demoImage(rel: string, label: string, emoji: string, idx: number) {
+  const file = path.join(DEMO_DIR, rel);
+  return existsSync(file) ? readFileSync(file) : foodImage(label, emoji, idx);
 }
 
-// ───── demo data ─────
-
-type Opt = [string, number] | [string, number, true];
-type Group = { name: string; type: "SINGLE" | "MULTIPLE" | "TEXT"; required?: boolean; max?: number; options?: Opt[] };
-type Item = { sku: string; name: string; cat: string; food: string; price: number; desc: string; ingredients: string; allergens?: string; diet?: string[]; emoji: string; groups?: string[]; prep?: number };
-type Demo = { slug: string; name: string; business: string; cuisine: string; area: string; city: string; desc: string; currency?: string; lat: number; lng: number; owner: string; verified?: boolean; fee?: number | null; areas?: [string, number | null][]; groups: Record<string, Group>; items: Item[]; reels: string[] };
-
-const HOURS = { mon: [{ open: "11:00", close: "23:30" }], tue: [{ open: "11:00", close: "23:30" }], wed: [{ open: "11:00", close: "23:30" }], thu: [{ open: "11:00", close: "23:30" }], fri: [{ open: "11:00", close: "01:00" }], sat: [{ open: "11:00", close: "01:00" }], sun: [{ open: "12:00", close: "23:00" }] };
-
-const DEMOS: Demo[] = [
-  {
-    slug: "burger-house", name: "Burger House", business: "Burger House SARL", cuisine: "Burgers, American", area: "Hamra", city: "Beirut", owner: "owner@burgerhouse.demo", verified: true, fee: null,
-    desc: "Smashed-to-order burgers on toasted brioche. Fresh beef ground daily, hand-cut fries.", lat: 33.8959, lng: 35.4787,
-    areas: [["Hamra", 1.5], ["Ras Beirut", 2], ["Verdun", 2.5], ["Achrafieh", 3]],
-    groups: {
-      cheese: { name: "Cheese", type: "SINGLE", required: true, options: [["Cheddar", 0, true], ["American", 0], ["Swiss", 50]] },
-      extras: { name: "Extra toppings", type: "MULTIPLE", max: 4, options: [["Extra cheese", 100], ["Bacon", 150], ["Fried egg", 100], ["Caramelized onions", 75]] },
-      remove: { name: "Remove ingredients", type: "MULTIPLE", options: [["No pickles", 0], ["No onions", 0], ["No sauce", 0]] },
-      sauce: { name: "Sauce", type: "SINGLE", required: true, options: [["House sauce", 0, true], ["BBQ sauce", 0], ["Spicy mayo", 0]] },
-      side: { name: "Add a side", type: "SINGLE", options: [["Add fries", 250], ["Add onion rings", 300]] },
-      cook: { name: "Cooking preference", type: "SINGLE", required: true, options: [["Medium", 0, true], ["Medium well", 0], ["Well done", 0]] },
-      notes: { name: "Special instructions", type: "TEXT" },
-    },
-    items: [
-      { sku: "BRG001", name: "Double Smash Burger", cat: "Burgers", food: "burgers", price: 750, emoji: "🍔", desc: "Two smashed beef patties, melted cheese, house sauce, pickles on a toasted brioche bun.", ingredients: "Beef, cheese, brioche bun, pickles, onion, house sauce", allergens: "Gluten, Dairy, Egg", groups: ["cheese", "extras", "remove", "sauce", "side", "cook", "notes"], prep: 12 },
-      { sku: "BRG002", name: "Crispy Chicken Burger", cat: "Burgers", food: "chicken", price: 675, emoji: "🍗", desc: "Buttermilk fried chicken thigh, slaw and spicy mayo.", ingredients: "Chicken thigh, flour, buttermilk, cabbage, mayo, brioche bun", allergens: "Gluten, Egg, Dairy", groups: ["extras", "remove", "side", "notes"], prep: 12 },
-      { sku: "BRG003", name: "Mushroom Swiss", cat: "Burgers", food: "burgers", price: 825, emoji: "🍄", desc: "Single patty, sautéed mushrooms, Swiss cheese, truffle mayo.", ingredients: "Beef, mushrooms, Swiss cheese, truffle mayo, brioche bun", allergens: "Gluten, Dairy, Egg", groups: ["extras", "remove", "side", "cook", "notes"], prep: 14 },
-      { sku: "SD001", name: "French Fries", cat: "Sides", food: "burgers", price: 300, emoji: "🍟", desc: "Hand-cut skin-on fries, sea salt.", ingredients: "Potato, sunflower oil, salt", diet: ["Vegan"], prep: 6 },
-      { sku: "SD002", name: "Loaded Fries", cat: "Sides", food: "burgers", price: 500, emoji: "🧀", desc: "Fries, cheese sauce, beef bacon bits, jalapeños.", ingredients: "Potato, cheese sauce, beef bacon, jalapeño", allergens: "Dairy", prep: 8 },
-      { sku: "DR001", name: "Fresh Lemonade", cat: "Drinks", food: "drinks", price: 250, emoji: "🍋", desc: "Squeezed daily with mint.", ingredients: "Lemon, sugar, mint, water", diet: ["Vegan"] },
-    ],
-    reels: ["BRG001", "BRG002", "SD002"],
-  },
-  {
-    slug: "manousheh-corner", name: "Manousheh Corner", business: "Manousheh Corner", cuisine: "Lebanese bakery", area: "Achrafieh", city: "Beirut", owner: "owner@manousheh.demo", verified: true, fee: 100,
-    desc: "Stone-oven manakish baked to order since the morning call to prayer.", lat: 33.8869, lng: 35.5197,
-    groups: { veg: { name: "Add vegetables", type: "MULTIPLE", options: [["Tomato", 0], ["Cucumber", 0], ["Mint", 0], ["Olives", 25]] }, cheese: { name: "Add cheese", type: "SINGLE", options: [["Akkawi", 75], ["Halloumi", 100]] } },
-    items: [
-      { sku: "MN001", name: "Zaatar Manousheh", cat: "Manakish", food: "lebanese", price: 150, emoji: "🫓", desc: "Thyme, sumac, sesame and olive oil on fresh dough.", ingredients: "Flour, zaatar, sesame, sumac, olive oil", allergens: "Gluten, Sesame", diet: ["Vegan"], groups: ["veg", "cheese"], prep: 7 },
-      { sku: "MN002", name: "Cheese Manousheh", cat: "Manakish", food: "lebanese", price: 250, emoji: "🧀", desc: "Akkawi and mozzarella blend, bubbling hot.", ingredients: "Flour, akkawi, mozzarella", allergens: "Gluten, Dairy", groups: ["veg"], prep: 8 },
-      { sku: "MN003", name: "Lahm Bi Ajeen", cat: "Manakish", food: "lebanese", price: 300, emoji: "🥙", desc: "Spiced minced meat, tomato and onion on thin dough.", ingredients: "Flour, minced beef, tomato, onion, spices", allergens: "Gluten", prep: 9 },
-      { sku: "MN004", name: "Kishk Manousheh", cat: "Manakish", food: "breakfast", price: 250, emoji: "🌾", desc: "Fermented bulgur and yogurt with onion and tomato.", ingredients: "Flour, kishk, onion, tomato, sesame", allergens: "Gluten, Dairy, Sesame", prep: 8 },
-    ],
-    reels: ["MN001", "MN002"],
-  },
-  {
-    slug: "shawarma-station", name: "Shawarma Station", business: "Shawarma Station SAL", cuisine: "Shawarma, Lebanese", area: "Mar Mikhael", city: "Beirut", owner: "owner@shawarma.demo", fee: 200,
-    desc: "Charcoal-kissed shawarma, whipped garlic toum and pickles made in-house.", lat: 33.8975, lng: 35.5265,
-    groups: { size: { name: "Size", type: "SINGLE", required: true, options: [["Regular", 0, true], ["Large", 150]] }, extra: { name: "Extras", type: "MULTIPLE", max: 3, options: [["Extra toum", 50], ["Extra pickles", 0], ["Add fries inside", 50], ["No meat (veg only)", -100]] } },
-    items: [
-      { sku: "SH001", name: "Chicken Shawarma Sandwich", cat: "Sandwiches", food: "shawarma", price: 450, emoji: "🌯", desc: "Marinated chicken, toum, pickles, fries in saj bread.", ingredients: "Chicken, garlic, saj bread, pickles, potato", allergens: "Gluten", groups: ["size", "extra"], prep: 6 },
-      { sku: "SH002", name: "Beef Shawarma Sandwich", cat: "Sandwiches", food: "shawarma", price: 500, emoji: "🥩", desc: "Beef shawarma, tarator, parsley, onion, tomato.", ingredients: "Beef, tahini, parsley, onion, tomato, bread", allergens: "Gluten, Sesame", groups: ["size", "extra"], prep: 6 },
-      { sku: "SH003", name: "Chicken Shawarma Platter", cat: "Platters", food: "chicken", price: 900, emoji: "🍽️", desc: "Generous shawarma, fries, toum, pickles and bread.", ingredients: "Chicken, potato, garlic, pickles, bread", allergens: "Gluten", prep: 10 },
-    ],
-    reels: ["SH001", "SH003"],
-  },
-  {
-    slug: "pizza-forno", name: "Pizza Forno", business: "Forno Group", cuisine: "Pizza, Italian", area: "Jounieh", city: "Jounieh", owner: "owner@forno.demo", fee: 250,
-    desc: "48-hour fermented dough, San Marzano tomatoes, wood-fired at 450°C.", lat: 33.9808, lng: 35.6178,
-    groups: { size: { name: "Size", type: "SINGLE", required: true, options: [["Medium", 0, true], ["Large", 300]] }, crust: { name: "Crust", type: "SINGLE", required: true, options: [["Classic", 0, true], ["Thin", 0]] }, top: { name: "Toppings", type: "MULTIPLE", max: 5, options: [["Extra cheese", 150], ["Mushrooms", 100], ["Olives", 75], ["Rocket", 75], ["Spicy salami", 200]] } },
-    items: [
-      { sku: "PZ001", name: "Margherita", cat: "Pizza", food: "pizza", price: 900, emoji: "🍕", desc: "Tomato, fior di latte, basil, olive oil.", ingredients: "Flour, tomato, mozzarella, basil, olive oil", allergens: "Gluten, Dairy", diet: ["Vegetarian"], groups: ["size", "crust", "top"], prep: 15 },
-      { sku: "PZ002", name: "Pepperoni", cat: "Pizza", food: "pizza", price: 1100, emoji: "🍕", desc: "Spicy beef pepperoni, mozzarella, hot honey.", ingredients: "Flour, tomato, mozzarella, beef pepperoni, honey", allergens: "Gluten, Dairy", groups: ["size", "crust", "top"], prep: 15 },
-      { sku: "PS001", name: "Truffle Pasta", cat: "Pasta", food: "pasta", price: 1250, emoji: "🍝", desc: "Tagliatelle, mushroom cream, black truffle paste, parmesan.", ingredients: "Pasta, cream, mushrooms, truffle, parmesan", allergens: "Gluten, Dairy, Egg", prep: 14 },
-    ],
-    reels: ["PZ001", "PZ002"],
-  },
-  {
-    slug: "bean-bar", name: "Bean Bar", business: "Bean Bar Coffee", cuisine: "Coffee, Bakery", area: "Gemmayzeh", city: "Beirut", owner: "owner@beanbar.demo", fee: 100,
-    desc: "Specialty coffee roasted in Beirut, plus fresh pastries every morning.", lat: 33.8946, lng: 35.5165,
-    groups: { size: { name: "Size", type: "SINGLE", required: true, options: [["Small", 0, true], ["Medium", 50], ["Large", 100]] }, milk: { name: "Milk type", type: "SINGLE", required: true, options: [["Full fat", 0, true], ["Skimmed", 0], ["Oat", 50], ["Almond", 50]] }, sugar: { name: "Sugar", type: "SINGLE", options: [["No sugar", 0], ["1 sugar", 0], ["2 sugars", 0]] }, shot: { name: "Extras", type: "MULTIPLE", options: [["Extra shot", 75], ["Vanilla syrup", 50], ["Caramel syrup", 50]] } },
-    items: [
-      { sku: "CF001", name: "Latte", cat: "Coffee", food: "coffee", price: 350, emoji: "☕", desc: "Double espresso and silky steamed milk.", ingredients: "Espresso, milk", allergens: "Dairy (unless plant milk)", groups: ["size", "milk", "sugar", "shot"], prep: 4 },
-      { sku: "CF002", name: "Iced Spanish Latte", cat: "Coffee", food: "coffee", price: 450, emoji: "🧊", desc: "Espresso, condensed milk, milk over ice.", ingredients: "Espresso, condensed milk, milk, ice", allergens: "Dairy", groups: ["size", "milk", "shot"], prep: 4 },
-      { sku: "BK001", name: "Butter Croissant", cat: "Bakery", food: "breakfast", price: 250, emoji: "🥐", desc: "Laminated with French butter, baked every morning.", ingredients: "Flour, butter, milk, sugar, yeast, egg", allergens: "Gluten, Dairy, Egg", prep: 2 },
-    ],
-    reels: ["CF002"],
-  },
-  {
-    slug: "sweet-ashta", name: "Sweet Ashta", business: "Sweet Ashta", cuisine: "Lebanese desserts", area: "Tripoli", city: "Tripoli", owner: "owner@ashta.demo", currency: "LBP", fee: 150000,
-    desc: "Traditional Tripoli sweets — warm knefeh and fresh ashta.", lat: 34.4367, lng: 35.8497,
-    groups: { bread: { name: "Serve with", type: "SINGLE", options: [["Kaak bread", 0, true], ["Plate only", 0]] } },
-    items: [
-      { sku: "DS001", name: "Knefeh Bi Jibn", cat: "Sweets", food: "desserts", price: 350000, emoji: "🧁", desc: "Warm semolina and cheese, orange-blossom syrup, sesame kaak.", ingredients: "Semolina, akkawi cheese, sugar syrup, sesame bread", allergens: "Gluten, Dairy, Sesame", groups: ["bread"], prep: 5 },
-      { sku: "DS002", name: "Ashta Bi Asal", cat: "Sweets", food: "desserts", price: 400000, emoji: "🍯", desc: "Clotted cream, honey and pistachio.", ingredients: "Milk, cream, honey, pistachio", allergens: "Dairy, Nuts" },
-    ],
-    reels: ["DS001"],
-  },
-];
-
-async function seedDemo(adminId: string) {
-  if (await prisma.restaurant.findUnique({ where: { slug: "burger-house" } })) {
-    console.log("Demo data already present — skipping");
-    return;
+/**
+ * Adds a demo reel from prisma/demo/reels. With Cloudflare Stream it is uploaded there and
+ * published once Stream finishes processing; otherwise it is transcoded locally with ffmpeg.
+ */
+async function addDemoReel(d: Demo, restaurantId: string, menuItemId: string, sku: string, vi: number, tmp: string) {
+  const file = path.join(DEMO_DIR, "reels", `${d.slug}-${sku}.mp4`);
+  if (!existsSync(file)) return false;
+  const it = d.items.find((x) => x.sku === sku)!;
+  const caption = vi === 0 ? `${it.name} — made fresh, order in one tap 🔥` : null;
+  const featured = d.slug === "burger-house" && vi === 0;
+  const posterFile = file.replace(/\.mp4$/, ".jpg");
+  const poster = existsSync(posterFile) ? await processImage(readFileSync(posterFile), { restaurantId, originalName: `${sku}-poster.jpg` }) : null;
+  if (streamConfigured()) {
+    const video = readFileSync(file);
+    const uid = await uploadVideoToStream(video, `${d.slug}-${sku}.mp4`);
+    const asset = await prisma.mediaAsset.create({ data: { restaurantId, kind: "VIDEO", isPrivate: false, storageKey: `stream:${uid}`, url: "", mimeType: "video/mp4", sizeBytes: video.length, originalName: `${sku}.mp4` } });
+    await prisma.reel.create({ data: { restaurantId, menuItemId, videoAssetId: asset.id, posterUrl: poster?.url ?? null, caption, featured, status: "PROCESSING", visibility: "DRAFT", autoPublish: true } });
+    return true;
   }
-  await updateSetting("whish", { recipientName: "numnum Demo Account", whishNumber: "70 000 000", accountId: "NUMNUM-DEMO", instructions: DEFAULT_SETTINGS.whish.instructions }, adminId);
+  if (spawnSync("ffmpeg", ["-version"]).status !== 0) return false;
+  const raw = path.join(tmp, `${d.slug}-${sku}.mp4`);
+  copyFileSync(file, raw);
+  const asset = await storeRawVideo(raw, { restaurantId, originalName: `${sku}.mp4` });
+  const out = await processVideoAsset(asset.id);
+  const publishedAt = new Date(Date.now() - Math.random() * 10 * 86400_000);
+  await prisma.reel.create({
+    data: { restaurantId, menuItemId, videoAssetId: asset.id, videoUrl: out.videoUrl, posterUrl: poster?.url ?? out.posterUrl, durationSec: out.durationSec, caption, status: "READY", visibility: "PUBLISHED", publishedAt, featured },
+  });
+  return true;
+}
 
-  const tmp = mkdtempSync(path.join(os.tmpdir(), "nnseed-"));
-  // Demo reels are generated with ffmpeg. Hosts without it (e.g. Hostinger) get
-  // demo restaurants and menus without reels; upload real videos from the dashboard.
-  const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
-  if (!hasFfmpeg) console.log("ffmpeg not found — demo restaurants will have no reels");
-  const pw = await hashPassword("demo1234");
-  const foodCats = Object.fromEntries((await prisma.foodCategory.findMany()).map((c) => [c.slug, c.id]));
-  let imgIdx = 0;
-  const created: { r: Awaited<ReturnType<typeof prisma.restaurant.create>>; owner: { id: string }; items: Record<string, string> }[] = [];
+async function setMainImage(restaurantId: string, menuItemId: string, image: Buffer, sku: string) {
+  await prisma.menuItemImage.deleteMany({ where: { menuItemId } });
+  const img = await processImage(image, { restaurantId, originalName: `${sku}.jpg` });
+  await attachImage(restaurantId, menuItemId, img.id, { makeMain: true });
+}
 
-  for (const d of DEMOS) {
-    const owner = await prisma.user.create({ data: { email: d.owner, name: `${d.name} Owner`, passwordHash: pw, roles: { create: { role: "RESTAURANT" } } } });
-    const currency = d.currency ?? "USD";
-    const r = await prisma.restaurant.create({
+const ALWAYS_OPEN = Object.fromEntries(["sun", "mon", "tue", "wed", "thu", "fri", "sat"].map((d) => [d, [{ open: "00:00", close: "00:00" }]]));
+
+type DemoRestaurant = { r: Awaited<ReturnType<typeof prisma.restaurant.create>>; owner: { id: string }; items: Record<string, string> };
+
+/**
+ * Creates a demo restaurant, or tops up an existing one: missing menu items and reels are
+ * added, and images are replaced when the committed demo media is newer. Never touches a
+ * restaurant that uses a demo slug but isn't the demo account.
+ */
+async function ensureDemoRestaurant(d: Demo, ri: number, opts: { pw: string; refreshMedia: boolean; tmp: string; foodCats: Record<string, string> }): Promise<DemoRestaurant | null> {
+  const currency = d.currency ?? "USD";
+  let r = await prisma.restaurant.findUnique({ where: { slug: d.slug } });
+  if (r && r.email !== d.owner) return null;
+  const owner = await prisma.user.upsert({ where: { email: d.owner }, create: { email: d.owner, name: `${d.name} Owner`, passwordHash: opts.pw, roles: { create: { role: "RESTAURANT" } } }, update: {} });
+  const isNew = !r;
+  if (!r) {
+    r = await prisma.restaurant.create({
       data: {
         slug: d.slug, businessName: d.business, displayName: d.name, description: d.desc, cuisine: d.cuisine, area: d.area, city: d.city, address: `${d.area} main street, ${d.city}`,
         phone: "96170123456", email: d.owner, latitude: d.lat, longitude: d.lng, currency, avgPrepMinutes: 25,
@@ -224,42 +156,89 @@ async function seedDemo(adminId: string) {
         staff: { create: { userId: owner.id, role: "OWNER" } },
       },
     });
-    const logo = await processImage(await foodImage("", d.items[0].emoji, imgIdx), { restaurantId: r.id, originalName: "logo.jpg", maxSize: 400 });
-    const cover = await processImage(await foodImage(d.name, d.items[1]?.emoji ?? d.items[0].emoji, imgIdx + 1), { restaurantId: r.id, originalName: "cover.jpg" });
-    await prisma.restaurant.update({ where: { id: r.id }, data: { logoUrl: logo.url, coverUrl: cover.url } });
+  }
+  if (isNew || opts.refreshMedia) {
+    const logo = await processImage(await demoImage(`logos/${d.slug}.jpg`, "", d.items[0].emoji, ri), { restaurantId: r.id, originalName: "logo.jpg", maxSize: 400 });
+    const cover = await processImage(await demoImage(`covers/${d.slug}.jpg`, d.name, d.items[0].emoji, ri + 1), { restaurantId: r.id, originalName: "cover.jpg" });
+    r = await prisma.restaurant.update({ where: { id: r.id }, data: { logoUrl: logo.url, coverUrl: cover.url } });
+  }
 
-    const groupIds: Record<string, string> = {};
-    for (const [key, g] of Object.entries(d.groups)) {
-      const opts = g.options ?? [];
-      const created = await prisma.customizationGroup.create({
-        data: { restaurantId: r.id, name: g.name, type: g.type, required: !!g.required, minSelect: g.required ? 1 : 0, maxSelect: g.type === "SINGLE" ? 1 : g.max ?? 0, options: { create: opts.map((o, i) => ({ name: o[0], priceDeltaCents: currency === "LBP" ? o[1] * 895 : o[1], isDefault: !!o[2], sortOrder: i })) } },
-      });
-      groupIds[key] = created.id;
+  const existingGroups = await prisma.customizationGroup.findMany({ where: { restaurantId: r.id } });
+  const groupIds: Record<string, string> = {};
+  for (const [key, g] of Object.entries(d.groups)) {
+    const found = existingGroups.find((x) => x.name === g.name);
+    if (found) {
+      groupIds[key] = found.id;
+      continue;
     }
-    const cats: Record<string, string> = {};
-    const items: Record<string, string> = {};
-    for (const [i, it] of d.items.entries()) {
-      if (!cats[it.cat]) cats[it.cat] = (await prisma.menuCategory.create({ data: { restaurantId: r.id, name: it.cat, sortOrder: Object.keys(cats).length } })).id;
-      const m = await prisma.menuItem.create({
-        data: { restaurantId: r.id, sku: it.sku, name: it.name, description: it.desc, ingredients: it.ingredients, allergens: it.allergens, dietaryLabels: it.diet ?? [], priceCents: it.price, currency, menuCategoryId: cats[it.cat], foodCategoryId: foodCats[it.food], prepTimeMinutes: it.prep, sortOrder: i },
-      });
-      items[it.sku] = m.id;
-      for (const [gi, gk] of (it.groups ?? []).entries()) await prisma.menuItemCustomizationGroup.create({ data: { menuItemId: m.id, groupId: groupIds[gk], sortOrder: gi } });
-      const img = await processImage(await foodImage(it.name, it.emoji, imgIdx++), { restaurantId: r.id, originalName: `${it.sku}.jpg` });
-      await attachImage(r.id, m.id, img.id);
+    const opts2 = g.options ?? [];
+    const created = await prisma.customizationGroup.create({
+      data: { restaurantId: r.id, name: g.name, type: g.type, required: !!g.required, minSelect: g.required ? 1 : 0, maxSelect: g.type === "SINGLE" ? 1 : g.max ?? 0, options: { create: opts2.map((o, i) => ({ name: o[0], priceDeltaCents: currency === "LBP" ? o[1] * 895 : o[1], isDefault: !!o[2], sortOrder: i })) } },
+    });
+    groupIds[key] = created.id;
+  }
+  const cats = Object.fromEntries((await prisma.menuCategory.findMany({ where: { restaurantId: r.id } })).map((c) => [c.name, c.id]));
+  const existingItems = Object.fromEntries((await prisma.menuItem.findMany({ where: { restaurantId: r.id } })).map((m) => [m.sku, m.id]));
+  const items: Record<string, string> = {};
+  for (const [i, it] of d.items.entries()) {
+    const photo = () => demoImage(`photos/${d.slug}-${it.sku}.jpg`, it.name, it.emoji, ri * 10 + i);
+    if (existingItems[it.sku]) {
+      items[it.sku] = existingItems[it.sku];
+      if (opts.refreshMedia) await setMainImage(r.id, items[it.sku], await photo(), it.sku);
+      continue;
     }
-    for (const [vi, sku] of (hasFfmpeg ? d.reels : []).entries()) {
-      const it = d.items.find((x) => x.sku === sku)!;
-      const raw = demoVideo(it.name, imgIdx + vi, tmp);
-      const asset = await storeRawVideo(raw, { restaurantId: r.id, originalName: `${sku}.mp4` });
-      const out = await processVideoAsset(asset.id);
-      const publishedAt = new Date(Date.now() - Math.random() * 10 * 86400_000);
-      await prisma.reel.create({
-        data: { restaurantId: r.id, menuItemId: items[sku], videoAssetId: asset.id, videoUrl: out.videoUrl, posterUrl: out.posterUrl, durationSec: out.durationSec, caption: vi === 0 ? `${it.name} — made fresh, order in one tap 🔥` : null, status: "READY", visibility: "PUBLISHED", publishedAt, featured: d.slug === "burger-house" && vi === 0 },
-      });
-    }
-    created.push({ r, owner, items });
-    console.log(`Restaurant: ${d.name} (${d.owner} / demo1234)`);
+    if (!cats[it.cat]) cats[it.cat] = (await prisma.menuCategory.create({ data: { restaurantId: r.id, name: it.cat, sortOrder: Object.keys(cats).length } })).id;
+    const m = await prisma.menuItem.create({
+      data: { restaurantId: r.id, sku: it.sku, name: it.name, description: it.desc, ingredients: it.ingredients, allergens: it.allergens, dietaryLabels: it.diet ?? [], priceCents: it.price, currency, menuCategoryId: cats[it.cat], foodCategoryId: opts.foodCats[it.food], prepTimeMinutes: it.prep, sortOrder: i },
+    });
+    items[it.sku] = m.id;
+    for (const [gi, gk] of (it.groups ?? []).entries()) await prisma.menuItemCustomizationGroup.create({ data: { menuItemId: m.id, groupId: groupIds[gk], sortOrder: gi } });
+    await setMainImage(r.id, m.id, await photo(), it.sku);
+  }
+
+  let reels = 0;
+  for (const [vi, sku] of d.reels.entries()) {
+    const has = await prisma.reel.count({ where: { restaurantId: r.id, menuItemId: items[sku], status: { not: "FAILED" } } });
+    if (!has && (await addDemoReel(d, r.id, items[sku], sku, vi, opts.tmp))) reels++;
+  }
+  console.log(`Restaurant: ${d.name} (${d.owner} / demo1234)${isNew ? "" : opts.refreshMedia ? " — images refreshed" : " — up to date"}${reels ? `, ${reels} reel(s) added` : ""}`);
+  return { r, owner, items };
+}
+
+/** Gives Cloudflare Stream a moment to finish the demo reels; the hourly cron finishes any stragglers. */
+async function waitForStreamReels() {
+  if (!streamConfigured()) return;
+  for (let i = 0; i < 15; i++) {
+    const pending = await prisma.reel.count({ where: { status: "PROCESSING", videoAsset: { storageKey: { startsWith: "stream:" } } } });
+    if (!pending) return;
+    await new Promise((res) => setTimeout(res, 6000));
+    await syncStreamReels().catch(() => 0);
+  }
+  console.log("Some demo reels are still processing on Cloudflare; they go live within the hour.");
+}
+
+async function seedDemo(adminId: string) {
+  const firstRun = !(await prisma.restaurant.findUnique({ where: { slug: "burger-house" } }));
+  const mediaSetting = await prisma.platformSetting.findUnique({ where: { key: "demo_media_version" } });
+  const refreshMedia = !firstRun && Number(mediaSetting?.value ?? 0) < DEMO_MEDIA_VERSION;
+  if (firstRun) await updateSetting("whish", { recipientName: "numnum Demo Account", whishNumber: "70 000 000", accountId: "NUMNUM-DEMO", instructions: DEFAULT_SETTINGS.whish.instructions }, adminId);
+  if (!streamConfigured() && spawnSync("ffmpeg", ["-version"]).status !== 0) console.log("No Cloudflare Stream or ffmpeg — demo restaurants will have no reels");
+
+  const tmp = mkdtempSync(path.join(os.tmpdir(), "nnseed-"));
+  const pw = await hashPassword("demo1234");
+  const foodCats = Object.fromEntries((await prisma.foodCategory.findMany()).map((c) => [c.slug, c.id]));
+  const created: DemoRestaurant[] = [];
+  for (const [ri, d] of DEMOS.entries()) {
+    const c = await ensureDemoRestaurant(d, ri, { pw, refreshMedia, tmp, foodCats });
+    if (c) created.push(c);
+  }
+  // Demo restaurants are always open so they can be shown (and ordered from) at any time.
+  if (!firstRun) for (const c of created) await prisma.restaurant.update({ where: { id: c.r.id }, data: { openingHours: ALWAYS_OPEN } });
+  await prisma.platformSetting.upsert({ where: { key: "demo_media_version" }, create: { key: "demo_media_version", value: DEMO_MEDIA_VERSION }, update: { value: DEMO_MEDIA_VERSION } });
+  if (!firstRun || created[0]?.r.slug !== "burger-house") {
+    rmSync(tmp, { recursive: true, force: true });
+    await waitForStreamReels();
+    return;
   }
 
   // A customer with an account (for reviews)
@@ -343,9 +322,7 @@ async function seedDemo(adminId: string) {
   await prisma.reelView.createMany({ data: views });
   for (const r of burgerReels) await prisma.reel.update({ where: { id: r.id }, data: { viewCount: await prisma.reelView.count({ where: { reelId: r.id } }) } });
   await prisma.restaurant.update({ where: { id: burger.r.id }, data: { totalReelViews: views.length } });
-  // Opening hours are set after the demo orders so seeding works at any time of day.
-  const ALWAYS = Object.fromEntries(["sun", "mon", "tue", "wed", "thu", "fri", "sat"].map((d) => [d, [{ open: "00:00", close: "00:00" }]]));
-  for (const c of created) await prisma.restaurant.update({ where: { id: c.r.id }, data: { openingHours: ["burger-house", "shawarma-station", "bean-bar"].includes(c.r.slug) ? ALWAYS : HOURS } });
+  for (const c of created) await prisma.restaurant.update({ where: { id: c.r.id }, data: { openingHours: ALWAYS_OPEN } });
 
   // Move the first five commission events into last month and invoice them
   const last = previousPeriod();
@@ -363,7 +340,7 @@ async function seedDemo(adminId: string) {
   // Reviews (linked to a fulfilled order for evidence)
   const cu = { id: customer.id, email: customer.email, name: customer.name, phone: customer.phone, roles: ["CUSTOMER" as const] };
   await submitItemReview(cu, { menuItemId: burger.items.BRG001, rating: 5, body: "Perfectly crispy edges and the house sauce is addictive. Arrived hot!", orderReference: orders[0].reference });
-  await submitRestaurantReview(cu, { restaurantId: burger.r.id, rating: 5, foodQuality: 5, service: 4, value: 5, delivery: 4, body: "Quick confirmation on WhatsApp and friendly delivery.", orderReference: orders[0].reference });
+  await submitRestaurantReview(cu, { restaurantId: burger.r.id, rating: 5, foodQuality: 5, service: 4, value: 5, delivery: 4, body: "Order confirmed in minutes and friendly delivery.", orderReference: orders[0].reference });
   const reviewers = ["Karim", "Maya", "Jad", "Lea"];
   for (const [i, n] of reviewers.entries()) {
     const u = await prisma.user.create({ data: { email: `${n.toLowerCase()}@numnum.demo`, name: `${n} Demo`, passwordHash: pw, roles: { create: { role: "CUSTOMER" } } } });
@@ -373,6 +350,7 @@ async function seedDemo(adminId: string) {
   }
 
   rmSync(tmp, { recursive: true, force: true });
+  await waitForStreamReels();
   console.log("Customer: customer@numnum.demo / demo1234");
 }
 

@@ -18,7 +18,8 @@
     "worker": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/worker.ts",
     "test:e2e": "node e2e/customer.js && node e2e/business.js",
     "build:local": "prisma generate && next build",
-    "db:setup": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs prisma/seed.ts"
+    "db:setup": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs prisma/seed.ts",
+    "demo:media": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/demo-media.ts"
   },
   "prisma": {
     "seed": "npm run db:seed"
