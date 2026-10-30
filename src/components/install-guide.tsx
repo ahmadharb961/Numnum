@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, BookOpen, ChevronLeft, ChevronRight, Copy, Ellipsis
 import { browserKind, externalBrowserUrl, getInstallPrompt, inAppBrowser, onInstallPrompt, safariVersion, setInstallPrompt, type BIPEvent, type BrowserKind, type InApp } from "@/lib/browser";
 import { Button, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/logo";
 
 /** Mounted once in the root layout: keeps Android's one-tap install prompt for later. */
 export function InstallPromptListener() {
@@ -76,7 +77,7 @@ function Page({ children, bar, barTop }: { children?: React.ReactNode; bar?: Rea
       {barTop && bar}
       <div className="relative flex-1 overflow-hidden">
         <div className="space-y-1.5 p-3 opacity-60">
-          <div className="text-sm font-black text-brand-600">numnum</div>
+          <Logo className="h-3.5 text-brand-600" />
           <div className="h-12 rounded-lg bg-gradient-to-br from-brand-200 to-brand-100" />
           <div className="h-2 w-2/3 rounded bg-black/10" />
           <div className="h-2 w-1/2 rounded bg-black/10" />

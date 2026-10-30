@@ -6,6 +6,7 @@ import { Bookmark, Compass, Home, ShoppingBag, Store, User } from "lucide-react"
 import { cn } from "@/lib/utils";
 import { useCart } from "./cart";
 import { LocationChip } from "./location-picker";
+import { Logo } from "@/components/logo";
 
 type Category = { slug: string; name: string; emoji: string | null; imageUrl: string | null };
 
@@ -45,8 +46,8 @@ export function DesktopSidebar({ categories, locationLabel }: { categories: Cate
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-black/5 bg-white lg:flex">
       <div className="px-6 pb-4 pt-6">
-        <Link href="/" className="text-2xl font-black tracking-tight">
-          numnum
+        <Link href="/" className="inline-block text-brand-600" aria-label="numnum home">
+          <Logo className="h-7" />
         </Link>
         <div className="mt-4">
           <LocationChip label={locationLabel} className="max-w-full border border-black/10 shadow-none" />

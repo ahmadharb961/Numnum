@@ -3,7 +3,7 @@
 // - images/posters: stale-while-revalidate (bounded)
 // - pages: network-first with offline fallback
 // - API, uploads and videos: never cached (videos use HTTP range requests)
-const VERSION = "nn-v3";
+const VERSION = "nn-v4";
 const STATIC = `${VERSION}-static`;
 const IMAGES = `${VERSION}-images`;
 const PAGES = `${VERSION}-pages`;

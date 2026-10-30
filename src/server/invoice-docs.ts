@@ -4,6 +4,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import type { Invoice, InvoiceLine, Payment } from "@prisma/client";
 import { formatMoney, formatRate } from "@/lib/money";
 import { formatDate, periodLabel } from "@/lib/utils";
+import { drawLogo } from "./pdf-logo";
 
 type FullInvoice = Invoice & { lines: InvoiceLine[]; payments: Payment[] };
 
@@ -47,7 +48,7 @@ export async function invoicePdf(inv: FullInvoice, platformName: string): Promis
   const snap = inv.restaurantSnapshot as Record<string, string | null>;
   const pay = inv.paymentInstructions as Record<string, string>;
 
-  text(platformName, M, y, { size: 22, f: bold, color: brand });
+  drawLogo(page, M, y + 18, 22, brand);
   text("COMMISSION INVOICE", W - M, y + 4, { size: 12, f: bold, right: true });
   y -= 18;
   text(`Invoice ${inv.number}`, W - M, y, { right: true, color: muted });

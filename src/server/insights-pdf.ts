@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import type { Insights } from "./insights";
 import { formatMoney } from "@/lib/money";
 import { STATUS_META } from "@/lib/order-status";
+import { drawLogo } from "./pdf-logo";
 
 const safe = (s: string | null | undefined) => (s ?? "").replace(/[^\x20-\x7E -ÿ]/g, "?");
 
@@ -34,7 +35,7 @@ export async function insightsPdf(ins: Insights, platformName: string): Promise<
     y -= 14;
   };
 
-  text(platformName, M, y, { size: 20, f: bold, color: brand });
+  drawLogo(page, M, y + 16, 20, brand);
   text("INSIGHTS REPORT", W - M, y + 3, { size: 11, f: bold, right: true });
   y -= 18;
   text(ins.restaurant.displayName, M, y, { size: 13, f: bold });

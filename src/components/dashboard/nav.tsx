@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/actions/auth";
+import { Logo } from "@/components/logo";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; minRole?: "MANAGER" | "OWNER"; badge?: number };
 
@@ -41,8 +42,8 @@ export function DashboardNav({ restaurantName, slug, role, memberships, currentI
   const content = (
     <div className="flex h-full flex-col">
       <div className="border-b border-black/5 p-4">
-        <Link href="/" className="text-xl font-black tracking-tight text-brand-600">
-          numnum <span className="text-xs font-bold text-ink-muted">for restaurants</span>
+        <Link href="/" className="flex items-end gap-2 text-brand-600">
+          <Logo className="h-5" /> <span className="whitespace-nowrap text-xs font-bold text-ink-muted">for restaurants</span>
         </Link>
         {memberships.length > 1 ? (
           <form action="/dashboard/switch" method="post" className="mt-3">

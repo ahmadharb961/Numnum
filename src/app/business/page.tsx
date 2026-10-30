@@ -5,6 +5,7 @@ import { getSettings } from "@/server/settings";
 import { getCurrentUser } from "@/server/auth";
 import { buttonClass } from "@/components/ui/button";
 import { formatRate } from "@/lib/money";
+import { Logo } from "@/components/logo";
 
 export const metadata: Metadata = { title: "numnum for restaurants", description: "Turn food videos into delivery orders. No setup fees — pay a commission only on completed orders." };
 
@@ -21,8 +22,8 @@ export default async function BusinessPage() {
   return (
     <main className="min-h-dvh bg-cream">
       <header className="container-app flex items-center justify-between" style={{ paddingTop: "var(--safe-top)", height: "calc(4rem + var(--safe-top))" }}>
-        <Link href="/" className="text-2xl font-black tracking-tight text-brand-600">
-          numnum
+        <Link href="/" className="text-brand-600" aria-label="numnum home">
+          <Logo className="h-7" />
         </Link>
         <Link href={user ? "/dashboard" : "/login?next=/dashboard"} className="text-sm font-semibold">
           {user ? "Dashboard" : "Log in"}

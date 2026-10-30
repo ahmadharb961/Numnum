@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/server/auth";
 import { RestaurantRegisterForm } from "@/components/auth-forms";
 import { BackButton } from "@/components/back-button";
+import { Logo } from "@/components/logo";
 
 export const metadata: Metadata = { title: "Register your restaurant", robots: { index: false } };
 
@@ -12,8 +13,8 @@ export default async function RegisterRestaurantPage() {
     <div className="min-h-dvh bg-cream">
       <header className="container-app flex items-center gap-1" style={{ paddingTop: "var(--safe-top)", height: "calc(4rem + var(--safe-top))" }}>
         <BackButton fallback="/business" />
-        <Link href="/business" className="text-2xl font-black tracking-tight text-brand-600">
-          numnum
+        <Link href="/business" className="text-brand-600" aria-label="numnum for restaurants">
+          <Logo className="h-7" />
         </Link>
       </header>
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-4">

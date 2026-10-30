@@ -15,6 +15,7 @@ import { HlsVideo } from "@/components/hls-video";
 import { pooledVideo, unlockPooledVideos } from "./video-pool";
 import { LocationChip } from "./location-picker";
 import { formatKm } from "@/lib/geo";
+import { Logo } from "@/components/logo";
 
 export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean };
 
@@ -210,7 +211,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
       )}
       {!fixed && !backHref && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-3 pb-8 lg:hidden" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
-          <span className="text-lg font-black tracking-tight">numnum</span>
+          <Logo className="h-[18px] text-white drop-shadow" />
           <span className="pointer-events-auto min-w-0">
             <LocationChip label={locationLabel} dark />
           </span>
