@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Clock, Eye, Instagram, MapPin, Phone, Share2, Bike, ShoppingBag, Globe } from "lucide-react";
+import { BadgeCheck, ChevronLeft, Clock, Instagram, MapPin, Phone, Share2, Bike, ShoppingBag, Globe } from "lucide-react";
 import { getPublicRestaurant } from "@/server/restaurant-public";
 import { ownerKey } from "@/server/engagement";
 import { prisma } from "@/server/db";
@@ -257,9 +257,12 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           ))}
           {!reviews.length && <p className="text-sm text-ink-muted">No reviews yet.</p>}
         </ul>
-        <div className="mt-6 flex items-center justify-center gap-1 pb-4 text-xs text-ink-muted">
-          <Eye className="h-3.5 w-3.5" /> Verified badge confirms business identity, not food quality. ·
-          <ReportButton targetType="RESTAURANT" targetId={r.id} label="Report" />
+        <div className="mt-8 flex flex-col items-center gap-2 border-t border-black/5 pb-4 pt-5 text-center text-xs text-ink-muted">
+          <p className="max-w-xs text-balance">
+            <BadgeCheck className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
+            The verified badge confirms business identity, not food quality.
+          </p>
+          <ReportButton targetType="RESTAURANT" targetId={r.id} label="Report this restaurant" />
         </div>
       </section>
     </main>
