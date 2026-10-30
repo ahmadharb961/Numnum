@@ -506,8 +506,8 @@ function ReelSlide({
             <span className="tabular text-lg font-extrabold text-brand-300 text-shadow">{formatMoney(reel.item.priceCents, reel.item.currency)}</span>
             <RatingPill avg={reel.item.ratingAvg} count={reel.item.ratingCount} dark />
           </div>
-          {(reel.caption || reel.item.description) && <p className="mt-1.5 line-clamp-2 text-sm text-white/85 text-shadow">{reel.caption || reel.item.description}</p>}
         </button>
+        {(reel.caption || reel.item.description) && <ReelCaption text={(reel.caption || reel.item.description)!} />}
         {reel.restaurant.orderingEnabled && reel.item.available ? (
           <button onClick={onOpen} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 text-base font-bold shadow-lg shadow-brand-500/40 active:scale-[0.98]">
             Order · {formatMoney(reel.item.priceCents, reel.item.currency)}
@@ -520,6 +520,45 @@ function ReelSlide({
       </div>
       </div>
     </section>
+  );
+}
+
+/** Like Instagram: one line ending in "… more"; tap to read it all, "less" folds it back. */
+function ReelCaption({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const [long, setLong] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || open) return;
+    const check = () => setLong(el.scrollWidth > el.clientWidth + 1 || text.includes("\n"));
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, open]);
+  if (open)
+    return (
+      <div className="mt-1.5 max-h-[38vh] overflow-y-auto overscroll-contain pb-1">
+        <p className="whitespace-pre-line break-words text-sm text-white/90 text-shadow" onClick={() => setOpen(false)}>
+          {text}{" "}
+          <button type="button" onClick={(e) => (e.stopPropagation(), setOpen(false))} className="font-semibold text-white">
+            less
+          </button>
+        </p>
+      </div>
+    );
+  return (
+    <div className="mt-1.5 flex min-w-0 items-baseline text-sm text-shadow">
+      <span ref={ref} className="min-w-0 flex-1 truncate text-white/85" onClick={() => long && setOpen(true)}>
+        {text.split("\n")[0]}
+      </span>
+      {long && (
+        <button type="button" onClick={() => setOpen(true)} className="shrink-0 pl-1 font-semibold text-white">
+          more
+        </button>
+      )}
+    </div>
   );
 }
 
