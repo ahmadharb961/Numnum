@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Compass, Home, ShoppingBag, Store } from "lucide-react";
+import { Compass, Home, ShoppingBag, Store, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "./cart";
 
@@ -11,8 +11,9 @@ const items = [
   { href: "/", label: "Home", icon: Home, match: (p: string) => p === "/" || p.startsWith("/reel/") },
   { href: "/explore", label: "Explore", icon: Compass, match: (p: string) => p.startsWith("/explore") || p.startsWith("/category") },
   { href: "/restaurants", label: "Restaurants", icon: Store, match: (p: string) => p.startsWith("/restaurants") || p.startsWith("/r/") },
-  { href: "/saved", label: "Saved", icon: Bookmark, match: (p: string) => p.startsWith("/saved") },
   { href: "/cart", label: "Cart", icon: ShoppingBag, match: (p: string) => p.startsWith("/cart") || p.startsWith("/checkout") },
+  // Saved items live inside Account (and in the desktop sidebar).
+  { href: "/account", label: "Account", icon: User, match: (p: string) => p.startsWith("/account") || p.startsWith("/saved") || p.startsWith("/order/") },
 ];
 
 export function BottomNav() {

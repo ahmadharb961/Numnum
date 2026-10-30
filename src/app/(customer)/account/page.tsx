@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bookmark, ChevronRight, MapPin, Receipt } from "lucide-react";
+import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield } from "lucide-react";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { PageHeader } from "@/components/customer/page-header";
@@ -15,11 +15,16 @@ export const metadata = { title: "Account", robots: { index: false } };
 
 export default async function AccountPage() {
   const user = await requireUser("/account");
-  const [active, orderCount, addressCount] = await Promise.all([
+  const [active, orderCount, addressCount, staffCount] = await Promise.all([
     prisma.order.findMany({ where: { userId: user.id, status: { in: ACTIVE_STATUSES } }, orderBy: { createdAt: "desc" }, take: 3 }),
     prisma.order.count({ where: { userId: user.id } }),
     prisma.customerAddress.count({ where: { userId: user.id } }),
+    prisma.restaurantStaff.count({ where: { userId: user.id } }),
   ]);
+  const workLinks = [
+    ...(staffCount ? [{ href: "/dashboard", icon: LayoutDashboard, label: "Restaurant dashboard", sub: "Orders, menu, reels, insights" }] : []),
+    ...(user.roles.includes("ADMIN") ? [{ href: "/admin", icon: Shield, label: "Admin panel", sub: "Restaurants, payments, settings" }] : []),
+  ];
   return (
     <main className="pb-nav">
       <PageHeader title={`Hi, ${user.name.split(" ")[0]}`} back={false} />
@@ -36,6 +41,7 @@ export default async function AccountPage() {
         ))}
         <nav className="card divide-y divide-black/5">
           {[
+            ...workLinks,
             { href: "/account/orders", icon: Receipt, label: "My orders", sub: `${orderCount} order${orderCount === 1 ? "" : "s"}` },
             { href: "/account/addresses", icon: MapPin, label: "Saved addresses", sub: `${addressCount} saved` },
             { href: "/saved", icon: Bookmark, label: "Saved dishes & restaurants", sub: "Reels, dishes, restaurants" },
