@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["sharp", "@prisma/client"],
   experimental: {
     serverActions: { bodySizeLimit: "60mb" },
+    // Shared hosting (Hostinger) caps threads per account: build with one worker.
+    cpus: 1,
+    workerThreads: false,
   },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }],

@@ -5,8 +5,8 @@
   "description": "numnum — video-first food discovery and WhatsApp ordering web app for Lebanon",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && npm run db:setup && RAYON_NUM_THREADS=2 UV_THREADPOOL_SIZE=2 next build",
-    "start": "next start",
+    "build": "prisma generate && prisma migrate deploy && npm run db:setup && RAYON_NUM_THREADS=2 UV_THREADPOOL_SIZE=2 TOKIO_WORKER_THREADS=2 NEXT_TELEMETRY_DISABLED=1 next build",
+    "start": "TOKIO_WORKER_THREADS=2 UV_THREADPOOL_SIZE=4 next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
