@@ -62,7 +62,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
     <main className="pb-nav">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <RestaurantViewTracker restaurantId={r.id} />
-      <div className="relative h-44 bg-gradient-to-br from-brand-200 to-brand-400 sm:h-56">
+      <div className="relative h-56 bg-gradient-to-br from-brand-200 to-brand-400 sm:h-72">
         {r.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={r.coverUrl} alt="" className="h-full w-full object-cover" />
@@ -77,7 +77,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
         </div>
       </div>
       <div className="container-app">
-        <div className="-mt-10 flex items-end gap-3">
+        <div className="relative z-10 -mt-10 flex items-end gap-3">
           <div className="h-20 w-20 shrink-0 overflow-hidden rounded-3xl border-4 border-cream bg-white shadow-md">
             {r.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

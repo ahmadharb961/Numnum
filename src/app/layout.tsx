@@ -12,9 +12,7 @@ export const metadata: Metadata = {
   description: "Discover Lebanon's best food through short videos and order from local restaurants — cash on delivery.",
   applicationName: "numnum",
   manifest: "/manifest.webmanifest",
-  // Not "black-translucent": iOS home-screen apps then start the page under the status bar but
-  // keep it a status bar's height short of the bottom, leaving a blank strip below the nav.
-  appleWebApp: { capable: true, title: "numnum", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "numnum", statusBarStyle: "black-translucent" },
   icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" },
   openGraph: { type: "website", siteName: "numnum", locale: "en_LB" },
   twitter: { card: "summary_large_image" },
