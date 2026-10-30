@@ -5,6 +5,7 @@ import { prisma } from "@/server/db";
 import { requireRestaurant } from "@/server/auth";
 import { enqueue } from "@/server/jobs";
 import { audit } from "@/server/audit";
+import { deleteStreamVideo, isStreamKey, streamConfigured, streamUidOf, syncStreamReels } from "@/server/stream";
 import type { ActionResult } from "./menu";
 
 async function ownReel(id: string) {
@@ -30,10 +31,12 @@ export async function createReelAction(input: { videoAssetId: string; menuItemId
     const p = await prisma.mediaAsset.findFirst({ where: { id: input.posterAssetId, restaurantId: r.id, kind: "IMAGE" } });
     posterUrl = p?.url ?? null;
   }
+  if (asset.storageKey === "stream:pending") return { ok: false, error: "The video upload didn't finish. Please upload it again." };
   const reel = await prisma.reel.create({
-    data: { restaurantId: r.id, menuItemId: item.id, videoAssetId: asset.id, caption: input.caption?.trim().slice(0, 300) || null, posterUrl, status: "PROCESSING", visibility: "DRAFT" },
+    data: { restaurantId: r.id, menuItemId: item.id, videoAssetId: asset.id, caption: input.caption?.trim().slice(0, 300) || null, posterUrl, status: "PROCESSING", visibility: "DRAFT", autoPublish: input.publish && r.status === "ACTIVE" },
   });
-  await enqueue("process_video", { reelId: reel.id, publish: input.publish && r.status === "ACTIVE" ? "1" : "0" });
+  if (isStreamKey(asset.storageKey)) await syncStreamReels({ reelId: reel.id });
+  else await enqueue("process_video", { reelId: reel.id, publish: input.publish && r.status === "ACTIVE" ? "1" : "0" });
   await audit({ actorId: ctx.user.id, action: "reel.create", entityType: "reel", entityId: reel.id });
   revalidatePath("/dashboard/reels");
   return { ok: true, data: reel.id };
@@ -81,8 +84,11 @@ export async function setReelVisibilityAction(id: string, publish: boolean): Pro
 
 export async function deleteReelAction(id: string): Promise<ActionResult> {
   try {
-    const { ctx } = await ownReel(id);
+    const { ctx, reel } = await ownReel(id);
+    const asset = await prisma.mediaAsset.findUnique({ where: { id: reel.videoAssetId } });
     await prisma.reel.delete({ where: { id } });
+    const uid = asset ? streamUidOf(asset.storageKey) : null;
+    if (uid && uid !== "pending") await deleteStreamVideo(uid).catch((e) => console.error("stream delete", e));
     await audit({ actorId: ctx.user.id, action: "reel.delete", entityType: "reel", entityId: id });
     revalidatePath("/dashboard/reels");
     return { ok: true };
@@ -95,6 +101,8 @@ export async function retryReelAction(id: string): Promise<ActionResult> {
   try {
     const { reel } = await ownReel(id);
     if (reel.status !== "FAILED") return { ok: true };
+    const asset = await prisma.mediaAsset.findUniqueOrThrow({ where: { id: reel.videoAssetId } });
+    if (isStreamKey(asset.storageKey)) return { ok: false, error: "Cloudflare couldn't process this video. Delete the reel and upload the video again." };
     await prisma.reel.update({ where: { id }, data: { status: "PROCESSING", processingError: null } });
     await enqueue("process_video", { reelId: id, publish: "0" });
     revalidatePath(`/dashboard/reels/${id}`);
@@ -102,4 +110,15 @@ export async function retryReelAction(id: string): Promise<ActionResult> {
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+}
+
+/** Creates the placeholder asset a Cloudflare Stream (tus) upload attaches to. */
+export async function startStreamUploadAction(fileName: string, sizeBytes: number): Promise<ActionResult<string>> {
+  const ctx = await requireRestaurant("MANAGER");
+  if (!streamConfigured()) return { ok: false, error: "Video uploads are not configured" };
+  if (ctx.restaurant.restrictReels) return { ok: false, error: "New reels are restricted on your account until outstanding invoices are settled." };
+  const asset = await prisma.mediaAsset.create({
+    data: { restaurantId: ctx.restaurant.id, kind: "VIDEO", isPrivate: false, storageKey: "stream:pending", url: "", mimeType: "video/*", sizeBytes: Math.max(0, Math.round(sizeBytes)), originalName: fileName.slice(0, 200), uploadedById: ctx.user.id },
+  });
+  return { ok: true, data: asset.id };
 }

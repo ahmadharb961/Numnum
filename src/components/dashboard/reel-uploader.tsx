@@ -3,13 +3,13 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Film, ImagePlus, CheckCircle2 } from "lucide-react";
-import { createReelAction } from "@/actions/reels";
+import { createReelAction, startStreamUploadAction } from "@/actions/reels";
 import { uploadFile } from "./upload";
 import { ItemPicker } from "./item-picker";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
 
-export function ReelUploader({ items, defaultItemId, canPublish }: { items: { id: string; label: string; sku: string }[]; defaultItemId?: string; canPublish: boolean }) {
+export function ReelUploader({ items, defaultItemId, canPublish, stream }: { items: { id: string; label: string; sku: string }[]; defaultItemId?: string; canPublish: boolean; stream: boolean }) {
   const router = useRouter();
   const [video, setVideo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -26,14 +26,35 @@ export function ReelUploader({ items, defaultItemId, canPublish }: { items: { id
 
   async function pickVideo(f: File) {
     setError(null);
-    if (f.size > 200 * 1024 * 1024) return setError("Video is larger than 200 MB");
+    const max = stream ? 500 : 200;
+    if (f.size > max * 1024 * 1024) return setError(`Video is larger than ${max} MB`);
     setVideo(f);
     setPreview(URL.createObjectURL(f));
     setAssetId(null);
     setProgress(0);
     try {
-      const res = await uploadFile(f, "video", { onProgress: setProgress, retries: 3 });
-      setAssetId(res.id);
+      if (stream) {
+        // Resumable upload straight from the phone to Cloudflare Stream.
+        const start = await startStreamUploadAction(f.name, f.size);
+        if (!start.ok) throw new Error(start.error);
+        const tus = await import("tus-js-client");
+        await new Promise<void>((resolve, reject) => {
+          const up = new tus.Upload(f, {
+            endpoint: `/api/reels/tus?assetId=${encodeURIComponent(start.data!)}`,
+            chunkSize: 50 * 1024 * 1024,
+            retryDelays: [0, 2000, 5000, 10000, 20000],
+            metadata: { filename: f.name, filetype: f.type },
+            onProgress: (sent, total) => setProgress(Math.round((sent / total) * 100)),
+            onSuccess: () => resolve(),
+            onError: (err) => reject(new Error("Upload failed. Check your connection and try again." + (err?.message ? ` (${err.message.slice(0, 80)})` : ""))),
+          });
+          up.start();
+        });
+        setAssetId(start.data!);
+      } else {
+        const res = await uploadFile(f, "video", { onProgress: setProgress, retries: 3 });
+        setAssetId(res.id);
+      }
     } catch (e) {
       setError((e as Error).message);
       setProgress(null);
@@ -83,7 +104,7 @@ export function ReelUploader({ items, defaultItemId, canPublish }: { items: { id
           <button onClick={() => vInput.current?.click()} className="mx-auto flex aspect-[9/16] w-full max-w-[320px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-black/15 bg-white text-center">
             <Film className="h-10 w-10 text-brand-500" />
             <span className="font-bold">Choose or record a video</span>
-            <span className="px-6 text-xs text-ink-muted">MP4, MOV or WebM · vertical works best</span>
+            <span className="px-6 text-xs text-ink-muted">MP4, MOV or WebM · vertical works best · up to {stream ? "500" : "200"} MB</span>
           </button>
         )}
         <input ref={vInput} type="file" accept="video/mp4,video/quicktime,video/webm,video/*" className="hidden" onChange={(e) => e.target.files?.[0] && pickVideo(e.target.files[0])} />

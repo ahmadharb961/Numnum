@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
+import { syncStreamReels } from "@/server/stream";
 import { DashPage } from "@/components/dashboard/page";
 import { ReelEditor } from "@/components/dashboard/reel-editor";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
@@ -12,6 +13,7 @@ export const metadata = { title: "Reel" };
 
 export default async function ReelDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireRestaurant("MANAGER");
+  await syncStreamReels({ restaurantId: ctx.restaurant.id }).catch((e) => console.error("stream sync", e));
   const reel = await prisma.reel.findFirst({ where: { id: (await params).id, restaurantId: ctx.restaurant.id }, include: { menuItem: true } });
   if (!reel) notFound();
   const items = await prisma.menuItem.findMany({ where: { restaurantId: ctx.restaurant.id, archived: false }, orderBy: { name: "asc" }, select: { id: true, name: true, sku: true, priceCents: true, currency: true } });

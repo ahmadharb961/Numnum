@@ -3,7 +3,7 @@
 // creates demo restaurants, menus, generated photos and videos, orders that flow
 // through the real order/commission/billing services, reviews and invoices.
 // Demo content is for development and demo environments only.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -193,6 +193,10 @@ async function seedDemo(adminId: string) {
   await updateSetting("whish", { recipientName: "numnum Demo Account", whishNumber: "70 000 000", accountId: "NUMNUM-DEMO", instructions: DEFAULT_SETTINGS.whish.instructions }, adminId);
 
   const tmp = mkdtempSync(path.join(os.tmpdir(), "nnseed-"));
+  // Demo reels are generated with ffmpeg. Hosts without it (e.g. Hostinger) get
+  // demo restaurants and menus without reels; upload real videos from the dashboard.
+  const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
+  if (!hasFfmpeg) console.log("ffmpeg not found — demo restaurants will have no reels");
   const pw = await hashPassword("demo1234");
   const foodCats = Object.fromEntries((await prisma.foodCategory.findMany()).map((c) => [c.slug, c.id]));
   let imgIdx = 0;
@@ -236,7 +240,7 @@ async function seedDemo(adminId: string) {
       const img = await processImage(await foodImage(it.name, it.emoji, imgIdx++), { restaurantId: r.id, originalName: `${it.sku}.jpg` });
       await attachImage(r.id, m.id, img.id);
     }
-    for (const [vi, sku] of d.reels.entries()) {
+    for (const [vi, sku] of (hasFfmpeg ? d.reels : []).entries()) {
       const it = d.items.find((x) => x.sku === sku)!;
       const raw = demoVideo(it.name, imgIdx + vi, tmp);
       const asset = await storeRawVideo(raw, { restaurantId: r.id, originalName: `${sku}.mp4` });

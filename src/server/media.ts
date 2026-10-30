@@ -7,7 +7,11 @@ import sharp, { type Metadata as SharpMetadata } from "sharp";
 import type { MediaKind } from "@prisma/client";
 import { prisma } from "./db";
 import { randomToken, sha256 } from "./crypto";
-import { driver, moveLocal, putLocal, uploadCloudinary, localPath } from "./storage";
+import { moveLocal, putLocal, localPath, putBlob, publicImageUrl } from "./storage";
+
+// Shared hosting has little RAM: one image at a time, no libvips cache.
+sharp.concurrency(1);
+sharp.cache(false);
 
 export const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
@@ -17,7 +21,7 @@ export class MediaError extends Error {
   status = 400;
 }
 
-/** Validate & normalize an image: auto-rotate, strip metadata, resize without distortion, WebP output. */
+/** Validate & normalize an image: auto-rotate, strip metadata, resize without distortion, WebP output, stored in the database. */
 export async function processImage(
   input: Buffer,
   opts: { restaurantId: string | null; originalName?: string; uploadedById?: string; kind?: MediaKind; isPrivate?: boolean; maxSize?: number },
@@ -43,36 +47,20 @@ export async function processImage(
     const dup = await prisma.mediaAsset.findFirst({ where: { restaurantId: opts.restaurantId, kind: "IMAGE", checksum } });
     if (dup) return dup;
   }
-  const maxSize = opts.maxSize ?? 1600;
+  const maxSize = opts.maxSize ?? 1200;
   const base = sharp(input, { failOn: "error" }).rotate(); // apply EXIF orientation; metadata stripped by default
-  const main = await base.clone().resize({ width: maxSize, height: maxSize, fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toBuffer({ resolveWithObject: true });
+  const main = await base.clone().resize({ width: maxSize, height: maxSize, fit: "inside", withoutEnlargement: true }).webp({ quality: 78 }).toBuffer({ resolveWithObject: true });
   const thumb = await base.clone().resize({ width: 480, height: 480, fit: "inside", withoutEnlargement: true }).webp({ quality: 72 }).toBuffer();
 
   const kind = opts.kind ?? "IMAGE";
   const isPrivate = !!opts.isPrivate;
-  const id = randomToken(12);
-  const folder = `${kind.toLowerCase()}/${opts.restaurantId ?? "platform"}`;
-  let url: string, thumbUrl: string | null;
-  let storageKey = `${folder}/${id}.webp`;
-
-  if (!isPrivate && driver() === "cloudinary") {
-    const up = await uploadCloudinary(main.data, "image", `numnum/${folder}/${id}`);
-    url = up.url;
-    thumbUrl = up.thumbUrl ?? null;
-    storageKey = `cloudinary:numnum/${folder}/${id}`;
-  } else {
-    url = await putLocal(storageKey, main.data, isPrivate);
-    thumbUrl = await putLocal(`${folder}/${id}_thumb.webp`, thumb, isPrivate);
-  }
-
   const asset = await prisma.mediaAsset.create({
     data: {
       restaurantId: opts.restaurantId,
       kind,
       isPrivate,
-      storageKey,
-      url,
-      thumbUrl: thumbUrl || null,
+      storageKey: "db",
+      url: "",
       mimeType: "image/webp",
       sizeBytes: main.data.byteLength,
       width: main.info.width,
@@ -82,10 +70,11 @@ export async function processImage(
       uploadedById: opts.uploadedById,
     },
   });
-  if (isPrivate && !asset.url) {
-    return prisma.mediaAsset.update({ where: { id: asset.id }, data: { url: `/api/private-media/${asset.id}`, thumbUrl: `/api/private-media/${asset.id}?thumb=1` } });
-  }
-  return asset;
+  await putBlob(asset.id, "main", main.data);
+  await putBlob(asset.id, "thumb", thumb);
+  const url = isPrivate ? `/api/private-media/${asset.id}` : publicImageUrl(asset.id, "main");
+  const thumbUrl = isPrivate ? `/api/private-media/${asset.id}?thumb=1` : publicImageUrl(asset.id, "thumb");
+  return prisma.mediaAsset.update({ where: { id: asset.id }, data: { url, thumbUrl } });
 }
 
 /** Private documents (receipts, verification docs). Images are normalized; PDFs are stored as-is after a magic-byte check. */
@@ -93,15 +82,12 @@ export async function storePrivateDocument(input: Buffer, opts: { restaurantId: 
   if (input.byteLength > MAX_DOC_BYTES) throw new MediaError("File is larger than 10 MB");
   const isPdf = input.subarray(0, 5).toString("latin1") === "%PDF-";
   if (!isPdf) return processImage(input, { ...opts, isPrivate: true, maxSize: 2400 });
-  const id = randomToken(12);
-  const storageKey = `${opts.kind.toLowerCase()}/${opts.restaurantId}/${id}.pdf`;
-  await putLocal(storageKey, input, true);
   const asset = await prisma.mediaAsset.create({
     data: {
       restaurantId: opts.restaurantId,
       kind: opts.kind,
       isPrivate: true,
-      storageKey,
+      storageKey: "db",
       url: "",
       mimeType: "application/pdf",
       sizeBytes: input.byteLength,
@@ -110,6 +96,7 @@ export async function storePrivateDocument(input: Buffer, opts: { restaurantId: 
       uploadedById: opts.uploadedById,
     },
   });
+  await putBlob(asset.id, "main", input);
   return prisma.mediaAsset.update({ where: { id: asset.id }, data: { url: `/api/private-media/${asset.id}` } });
 }
 
@@ -206,15 +193,8 @@ export async function processVideoAsset(assetId: string): Promise<{ videoUrl: st
       posterBuf = await sharp(await fs.readFile(posterRaw)).resize({ width: 720, withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
     } catch {}
 
-    let videoUrl: string, posterUrl: string | null = null;
-    if (driver() === "cloudinary") {
-      const up = await uploadCloudinary(await fs.readFile(out), "video", `numnum/${base}`);
-      videoUrl = up.url;
-      posterUrl = up.posterUrl ?? null;
-    } else {
-      videoUrl = await moveLocal(out, `${base}.mp4`, false);
-      if (posterBuf) posterUrl = await putLocal(`${base}_poster.webp`, posterBuf, false);
-    }
+    const videoUrl = await moveLocal(out, `${base}.mp4`, false);
+    const posterUrl = posterBuf ? await putLocal(`${base}_poster.webp`, posterBuf, false) : null;
     const stat = await fs.stat(localPath(asset.storageKey, true));
     await prisma.mediaAsset.update({
       where: { id: assetId },

@@ -11,6 +11,7 @@ import { VerifiedBadge, RatingPill } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { ItemSheet } from "./item-sheet";
 import { api, track } from "./track";
+import { HlsVideo } from "@/components/hls-video";
 
 export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean };
 
@@ -291,10 +292,11 @@ function ReelSlide({
         <img src={reel.posterUrl} alt="" className="absolute inset-0 h-full w-full object-cover" loading={index < 2 ? "eager" : "lazy"} fetchPriority={index === 0 ? "high" : "auto"} />
       )}
       {showVideo && (
-        <video
+        <HlsVideo
           ref={videoRef}
           className="absolute inset-0 h-full w-full object-cover"
           src={reel.videoUrl!}
+          onFatal={() => setFailed(true)}
           poster={reel.posterUrl ?? undefined}
           muted={muted}
           loop

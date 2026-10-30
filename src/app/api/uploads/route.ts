@@ -4,6 +4,7 @@ import { getCurrentUser, getRestaurantContext, hasRole, canAccess } from "@/serv
 import { errorResponse, json, limit } from "@/server/http";
 import { MAX_DOC_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, processImage, storePrivateDocument, storeRawVideo, streamToTempFile } from "@/server/media";
 import { attachImage } from "@/server/menu";
+import { streamConfigured } from "@/server/stream";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -43,6 +44,7 @@ export async function PUT(req: Request) {
     }
     if (!restaurantId || !ctx) return json({ error: "Invalid upload" }, 400);
     if (kind === "video") {
+      if (streamConfigured()) return json({ error: "Videos upload directly to Cloudflare Stream" }, 400);
       if (!canAccess(ctx.staffRole, "MANAGER")) return json({ error: "Requires manager access" }, 403);
       if (ctx.restaurant.restrictReels) return json({ error: "Reel uploads are restricted on your account. Please settle outstanding invoices or contact support." }, 403);
       const { file } = await streamToTempFile(req.body, MAX_VIDEO_BYTES);

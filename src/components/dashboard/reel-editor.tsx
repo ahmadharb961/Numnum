@@ -9,6 +9,7 @@ import { ItemPicker } from "./item-picker";
 import { Button } from "@/components/ui/button";
 import { Alert, Badge, Field } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
+import { HlsVideo } from "@/components/hls-video";
 
 type Reel = { id: string; status: string; visibility: string; caption: string; videoUrl: string | null; posterUrl: string | null; menuItemId: string; processingError: string | null; removedReason: string | null };
 
@@ -32,7 +33,7 @@ export function ReelEditor({ reel, items }: { reel: Reel; items: { id: string; l
     <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
       <div className="mx-auto aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-2xl bg-black">
         {reel.status === "READY" && reel.videoUrl ? (
-          <video src={reel.videoUrl} poster={reel.posterUrl ?? undefined} className="h-full w-full object-cover" controls playsInline />
+          <HlsVideo src={reel.videoUrl} poster={reel.posterUrl ?? undefined} className="h-full w-full object-cover" controls playsInline preload="auto" />
         ) : reel.status === "PROCESSING" ? (
           <div className="grid h-full place-items-center text-center text-sm text-white/80">
             <div>

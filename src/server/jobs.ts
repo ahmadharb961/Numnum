@@ -60,7 +60,7 @@ async function handle(type: JobType, payload: Record<string, string>) {
         posterUrl: reel.posterUrl ?? out.posterUrl, // keep a custom thumbnail if one was uploaded
         durationSec: out.durationSec,
         processingError: null,
-        ...(payload.publish === "1" && reel.visibility === "DRAFT" ? { visibility: "PUBLISHED", publishedAt: new Date() } : {}),
+        ...((payload.publish === "1" || reel.autoPublish) && reel.visibility === "DRAFT" ? { visibility: "PUBLISHED", publishedAt: new Date() } : {}),
       },
     });
   }

@@ -8,7 +8,7 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN npm run build:local
 
 FROM base AS run
 ENV NODE_ENV=production PORT=3000 STORAGE_DIR=/data/storage NEXT_TELEMETRY_DISABLED=1

@@ -17,7 +17,7 @@ Video-first food discovery and WhatsApp ordering for Lebanon — a mobile-first 
 | Web | Next.js 15 (App Router, Server Components, Server Actions), React 19, TypeScript, Tailwind CSS |
 | Data | PostgreSQL + Prisma (migrations in `prisma/migrations`) |
 | Auth | Session cookies (httpOnly, hashed tokens in DB), bcrypt, role-based access (customer / restaurant staff: owner, manager, staff / admin) |
-| Media | `sharp` image pipeline (EXIF rotate, metadata strip, resize without distortion, WebP + thumbnails). `ffmpeg` video pipeline (H.264/AAC 720p, faststart, poster frame). Storage: local disk (default) or Cloudinary for public media |
+| Media | `sharp` image pipeline (EXIF rotate, metadata strip, resize without distortion, WebP + thumbnails), stored in Postgres. Videos on Cloudflare Stream (tus uploads, adaptive HLS via hls.js); local `ffmpeg` fallback for development |
 | Jobs | DB-backed job queue (`jobs` table) for video processing; scheduled endpoint for billing |
 | Documents | `pdf-lib` invoice PDFs, CSV statements/exports |
 
@@ -41,7 +41,7 @@ Video-first food discovery and WhatsApp ordering for Lebanon — a mobile-first 
 Requirements: Node 20+, PostgreSQL 14+, `ffmpeg` and `ffprobe` on the PATH.
 
 ```bash
-cp .env.example .env          # set DATABASE_URL, SESSION_SECRET
+cp .env.example .env          # set DATABASE_URL, SESSION_SECRET (Cloudflare optional locally)
 npm install
 npx prisma migrate deploy
 SEED_DEMO=true npm run db:seed   # demo data; omit SEED_DEMO for categories + admin only
@@ -70,31 +70,16 @@ Covered: commission math (a $20 order → $2.80 at 14%), exactly-once commission
 
 The E2E scripts cover the full guest order journey to the WhatsApp deep link, a 150-item CSV import, a 150-photo ZIP upload, acknowledgment by order reference, admin payment verification, and an error sweep of every dashboard and admin page.
 
-## Deploy on Render (quickest path)
+## Putting it online (Hostinger)
 
-The repo includes `render.yaml`, a `Dockerfile` (Node 22 + ffmpeg) and `scripts/start.sh` (runs migrations, optional seed, then serves).
+Follow **[docs/SETUP.md](docs/SETUP.md)**. It's the same setup as Hireel: Hostinger Cloud Startup (Node 22), Neon Postgres, Cloudflare Stream for reels, the Hostinger mailbox for email, and an hPanel cron job calling `/api/cron` hourly.
 
-1. Merge this branch into your default branch, or select it while creating the Blueprint.
-2. At [render.com](https://render.com): **New → Blueprint**, connect the GitHub repo. Render creates the Postgres database, the web service (with a 10 GB disk for photos and videos) and an hourly billing cron job.
-3. When prompted, fill in `ADMIN_EMAIL` and `ADMIN_PASSWORD` (your admin login), and `APP_URL` (e.g. `https://numnum.onrender.com`, or your own domain later) on both the web service and the cron job.
-4. To load the demo restaurants, set `SEED_DEMO=true` before the first deploy. Leave it `false` for a clean launch.
-5. After the first deploy, open `APP_URL/login`, sign in as admin, and fill in Admin → Settings (Whish recipient details, etc.).
-6. Custom domain: Render service → Settings → Custom Domains, then update `APP_URL`.
+- `npm run build` is the Hostinger build. It applies database migrations, creates the categories and the first admin (`ADMIN_EMAIL`/`ADMIN_PASSWORD`), optionally loads demo data (`SEED_DEMO=true`), then builds with limited threads.
+- Photos, receipts and documents are stored in Postgres. Nothing needs a persistent disk.
+- Reels upload from the phone straight to Cloudflare Stream (resumable tus uploads) and play as adaptive HLS. Processing status is synced when restaurants view their reels and by the hourly cron, so no webhook setup is needed.
+- Without Cloudflare credentials (local development), reels fall back to local ffmpeg transcoding.
 
-Any Docker host works the same way: build the `Dockerfile`, then provide `DATABASE_URL`, `SESSION_SECRET`, `CRON_SECRET` and `APP_URL`, mount a persistent volume at `/data`, and call `/api/cron` hourly.
-
-## Deployment
-
-1. **Database:** managed PostgreSQL with automated daily backups and point-in-time recovery. Run `npx prisma migrate deploy` on each release.
-2. **Environment:** see `.env.example`. Required: `DATABASE_URL`, `APP_URL`, `SESSION_SECRET` (64+ random characters), `CRON_SECRET`. Never commit secrets.
-3. **Build and run:** `npm ci && npm run build && npm start` on a Node host with `ffmpeg` installed. The included `npm start` serves on `$PORT`. HTTPS terminates at your load balancer or CDN.
-4. **Worker:** run `npm run worker` as a separate process so video transcoding doesn't compete with web traffic. Set `INLINE_JOBS=false` on web instances when a worker runs.
-5. **Scheduler:** call `GET /api/cron` hourly with `Authorization: Bearer $CRON_SECRET`. It processes jobs, issues the previous month's invoices on the 1st–3rd (idempotent), refreshes overdue statuses, sends reminders and applies the configured overdue policy. `npm run billing:run [-- YYYY-MM]` does the same from a shell.
-6. **Media:** local storage writes to `STORAGE_DIR` (`public/` and `private/`). Use a persistent volume and put a CDN in front of `/media/*` (immutable cache headers and Range support are built in). Alternatively set `STORAGE_DRIVER=cloudinary` for public images and videos; receipts and verification documents always stay in private storage.
-7. **First admin:** `ADMIN_EMAIL=… ADMIN_PASSWORD=… npm run db:seed`, then configure the Whish recipient, commission settings and policies in Admin → Settings.
-8. **Monitoring:** forward stdout/stderr to your log platform and add your error tracker (e.g. Sentry) in `src/app/error.tsx` and `src/server/http.ts#errorResponse`. Rate limiting is in-memory per instance; add edge or Redis rate limiting when scaling horizontally.
-9. **Email (optional):** set `SMTP_URL` and install `nodemailer` to send billing emails. In-app dashboard notifications always work.
-10. **Maps (optional):** `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (HTTP-referrer restricted) enables the embedded Maps preview at checkout. Without it, a keyless embed and pasted Maps links are used.
+`npm run build:local` builds without touching a database (CI, Docker). A `Dockerfile` is included for VPS hosting.
 
 ## Project layout
 
@@ -114,5 +99,5 @@ tests/  e2e/       vitest suites, Playwright journeys
 
 - **Arabic:** the UI language is English. Menu content can be entered in Arabic (UTF-8 throughout, RTL-ready CSS). Invoice PDFs use standard fonts, so Arabic names show as `?`. Embed an Arabic font for production PDFs.
 - **HEIC:** conversion depends on the server's libvips build. iOS normally uploads JPEG from the browser picker.
-- **Streaming:** reels use optimized progressive MP4 with faststart, poster frames and conservative preloading. Adaptive HLS can be added via Cloudinary streaming profiles.
+- **Streaming:** with Cloudflare Stream, reels play as adaptive HLS (lower quality on weak mobile networks), and only the visible and next reel buffer. The local ffmpeg fallback produces a progressive 720p MP4.
 - **Image matching:** "intelligent" matching is filename/name-similarity based, and suggestions always need restaurant confirmation. No external AI service is called.

@@ -242,10 +242,24 @@ model MediaAsset {
   itemImages     MenuItemImage[]
   reels          Reel[]
   evidence       PaymentEvidence[]
+  blobs          MediaBlob[]
 
   @@index([restaurantId, kind])
   @@index([restaurantId, checksum])
   @@map("media_assets")
+}
+
+/// Image and document bytes live in Postgres (no separate file storage needed on
+/// hosts without a persistent disk). Kept out of MediaAsset so normal queries stay light.
+model MediaBlob {
+  id      String     @id @default(cuid())
+  assetId String
+  variant String // "main" | "thumb"
+  data    Bytes
+  asset   MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, variant])
+  @@map("media_blobs")
 }
 
 // ───────────────────────── Catalog ─────────────────────────
@@ -433,6 +447,7 @@ model Reel {
   durationSec     Float?
   featured        Boolean        @default(false)
   sponsored       Boolean        @default(false)
+  autoPublish     Boolean        @default(false)
   viewCount       Int            @default(0)
   uniqueViewers   Int            @default(0)
   likeCount       Int            @default(0)

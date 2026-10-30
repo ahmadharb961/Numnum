@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, Eye, Heart, MessageCircle, Film } from "lucide-react";
 import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
+import { syncStreamReels } from "@/server/stream";
 import { DashPage } from "@/components/dashboard/page";
 import { buttonClass } from "@/components/ui/button";
 import { Badge, EmptyState } from "@/components/ui/misc";
@@ -14,6 +15,7 @@ const visTone = { PUBLISHED: "green", DRAFT: "gray", UNPUBLISHED: "amber", REMOV
 
 export default async function ReelsPage() {
   const ctx = await requireRestaurant("MANAGER");
+  await syncStreamReels({ restaurantId: ctx.restaurant.id }).catch((e) => console.error("stream sync", e));
   const reels = await prisma.reel.findMany({ where: { restaurantId: ctx.restaurant.id }, orderBy: { createdAt: "desc" }, include: { menuItem: { select: { name: true } } } });
   const processing = reels.some((r) => r.status === "PROCESSING");
   return (

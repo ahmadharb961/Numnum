@@ -5,18 +5,20 @@
   "description": "numnum — video-first food discovery and WhatsApp ordering web app for Lebanon",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && prisma migrate deploy && npm run db:setup && RAYON_NUM_THREADS=2 UV_THREADPOOL_SIZE=2 next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
-    "db:seed": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs prisma/seed.ts",
+    "db:seed": "npm run db:setup",
     "billing:run": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/run-billing.ts",
     "postinstall": "prisma generate",
     "worker": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/worker.ts",
-    "test:e2e": "node e2e/customer.js && node e2e/business.js"
+    "test:e2e": "node e2e/customer.js && node e2e/business.js",
+    "build:local": "prisma generate && next build",
+    "db:setup": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs prisma/seed.ts"
   },
   "prisma": {
     "seed": "npm run db:seed"
@@ -24,19 +26,25 @@
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
+    "hls.js": "^1.7.4",
     "jszip": "^3.10.1",
     "lucide-react": "^0.544.0",
     "next": "^15.5.28",
+    "nodemailer": "^6.10.1",
     "papaparse": "^5.5.3",
     "pdf-lib": "^1.17.1",
+    "prisma": "^6.19.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "server-only": "^0.0.1",
     "sharp": "^0.35.5",
+    "tsx": "^4.23.15",
+    "tus-js-client": "^4.3.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "@types/nodemailer": "^8.0.2",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -44,10 +52,11 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.28",
     "postcss": "^8.5.32",
-    "prisma": "^6.19.3",
     "tailwindcss": "^3.4.18",
-    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
