@@ -27,7 +27,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
         {reels.length > 0 && (
           <section>
             <h2 className="mb-2 text-lg font-extrabold">Reels</h2>
-            <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+            <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible px-4">
               {reels.slice(0, 12).map((r) => (
                 <ReelThumb key={r.id} href={`/reel/${r.id}`} posterUrl={r.posterUrl} views={r.viewCount} className="w-28 shrink-0 rounded-xl" label={r.item.name} />
               ))}

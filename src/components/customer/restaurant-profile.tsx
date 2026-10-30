@@ -44,7 +44,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
             ))}
           </div>
           {tab === "menu" && sections.length > 1 && (
-            <div className="no-scrollbar container-app flex gap-2 overflow-x-auto py-2">
+            <div className="no-scrollbar container-app flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible py-2">
               {sections.map((s) => (
                 <a
                   key={s.id}

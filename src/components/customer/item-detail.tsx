@@ -34,6 +34,8 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
   const [conflict, setConflict] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
   const groupsRef = useRef<HTMLDivElement>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const showImage = (i: number) => galleryRef.current?.scrollTo({ left: i * galleryRef.current.clientWidth, behavior: "smooth" });
 
   const v = useMemo(() => validateSelections(item.groups, selections), [item.groups, selections]);
   const unit = unitPrice(item.priceCents, v.unitOptionsCents);
@@ -77,7 +79,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
     if (res === "conflict") return setConflict(true);
     setConflict(false);
     track("add_to_cart", { menuItemId: item.id, reelId: reelId ?? undefined, restaurantId: item.restaurant.id });
-    toast(`Added ${qty} × ${item.name}`, "success");
+    toast(`Added ${qty} × ${item.name}`, "success", { label: "View cart", href: "/cart" });
     onAdded?.();
   }
 
@@ -88,6 +90,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
         {item.images.length ? (
           <>
             <div
+              ref={galleryRef}
               className="no-scrollbar flex h-full snap-x snap-mandatory overflow-x-auto"
               onScroll={(e) => {
                 const el = e.currentTarget;
@@ -102,7 +105,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
             {item.images.length > 1 && (
               <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
                 {item.images.map((_, i) => (
-                  <span key={i} className={cn("h-1.5 rounded-full bg-white/90 transition-all", i === imgIdx ? "w-5" : "w-1.5 opacity-60")} />
+                  <button key={i} onClick={() => showImage(i)} className={cn("h-1.5 rounded-full bg-white/90 transition-all", i === imgIdx ? "w-5" : "w-1.5 opacity-60")} aria-label={`Photo ${i + 1}`} />
                 ))}
               </div>
             )}
@@ -157,7 +160,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
         {item.reels.length > 0 && !compact && (
           <div className="mt-5">
             <h3 className="mb-2 text-sm font-bold">Reels</h3>
-            <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5">
+            <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible px-5">
               {item.reels.map((r) => (
                 <Link key={r.id} href={`/reel/${r.id}`} className="relative aspect-[9/16] w-24 shrink-0 overflow-hidden rounded-xl bg-black">
                   {r.posterUrl && (

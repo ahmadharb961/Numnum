@@ -75,7 +75,7 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
             </button>
           ))}
         </div>
-        <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
+        <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible px-4">
           <button onClick={() => setParams({ category: null })} className={cn("chip", !sp.get("category") && "chip-active")}>
             All
           </button>

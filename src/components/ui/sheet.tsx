@@ -43,6 +43,12 @@ export function Sheet({ open, onClose, title, children, className, full }: { ope
             </button>
           </div>
         )}
+        {title === undefined && (
+          // Untitled sheets (e.g. a dish with its photo on top) get a floating close button.
+          <button onClick={onClose} className="absolute right-3 top-3 z-20 grid h-10 w-10 place-items-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur hover:bg-black/65" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
       </div>
     </div>,

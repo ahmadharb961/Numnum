@@ -28,7 +28,7 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
             <LocationChip label={loc?.label ?? null} />
           </div>
           {f.areas.length > 0 && (
-            <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
+            <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible px-4">
               {loc && (
                 <Link href={sp.near === "1" ? "/restaurants" : "/restaurants?near=1"} className={cn("chip", sp.near === "1" && "chip-active")}>
                   Delivers to me
