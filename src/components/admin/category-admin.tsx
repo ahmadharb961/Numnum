@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { ImagePlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { deleteFoodCategoryAction, mergeFoodCategoryAction, saveFoodCategoryAction } from "@/actions/admin";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { uploadFile } from "@/components/dashboard/upload";
 
-type Cat = { id: string; name: string; nameAr: string; emoji: string; sortOrder: number; active: boolean; slug: string; count: number };
+type Cat = { id: string; name: string; nameAr: string; emoji: string; imageUrl: string; sortOrder: number; active: boolean; slug: string; count: number };
 
 export function CategoryAdmin({ categories }: { categories: Cat[] }) {
   const [rows, setRows] = useState(categories);
@@ -20,12 +22,41 @@ export function CategoryAdmin({ categories }: { categories: Cat[] }) {
       toast(r.ok ? r.message ?? "Saved" : r.error ?? "Failed", r.ok ? "success" : "error");
       router.refresh();
     });
-  const upd = (id: string, patch: Partial<Cat>) => setRows(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const upd = (id: string, patch: Partial<Cat>) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadFor, setUploadFor] = useState<string | null>(null);
+  // A new photo is saved straight away so the Restaurants page shows it.
+  const onFile = async (file: File) => {
+    const c = rows.find((r) => r.id === uploadFor);
+    if (!c) return;
+    try {
+      const up = await uploadFile(file, "image", { params: { scope: "platform" } });
+      upd(c.id, { imageUrl: up.url ?? "" });
+      run(() => saveFoodCategoryAction({ ...c, imageUrl: up.url ?? "" }));
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setUploadFor(null);
+    }
+  };
   return (
     <div className="card overflow-x-auto p-4">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) void onFile(f);
+          else setUploadFor(null);
+        }}
+      />
       <table className="table-app">
         <thead>
           <tr>
+            <th>Image</th>
             <th>Emoji</th>
             <th>Name</th>
             <th>Arabic</th>
@@ -38,6 +69,25 @@ export function CategoryAdmin({ categories }: { categories: Cat[] }) {
         <tbody>
           {rows.map((c) => (
             <tr key={c.id}>
+              <td>
+                <button
+                  type="button"
+                  title="Upload a square photo (white or transparent background looks best)"
+                  onClick={() => {
+                    setUploadFor(c.id);
+                    fileRef.current?.click();
+                  }}
+                  className="relative grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-white shadow ring-1 ring-black/5"
+                >
+                  {c.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.imageUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <ImagePlus className="h-5 w-5 text-ink-muted" />
+                  )}
+                  {uploadFor === c.id && <span className="absolute inset-0 animate-pulse bg-white/70" />}
+                </button>
+              </td>
               <td>
                 <input className="input h-9 w-14 text-center" value={c.emoji} onChange={(e) => upd(c.id, { emoji: e.target.value })} />
               </td>
@@ -80,6 +130,7 @@ export function CategoryAdmin({ categories }: { categories: Cat[] }) {
             </tr>
           ))}
           <tr>
+            <td />
             <td>
               <input className="input h-9 w-14 text-center" value={nw.emoji} onChange={(e) => setNw({ ...nw, emoji: e.target.value })} placeholder="🍕" />
             </td>

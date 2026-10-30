@@ -296,6 +296,7 @@ model FoodCategory {
   name      String
   nameAr    String?
   emoji     String?
+  imageUrl  String?
   sortOrder Int        @default(0)
   active    Boolean    @default(true)
   createdAt DateTime   @default(now())

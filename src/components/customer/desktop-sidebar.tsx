@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useCart } from "./cart";
 import { LocationChip } from "./location-picker";
 
-type Category = { slug: string; name: string; emoji: string | null };
+type Category = { slug: string; name: string; emoji: string | null; imageUrl: string | null };
 
 const NAV = [
   { href: "/", label: "Home", icon: Home, match: (p: string) => p === "/" || p.startsWith("/reel/") },
@@ -72,7 +72,12 @@ export function DesktopSidebar({ categories, locationLabel }: { categories: Cate
             return (
               <li key={c.slug}>
                 <Link href={exploreHref({ category: active ? null : c.slug })} className={cn("flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition", active ? "bg-ink text-white" : "text-ink-soft hover:bg-black/5")}>
-                  <span className="w-5 text-center text-base">{c.emoji}</span>
+                  {c.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.imageUrl} alt="" width={24} height={24} loading="lazy" className="h-6 w-6 shrink-0 rounded-full" />
+                  ) : (
+                    <span className="w-6 text-center text-base">{c.emoji}</span>
+                  )}
                   {c.name}
                 </Link>
               </li>

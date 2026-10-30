@@ -289,16 +289,19 @@ export async function resolveReportAction(id: string, outcome: "ACTIONED" | "DIS
 
 // ───── Categories ─────
 
-export async function saveFoodCategoryAction(input: { id?: string; name: string; nameAr?: string; emoji?: string; sortOrder?: number; active?: boolean }) {
+export async function saveFoodCategoryAction(input: { id?: string; name: string; nameAr?: string; emoji?: string; imageUrl?: string; sortOrder?: number; active?: boolean }) {
   const { user } = await admin();
   return wrap(async () => {
     const name = input.name.trim();
     if (!name) throw new Error("Name is required");
-    const data = { name, nameAr: input.nameAr?.trim() || null, emoji: input.emoji?.trim() || null, sortOrder: input.sortOrder ?? 0, active: input.active ?? true };
+    const imageUrl = input.imageUrl?.trim() || null;
+    if (imageUrl && !/^\/(categories|media)\//.test(imageUrl)) throw new Error("Upload the image here");
+    const data = { name, nameAr: input.nameAr?.trim() || null, emoji: input.emoji?.trim() || null, imageUrl, sortOrder: input.sortOrder ?? 0, active: input.active ?? true };
     if (input.id) await prisma.foodCategory.update({ where: { id: input.id }, data });
     else await prisma.foodCategory.create({ data: { ...data, slug: slugify(name) } });
     await audit({ actorId: user.id, action: input.id ? "category.update" : "category.create", entityType: "food_category", entityId: input.id, data });
     revalidatePath("/admin/categories");
+    revalidatePath("/restaurants");
   }, "Category saved");
 }
 

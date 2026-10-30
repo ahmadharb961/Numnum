@@ -23,22 +23,33 @@ import { DEMOS, PALETTES, type Demo } from "./demo-data";
 const CATEGORIES = [
   ["burgers", "Burgers", "برغر", "🍔"],
   ["pizza", "Pizza", "بيتزا", "🍕"],
+  ["fast-food", "Fast Food", "وجبات سريعة", "🍟"],
   ["lebanese", "Lebanese", "لبناني", "🫓"],
   ["shawarma", "Shawarma", "شاورما", "🌯"],
   ["sandwiches", "Sandwiches", "سندويشات", "🥪"],
-  ["sushi", "Sushi", "سوشي", "🍣"],
-  ["pasta", "Pasta", "باستا", "🍝"],
+  ["grills", "Grills", "مشاوي", "🍢"],
   ["chicken", "Chicken", "دجاج", "🍗"],
+  ["manakish", "Manakish", "مناقيش", "🫓"],
+  ["sushi", "Sushi", "سوشي", "🍣"],
+  ["asian", "Asian", "آسيوي", "🍜"],
+  ["pasta", "Pasta", "باستا", "🍝"],
+  ["mexican", "Mexican", "مكسيكي", "🌮"],
+  ["seafood", "Seafood", "مأكولات بحرية", "🦐"],
   ["healthy", "Healthy Food", "أكل صحي", "🥗"],
-  ["desserts", "Desserts", "حلويات", "🍰"],
   ["breakfast", "Breakfast", "فطور", "🍳"],
+  ["bakery", "Bakery", "مخبوزات", "🥐"],
+  ["desserts", "Desserts", "حلويات", "🍰"],
+  ["ice-cream", "Ice Cream", "بوظة", "🍦"],
   ["coffee", "Coffee", "قهوة", "☕"],
   ["drinks", "Drinks", "مشروبات", "🥤"],
 ] as const;
 
 async function seedBase() {
   for (const [i, [slug, name, nameAr, emoji]] of CATEGORIES.entries()) {
-    await prisma.foodCategory.upsert({ where: { slug }, create: { slug, name, nameAr, emoji, sortOrder: i }, update: {} });
+    const imageUrl = `/categories/${slug}.webp`;
+    await prisma.foodCategory.upsert({ where: { slug }, create: { slug, name, nameAr, emoji, imageUrl, sortOrder: i }, update: {} });
+    // Categories from before the 3D images get one, and the new default order, once; admin edits stay.
+    await prisma.foodCategory.updateMany({ where: { slug, imageUrl: null }, data: { imageUrl, sortOrder: i } });
   }
   // Flag emoji don't render on Windows (shows "LB"): replace the old default.
   await prisma.foodCategory.updateMany({ where: { slug: "lebanese", emoji: "🇱🇧" }, data: { emoji: "🫓" } });
@@ -191,12 +202,16 @@ async function ensureDemoRestaurant(d: Demo, ri: number, opts: { pw: string; ref
     groupIds[key] = created.id;
   }
   const cats = Object.fromEntries((await prisma.menuCategory.findMany({ where: { restaurantId: r.id } })).map((c) => [c.name, c.id]));
-  const existingItems = Object.fromEntries((await prisma.menuItem.findMany({ where: { restaurantId: r.id } })).map((m) => [m.sku, m.id]));
+  const existingRows = await prisma.menuItem.findMany({ where: { restaurantId: r.id } });
+  const existingItems = Object.fromEntries(existingRows.map((m) => [m.sku, m.id]));
   const items: Record<string, string> = {};
   for (const [i, it] of d.items.entries()) {
     const photo = () => demoImage(`photos/${d.slug}-${it.sku}.jpg`, it.name, it.emoji, ri * 10 + i);
     if (existingItems[it.sku]) {
       items[it.sku] = existingItems[it.sku];
+      // Dishes move when the demo data gets a better category (e.g. fries → Fast Food).
+      const food = opts.foodCats[it.food];
+      if (food && existingRows.find((m) => m.sku === it.sku)?.foodCategoryId !== food) await prisma.menuItem.update({ where: { id: items[it.sku] }, data: { foodCategoryId: food } });
       if (opts.refreshMedia) await setMainImage(r.id, items[it.sku], await photo(), it.sku);
       continue;
     }

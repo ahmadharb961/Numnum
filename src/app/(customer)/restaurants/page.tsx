@@ -8,17 +8,25 @@ import { cn } from "@/lib/utils";
 import { customerLocation } from "@/server/location";
 import { quoteDelivery } from "@/lib/geo";
 import { LocationChip } from "@/components/customer/location-picker";
+import { CategoryTiles } from "@/components/customer/category-tiles";
 
 export const metadata: Metadata = { title: "Restaurants", description: "Restaurants in Lebanon delivering through numnum — cash on delivery." };
 export const dynamic = "force-dynamic";
 
-export default async function RestaurantsPage({ searchParams }: { searchParams: Promise<{ area?: string; near?: string }> }) {
+export default async function RestaurantsPage({ searchParams }: { searchParams: Promise<{ area?: string; near?: string; category?: string }> }) {
   const sp = await searchParams;
   const loc = await customerLocation();
-  const [raw, f] = await Promise.all([searchRestaurants({ area: sp.area, page: 1 }), facets()]);
+  const [raw, f] = await Promise.all([searchRestaurants({ area: sp.area, category: sp.category, page: 1 }), facets()]);
   // With a location: show distance, deliverable restaurants first, and an optional "delivers to me" filter.
   const withQ = raw.map((r) => ({ r, q: loc ? quoteDelivery(r, loc) : null }));
   const list = (loc ? withQ.filter((x) => sp.near !== "1" || (x.r.deliveryEnabled && x.q?.deliverable)).sort((a, b) => Number(!!b.q?.deliverable) - Number(!!a.q?.deliverable) || (a.q?.km ?? 999) - (b.q?.km ?? 999)) : withQ);
+  const category = f.categories.find((c) => c.slug === sp.category);
+  // Links keep the other filters: area/near links keep the category, category tiles keep the area.
+  const href = (p: { area?: string; near?: string; category?: string }) => {
+    const q = new URLSearchParams(Object.entries(p).filter((e): e is [string, string] => !!e[1]));
+    return q.size ? `/restaurants?${q}` : "/restaurants";
+  };
+  const cat = category?.slug;
   return (
     <main className="pb-nav">
       <header className="sticky top-0 z-30 bg-cream/95 backdrop-blur-xl" style={{ paddingTop: "var(--safe-top)" }}>
@@ -30,15 +38,15 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
           {f.areas.length > 0 && (
             <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible px-4">
               {loc && (
-                <Link href={sp.near === "1" ? "/restaurants" : "/restaurants?near=1"} className={cn("chip", sp.near === "1" && "chip-active")}>
+                <Link href={href({ near: sp.near === "1" ? undefined : "1", category: cat })} className={cn("chip", sp.near === "1" && "chip-active")}>
                   Delivers to me
                 </Link>
               )}
-              <Link href="/restaurants" className={cn("chip", !sp.area && sp.near !== "1" && "chip-active")}>
+              <Link href={href({ category: cat })} className={cn("chip", !sp.area && sp.near !== "1" && "chip-active")}>
                 All areas
               </Link>
               {f.areas.map((a) => (
-                <Link key={a} href={`/restaurants?area=${encodeURIComponent(a)}`} className={cn("chip", sp.area === a && "chip-active")}>
+                <Link key={a} href={href({ area: a, category: cat })} className={cn("chip", sp.area === a && "chip-active")}>
                   {a}
                 </Link>
               ))}
@@ -46,8 +54,19 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
           )}
         </div>
       </header>
-      <div className="container-wide grid gap-3 pt-2 lg:grid-cols-2 lg:gap-5 xl:grid-cols-3">
-        {list.length ? list.map(({ r, q }) => <RestaurantCard key={r.id} r={r} delivery={q ? { km: q.km, deliverable: r.deliveryEnabled && q.deliverable, feeCents: q.deliverable ? q.feeCents : null } : null} />) : <EmptyState icon={<Store />} title="No restaurants here yet" body="New restaurants join every week." />}
+      <section className="container-wide pt-2" aria-label="Food categories">
+        <CategoryTiles categories={f.categories} active={cat} hrefFor={(slug) => href({ area: sp.area, near: sp.near, category: slug })} />
+      </section>
+      {category && (
+        <div className="container-wide mt-3 flex items-baseline justify-between">
+          <h2 className="text-lg font-black">{category.name}</h2>
+          <span className="text-sm text-ink-muted">
+            {list.length} restaurant{list.length === 1 ? "" : "s"}
+          </span>
+        </div>
+      )}
+      <div className="container-wide mt-2 grid gap-3 lg:grid-cols-2 lg:gap-5 xl:grid-cols-3">
+        {list.length ? list.map(({ r, q }) => <RestaurantCard key={r.id} r={r} delivery={q ? { km: q.km, deliverable: r.deliveryEnabled && q.deliverable, feeCents: q.deliverable ? q.feeCents : null } : null} />) : <EmptyState icon={<Store />} title={category ? `No ${category.name.toLowerCase()} restaurants here yet` : "No restaurants here yet"} body="New restaurants join every week." />}
       </div>
       <div className="container-app mt-8 text-center">
         <Link href="/business" className="text-sm font-semibold text-brand-600">
