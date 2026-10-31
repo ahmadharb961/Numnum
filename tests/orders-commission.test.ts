@@ -281,3 +281,27 @@ describe("monthly billing & Whish settlement", () => {
     expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).totalDueCents).toBe(560);
   });
 });
+
+describe("order access control", () => {
+  it("a restaurant cannot act on another restaurant's order", async () => {
+    const a = await makeRestaurant({ name: "Alpha" });
+    const b = await makeRestaurant({ name: "Beta" });
+    const { order } = await place(a, "acl1");
+    for (const action of ["ACCEPT", "REJECT", "DISPATCH", "COMPLETE"] as const) {
+      await expect(restaurantOrderAction(b.restaurant.id, b.user.id, order.id, action)).rejects.toThrow(/Order not found/);
+    }
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("PLACED");
+  });
+
+  it("a customer cannot see or cancel someone else's order", async () => {
+    const f = await makeRestaurant();
+    const { order } = await place(f, "acl2");
+    const stranger = await makeCustomer();
+    const viewer = { userId: stranger.id, deviceKey: "device-stranger-aaaaaaaa", token: null };
+    expect(canViewOrder(order, viewer)).toBe(false);
+    expect(canViewOrder(order, { ...viewer, token: "wrong-token" })).toBe(false);
+    expect(canViewOrder(order, { ...viewer, token: order.trackingToken })).toBe(true); // the private tracking link
+    await expect(customerCancelOrder(order.reference, viewer)).rejects.toThrow(/Order not found/);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("PLACED");
+  });
+});
