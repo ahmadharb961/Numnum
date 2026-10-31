@@ -111,7 +111,15 @@ const shot = (p, name, full = false) => p.screenshot({ path: `${OUT}/${name}.png
   await n.goto("/", { waitUntil: "networkidle" });
   await shot(n, "11-feed-location-chip");
 
-  // 6. Rating popup for a delivered order
+  // 6. Rating popup for a delivered order (the demo customer's latest order, marked delivered)
+  {
+    const { PrismaClient } = require("@prisma/client");
+    const db = new PrismaClient();
+    const c = await db.user.findUniqueOrThrow({ where: { email: "customer@numnum.demo" } });
+    const o = await db.order.findFirstOrThrow({ where: { userId: c.id }, orderBy: { createdAt: "desc" } });
+    await db.order.update({ where: { id: o.id }, data: { status: "COMPLETED", completedAt: new Date(), reviewedAt: null, reviewDismissedAt: null } });
+    await db.$disconnect();
+  }
   const rc = await browser.newContext({ ...devices["iPhone 13"], baseURL: BASE });
   const r = await login(rc, "customer@numnum.demo", "demo1234");
   await r.goto("/restaurants", { waitUntil: "networkidle" });

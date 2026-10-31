@@ -1,5 +1,6 @@
 const { chromium, devices } = require("playwright");
 const D = __dirname, SHOTS = process.env.SHOTS || require("os").tmpdir();
+const BASE = process.env.BASE_URL || "http://localhost:3000";
 async function login(ctx, email, pw) {
   const page = await ctx.newPage();
   await page.goto("/login");
@@ -19,7 +20,7 @@ async function sweep(page, paths, errors) {
 (async () => {
   const browser = await chromium.launch();
   const errors = [];
-  const rctx = await browser.newContext({ ...devices["Pixel 7"], baseURL: "http://localhost:3000" });
+  const rctx = await browser.newContext({ ...devices["Pixel 7"], baseURL: BASE });
   const page = await login(rctx, "owner@burgerhouse.demo", "demo1234");
   page.on("pageerror", (e) => errors.push("pageerror " + e.message));
   console.log("owner landed:", new URL(page.url()).pathname);
@@ -58,7 +59,7 @@ async function sweep(page, paths, errors) {
   await page.screenshot({ path: SHOTS + "/14-overview.png", fullPage: true });
   console.log("dashboard overflow:", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
 
-  const octx = await browser.newContext({ baseURL: "http://localhost:3000" });
+  const octx = await browser.newContext({ baseURL: BASE });
   const other = await login(octx, "owner@manousheh.demo", "demo1234");
   const r1 = await other.request.get(`/api/invoices/${invId}/pdf`);
   const r2 = await other.goto(`/dashboard/billing/${invId}`);
@@ -66,7 +67,7 @@ async function sweep(page, paths, errors) {
   const receipts = await other.request.get(`/dashboard/orders?ref=NN`);
   console.log("isolation: other restaurant invoice pdf", r1.status(), "invoice page", r2.status(), "orders page sees burger refs:", (await receipts.text()).includes("John Smith"));
 
-  const actx = await browser.newContext({ viewport: { width: 1366, height: 900 }, baseURL: "http://localhost:3000" });
+  const actx = await browser.newContext({ viewport: { width: 1366, height: 900 }, baseURL: BASE });
   const admin = await login(actx, "admin@numnum.app", "admin1234");
   console.log("admin landed:", new URL(admin.url()).pathname);
   if (!process.env.SKIP) {
@@ -90,7 +91,7 @@ async function sweep(page, paths, errors) {
   const csv = await admin.request.get(`/api/admin/export?type=commissions`);
   console.log("export:", csv.status(), (await csv.text()).split("\n")[0]);
 
-  const anon = await (await browser.newContext({ baseURL: "http://localhost:3000" })).newPage();
+  const anon = await (await browser.newContext({ baseURL: BASE })).newPage();
   await anon.goto("/admin");
   console.log("anon /admin ->", new URL(anon.url()).pathname);
   await anon.goto("/dashboard");
