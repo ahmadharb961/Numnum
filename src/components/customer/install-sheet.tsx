@@ -49,7 +49,7 @@ export function InstallSheet({ reference, open, onClose }: { reference?: string;
             🛵
           </div>
           <h2 className="mt-2 text-xl font-extrabold leading-tight">{t("Know the moment your order is on its way")}</h2>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-ink-soft">Add numnum to your home screen and we&apos;ll notify you when the restaurant accepts your order, when it leaves and when it arrives.</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-ink-soft">{t("Add numnum to your home screen and we'll notify you when the restaurant accepts your order, when it leaves and when it arrives.")}</p>
         </div>
         <div className="mt-5">
           <InstallHelp />

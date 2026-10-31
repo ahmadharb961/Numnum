@@ -1,12 +1,11 @@
 // numnum service worker: installability + light offline support.
 // - static assets: cache-first
 // - images/posters: stale-while-revalidate (bounded)
-// - pages: network-first with offline fallback
+// - pages: network only, offline fallback page
 // - API, uploads and videos: never cached (videos use HTTP range requests)
-const VERSION = "nn-v5";
+const VERSION = "nn-v6";
 const STATIC = `${VERSION}-static`;
 const IMAGES = `${VERSION}-images`;
-const PAGES = `${VERSION}-pages`;
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (e) => {
@@ -45,11 +44,9 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   if (req.mode === "navigate") {
-    e.respondWith(
-      fetch(req)
-        .then((res) => { const copy = res.clone(); caches.open(PAGES).then((c) => { c.put(req, copy); trim(PAGES, 30); }); return res; })
-        .catch(async () => (await caches.match(req)) || (await caches.match(OFFLINE_URL))),
-    );
+    // Pages are streamed (React Suspense): pass the response straight through. Copying it into a
+    // cache while it streams changes how the chunks reach the page and made hydration fail at random.
+    e.respondWith(fetch(req).catch(async () => (await caches.match(OFFLINE_URL)) || Response.error()));
   }
 });
 

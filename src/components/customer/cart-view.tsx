@@ -104,7 +104,7 @@ export function CartView() {
           </div>
           <div className="sticky mt-4" style={{ bottom: "calc(var(--nav-h) + var(--safe-bottom) + 12px)" }}>
             <Button size="lg" block onClick={() => router.push("/checkout")}>
-              Continue to checkout · {formatMoney(subtotalCents, cart.currency)}
+              {t("Continue to checkout · {total}", { total: formatMoney(subtotalCents, cart.currency) })}
             </Button>
           </div>
         </div>

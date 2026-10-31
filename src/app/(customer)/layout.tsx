@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { BottomNav } from "@/components/customer/bottom-nav";
 import { DesktopSidebar } from "@/components/customer/desktop-sidebar";
 import { ReviewPrompt } from "@/components/customer/review-prompt";
@@ -11,9 +10,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     <>
       {/* Browsing is open; customers are asked to add numnum to their home screen after ordering. */}
       <div className="lg:ps-64">{children}</div>
-      <Suspense>
-        <DesktopSidebar categories={categories} locationLabel={loc?.label ?? null} />
-      </Suspense>
+      <DesktopSidebar categories={categories} locationLabel={loc?.label ?? null} />
       <BottomNav />
       <ReviewPrompt />
     </>

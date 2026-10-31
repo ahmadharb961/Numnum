@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { selectionSignature, type Selections } from "@/lib/customization";
 
 export type CartLine = {
@@ -126,10 +126,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-export function useCart() {
+export function useCart(): CartCtx {
   const c = useContext(Ctx);
   if (!c) throw new Error("useCart outside CartProvider");
-  return c;
+  // The cart lives in localStorage, so the server always renders "no cart yet". A component that
+  // hydrates late (inside Suspense or a loading boundary) must still render that first, or React
+  // throws a hydration error (#418) once the provider has already loaded the cart.
+  const hydrated = useHydrated();
+  return hydrated ? c : { ...c, cart: null, count: 0, subtotalCents: 0, ready: false };
 }
 
 export { lineTotal };
+
+const noop = () => () => {};
+/** False while hydrating, true afterwards (and on every client-side render). */
+export function useHydrated() {
+  return useSyncExternalStore(noop, () => true, () => false);
+}

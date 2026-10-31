@@ -13,7 +13,7 @@ import { Badge, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
-import { useLocale, useT } from "@/i18n/client";
+import { rich, useLocale, useT } from "@/i18n/client";
 import type { T } from "@/i18n/core";
 
 type Order = {
@@ -175,13 +175,10 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                   <div className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-emerald-900">
                     <Banknote className="h-4 w-4" />
                     <span>
-                      {t("Collect")} <b>{formatMoney(o.totalCents, o.currency)}</b> {t("in cash")}
-                      {o.changeForCents ? (
-                        <>
-                          {" "}
-                          · pays with {formatMoney(o.changeForCents, o.currency)}, bring <b>{formatMoney(o.changeForCents - o.totalCents, o.currency)}</b> {t("change")}
-                        </>
-                      ) : null}
+                      {rich(t, "Collect {amount} in cash", { amount: <b className="tabular">{formatMoney(o.totalCents, o.currency)}</b> })}
+                      {o.changeForCents
+                        ? <> · {rich(t, "pays with {bill}, bring {change} change", { bill: <span className="tabular">{formatMoney(o.changeForCents, o.currency)}</span>, change: <b className="tabular">{formatMoney(o.changeForCents - o.totalCents, o.currency)}</b> })}</>
+                        : null}
                     </span>
                   </div>
                   {o.reason && <div className="text-xs text-red-600">{o.status === "CANCELED" ? (o.canceledBy === "ADMIN" ? t("Canceled by numnum") : t("Canceled by the customer")) : t("Reason")}: {t(o.reason)}</div>}

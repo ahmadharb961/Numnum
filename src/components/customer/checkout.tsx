@@ -259,7 +259,7 @@ export function Checkout() {
               />
             )}
             {info.pickupEnabled && <MethodCard active={method === "PICKUP"} onClick={() => setMethod("PICKUP")} icon={<ShoppingBag className="h-6 w-6" />} title={t("Pickup")} body={t("Ready in about {n} min", { n: info.avgPrepMinutes }) + (info.address ? ` · ${info.address}` : "")} />}
-            {!info.deliveryEnabled && !info.pickupEnabled && <Alert tone="amber">This restaurant hasn&apos;t set up delivery or pickup yet.</Alert>}
+            {!info.deliveryEnabled && !info.pickupEnabled && <Alert tone="amber">{t("This restaurant hasn't set up delivery or pickup yet.")}</Alert>}
             <Button size="lg" block disabled={!method || info.openNow === false} onClick={() => setStep(1)} className="mt-4">
               {t("Continue")}
             </Button>

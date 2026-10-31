@@ -72,11 +72,11 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
         </div>
       )}
       <div className="container-wide mt-2 grid gap-3 lg:grid-cols-2 lg:gap-5 xl:grid-cols-3">
-        {list.length ? list.map(({ r, q }) => <RestaurantCard key={r.id} r={r} delivery={q ? { km: q.km, deliverable: r.deliveryEnabled && q.deliverable, feeCents: q.deliverable ? q.feeCents : null } : null} />) : <EmptyState icon={<Store />} title={category ? `No ${category.name.toLowerCase()} restaurants here yet` : "No restaurants here yet"} body={t("New restaurants join every week.")} />}
+        {list.length ? list.map(({ r, q }) => <RestaurantCard key={r.id} r={r} delivery={q ? { km: q.km, deliverable: r.deliveryEnabled && q.deliverable, feeCents: q.deliverable ? q.feeCents : null } : null} />) : <EmptyState icon={<Store />} title={category ? t("No {name} restaurants here yet", { name: category.name.toLowerCase() }) : t("No restaurants here yet")} body={t("New restaurants join every week.")} />}
       </div>
       <div className="container-app mt-8 text-center">
         <Link href="/business" className="text-sm font-semibold text-brand-600">
-          Own a restaurant? Join numnum →
+          {t("Own a restaurant? Join numnum →")}
         </Link>
       </div>
     </main>

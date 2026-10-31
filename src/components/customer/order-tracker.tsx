@@ -123,9 +123,9 @@ export function OrderTracker({ order: o, token, placed, loggedIn }: { order: Ord
         {placed && o.status === "PLACED" && (
           <div className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-900">
             <div className="flex items-center gap-2 font-bold">
-              <CheckCircle2 className="h-5 w-5" /> Order sent to {o.restaurantName}
+              <CheckCircle2 className="h-5 w-5" /> {t("Order sent to {name}", { name: o.restaurantName })}
             </div>
-            <p className="mt-1">You&apos;ll see updates here as soon as they accept it.{!loggedIn && " " + t("Keep this page or bookmark the link to track it.")}</p>
+            <p className="mt-1">{t("You'll see updates here as soon as they accept it.")}{!loggedIn && " " + t("Keep this page or bookmark the link to track it.")}</p>
           </div>
         )}
 

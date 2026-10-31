@@ -44,11 +44,11 @@ export default async function SavedPage() {
         <h1 className="text-2xl font-black tracking-tight">{t("Saved")}</h1>
         {!user && (
           <p className="mt-1 text-sm text-ink-muted">
-            Saved on this device.{" "}
+            {t("Saved on this device.")}{" "}
             <Link href="/account/register?next=/saved" className="font-semibold text-brand-600">
               {t("Create an account")}
             </Link>{" "}
-            to keep saves, addresses and order history across devices.
+            {t("to keep saves, addresses and order history across devices.")}
           </p>
         )}
         {user && (
