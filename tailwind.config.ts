@@ -35,6 +35,7 @@ export default {
         pop: { "0%": { transform: "scale(1)" }, "50%": { transform: "scale(1.25)" }, "100%": { transform: "scale(1)" } },
         // A finger tapping a button in the install guides.
         tap: { "0%, 100%": { transform: "translate(8px, 10px) scale(1)", opacity: "0.9" }, "45%": { transform: "translate(0, 0) scale(1)", opacity: "1" }, "60%": { transform: "translate(0, 0) scale(0.85)" } },
+        "search-bar": { "0%": { transform: "translateX(-100%)" }, "100%": { transform: "translateX(300%)" } },
         "step-in": { from: { opacity: "0", transform: "translateY(6px)" }, to: { opacity: "1", transform: "translateY(0)" } },
       },
       animation: {

@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
+import { unstable_cache } from "next/cache";
 import { getMainImages } from "./menu";
 import { publicReelWhere, reelCardSelect, toPublicReel } from "./feed";
 
@@ -61,12 +62,29 @@ function restaurantWhere(p: SearchParams): Prisma.RestaurantWhereInput {
   return { AND: and };
 }
 
+/** "pizzas" also finds "pizza", "burgers" finds "burger". */
+export function queryVariants(q: string) {
+  const v = [q];
+  if (q.length > 3 && /es$/i.test(q)) v.push(q.slice(0, -2));
+  if (q.length > 3 && /s$/i.test(q)) v.push(q.slice(0, -1));
+  return [...new Set(v)];
+}
+
+/** Dishes whose name or food category matches come before ones that only match their restaurant (stable within each group). */
+export function rankByMatch<T extends { name: string; description: string | null; foodCategory?: { name: string } | null }>(items: T[], q: string) {
+  const vs = queryVariants(q.toLowerCase());
+  const has = (t?: string | null) => !!t && vs.some((v) => t.toLowerCase().includes(v));
+  const score = (i: T) => (has(i.name) ? 3 : has(i.foodCategory?.name) ? 2 : has(i.description) ? 1 : 0);
+  const order = new Map(items.map((i, n) => [i, n]));
+  items.sort((a, b) => score(b) - score(a) || order.get(a)! - order.get(b)!);
+  return items;
+}
+
 function itemWhere(p: SearchParams): Prisma.MenuItemWhereInput {
   const and: Prisma.MenuItemWhereInput[] = [{ archived: false, restaurant: restaurantWhere(p) }];
   if (p.q) {
-    const q = p.q;
     and.push({
-      OR: [
+      OR: queryVariants(p.q).flatMap((q) => [
         { name: { contains: q, mode: "insensitive" } },
         { description: { contains: q, mode: "insensitive" } },
         { ingredients: { contains: q, mode: "insensitive" } },
@@ -75,7 +93,7 @@ function itemWhere(p: SearchParams): Prisma.MenuItemWhereInput {
         { restaurant: { displayName: { contains: q, mode: "insensitive" } } },
         { restaurant: { cuisine: { contains: q, mode: "insensitive" } } },
         { restaurant: { area: { contains: q, mode: "insensitive" } } },
-      ],
+      ] satisfies Prisma.MenuItemWhereInput[]),
     });
   }
   if (p.category) and.push({ foodCategory: { slug: p.category } });
@@ -93,7 +111,7 @@ export async function searchDishes(p: SearchParams) {
   const [items, total] = await Promise.all([
     prisma.menuItem.findMany({
       where,
-      include: { restaurant: { select: { slug: true, displayName: true, verificationStatus: true, area: true } } },
+      include: { restaurant: { select: { slug: true, displayName: true, verificationStatus: true, area: true } }, foodCategory: { select: { name: true } } },
       orderBy: [{ ratingCount: "desc" }, { viewCount: "desc" }, { createdAt: "desc" }],
       skip: ((p.page ?? 1) - 1) * PAGE,
       take: PAGE,
@@ -101,6 +119,7 @@ export async function searchDishes(p: SearchParams) {
     prisma.menuItem.count({ where }),
   ]);
   const images = await getMainImages(items.map((i) => i.id));
+  if (p.q) rankByMatch(items, p.q);
   return { items: items.map((i) => ({ ...i, image: images.get(i.id) ?? null })), total, pages: Math.ceil(total / PAGE) };
 }
 
@@ -119,13 +138,13 @@ export async function searchRestaurants(p: SearchParams) {
   const where = restaurantWhere(p);
   if (p.q) {
     (where.AND as Prisma.RestaurantWhereInput[]).push({
-      OR: [
-        { displayName: { contains: p.q, mode: "insensitive" } },
-        { cuisine: { contains: p.q, mode: "insensitive" } },
-        { area: { contains: p.q, mode: "insensitive" } },
-        { description: { contains: p.q, mode: "insensitive" } },
-        { menuItems: { some: { archived: false, name: { contains: p.q, mode: "insensitive" } } } },
-      ],
+      OR: queryVariants(p.q).flatMap((q) => [
+        { displayName: { contains: q, mode: "insensitive" } },
+        { cuisine: { contains: q, mode: "insensitive" } },
+        { area: { contains: q, mode: "insensitive" } },
+        { description: { contains: q, mode: "insensitive" } },
+        { menuItems: { some: { archived: false, OR: [{ name: { contains: q, mode: "insensitive" } }, { foodCategory: { name: { contains: q, mode: "insensitive" } } }] } } },
+      ] satisfies Prisma.RestaurantWhereInput[]),
     });
   }
   if (p.category) (where.AND as Prisma.RestaurantWhereInput[]).push({ menuItems: { some: { archived: false, foodCategory: { slug: p.category } } } });
@@ -138,7 +157,10 @@ export async function searchRestaurants(p: SearchParams) {
   });
 }
 
-export async function facets() {
+/** Categories, areas and cuisines change rarely: cached for a minute so each search does less work. */
+export const facets = unstable_cache(loadFacets, ["search-facets"], { revalidate: 60 });
+
+async function loadFacets() {
   const [categories, areas, cuisines] = await Promise.all([
     prisma.foodCategory.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.restaurant.findMany({ where: { status: "ACTIVE", area: { not: null } }, select: { area: true }, distinct: ["area"], orderBy: { area: "asc" } }),
