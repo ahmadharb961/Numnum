@@ -19,6 +19,7 @@ import { updateSetting, DEFAULT_SETTINGS } from "../src/server/settings";
 import { previousPeriod } from "../src/lib/utils";
 import { deleteStreamVideo, streamConfigured, streamUidOf, syncStreamReels, uploadVideoToStream } from "../src/server/stream";
 import { DEMOS, PALETTES, type Demo } from "./demo-data";
+import { refreshAllSearchText } from "../src/server/search-text";
 
 const CATEGORIES = [
   ["burgers", "Burgers", "برغر", "🍔"],
@@ -386,6 +387,9 @@ async function seedDemo(adminId: string) {
 async function main() {
   const admin = await seedBase();
   if (process.env.SEED_DEMO === "true" && admin) await seedDemo(admin.id);
+  // Search index: build it now so search is complete right after a deploy.
+  const s = await refreshAllSearchText();
+  if (s.items || s.restaurants) console.log(`Search index: ${s.items} dishes, ${s.restaurants} restaurants refreshed`);
   await prisma.$disconnect();
 }
 

@@ -193,9 +193,16 @@ model Restaurant {
   reviews           RestaurantReview[]
   notifications     Notification[]
   importJobs        MenuImport[]
+  // Search: name, cuisine, area and the dishes it serves, normalized (see src/server/search-text.ts).
+  searchName        String             @default("")
+  searchText        String             @default("")
+  searchedAt        DateTime?
 
   @@index([status])
   @@index([area])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "restaurants_search_text_trgm")
+  @@index([searchName(ops: raw("gin_trgm_ops"))], type: Gin, map: "restaurants_search_name_trgm")
+  @@index([searchedAt])
   @@map("restaurants")
 }
 
@@ -350,9 +357,17 @@ model MenuItem {
   reviews        ItemReview[]
   orderItems     OrderItem[]
 
+  // Search: normalized text kept up to date by src/server/search-text.ts (NULL searchedAt = needs refresh).
+  searchName      String        @default("")
+  searchText      String        @default("")
+  searchedAt      DateTime?
+
   @@unique([restaurantId, sku])
   @@index([restaurantId, archived])
   @@index([foodCategoryId])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "menu_items_search_text_trgm")
+  @@index([searchName(ops: raw("gin_trgm_ops"))], type: Gin, map: "menu_items_search_name_trgm")
+  @@index([searchedAt])
   @@map("menu_items")
 }
 

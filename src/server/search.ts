@@ -169,9 +169,25 @@ async function loadFacets() {
   return { categories, areas: areas.map((a) => a.area!).filter(Boolean), cuisines: cuisines.map((c) => c.cuisine!).filter(Boolean) };
 }
 
-/** Ids of active restaurants that deliver to a location. */
+const nearCache = new Map<string, { at: number; ids: string[] }>();
+
+/**
+ * Ids of active restaurants that deliver to a location. Only restaurants within the largest
+ * possible delivery radius are loaded (a lat/lng box), and answers are cached per ~1 km for a minute.
+ */
 export async function restaurantsDeliveringTo(loc: { lat: number; lng: number }) {
-  const { quoteDelivery } = await import("@/lib/geo");
-  const rs = await prisma.restaurant.findMany({ where: { status: "ACTIVE", deliveryEnabled: true, latitude: { not: null } }, select: { id: true, latitude: true, longitude: true, deliveryZones: true } });
-  return rs.filter((r) => quoteDelivery(r, loc).deliverable).map((r) => r.id);
+  const key = `${loc.lat.toFixed(2)},${loc.lng.toFixed(2)}`;
+  const hit = nearCache.get(key);
+  if (hit && Date.now() - hit.at < 60_000) return hit.ids;
+  const { quoteDelivery, MAX_ZONE_KM } = await import("@/lib/geo");
+  const dLat = MAX_ZONE_KM / 111;
+  const dLng = MAX_ZONE_KM / (111 * Math.max(0.2, Math.cos((loc.lat * Math.PI) / 180)));
+  const rs = await prisma.restaurant.findMany({
+    where: { status: "ACTIVE", deliveryEnabled: true, latitude: { gte: loc.lat - dLat, lte: loc.lat + dLat }, longitude: { gte: loc.lng - dLng, lte: loc.lng + dLng } },
+    select: { id: true, latitude: true, longitude: true, deliveryZones: true },
+  });
+  const ids = rs.filter((r) => quoteDelivery(r, loc).deliverable).map((r) => r.id);
+  if (nearCache.size > 2000) nearCache.delete(nearCache.keys().next().value!);
+  nearCache.set(key, { at: Date.now(), ids });
+  return ids;
 }

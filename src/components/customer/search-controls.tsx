@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { History, Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { LocationChip } from "./location-picker";
-import { setCounts, setQuery, setSearching, useCounts, useQuery } from "./search-state";
-import { useSearchIndex } from "./instant-search";
+import { setCounts, setQuery, setSearching, useCounts, useQuery, useSearching } from "./search-state";
 
 type Facets = { categories: { slug: string; name: string; emoji: string | null }[]; areas: string[]; cuisines: string[] };
 
@@ -30,25 +29,18 @@ export function rememberSearch(q: string) {
 }
 
 export function SearchControls({ facets, locationLabel }: { facets: Facets; locationLabel: string | null }) {
-  const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
   const [q, setQ] = useState(sp.get("q") ?? "");
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
-  const [pending, start] = useTransition();
-  const index = useSearchIndex();
   const counts = useCounts();
+  const busy = useSearching();
   const type = sp.get("type") ?? "dishes";
 
-  // With the search index loaded, results are computed in the browser: the URL is only kept in
-  // sync (for back/share), without asking the server again.
-  const go = (next: URLSearchParams) => {
-    const url = `${pathname}${next.size ? `?${next}` : ""}`;
-    if (index) window.history.replaceState(null, "", url);
-    else start(() => router.replace(url, { scroll: false }));
-  };
+  // Results fetch themselves from /api/search; the URL only follows along (for back and sharing).
+  const go = (next: URLSearchParams) => window.history.replaceState(null, "", `${pathname}${next.size ? `?${next}` : ""}`);
   // Read the live URL (not the last render's): typing and tab taps update it independently.
   const setParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(window.location.search);
@@ -87,14 +79,11 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
   useEffect(() => {
     const t = setTimeout(() => {
       if ((sp.get("q") ?? "") !== q.trim()) setParams({ q: q.trim() || null });
-    }, index ? 400 : 250);
+    }, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  // Only a server search (before the index arrives) needs a loader; local results are instant.
-  const busy = !index && (pending || (sp.get("q") ?? "") !== q.trim());
-  useEffect(() => setSearching(busy), [busy]);
   useEffect(
     () => () => {
       setSearching(false);
@@ -160,7 +149,7 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
           {(["dishes", "reels", "restaurants"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={cn("h-9 rounded-lg capitalize transition", type === t ? "bg-white shadow-sm" : "text-ink-muted")}>
               {t}
-              {q.trim() && counts && <span className={cn("ml-1 tabular text-xs", type === t ? "text-brand-600" : "text-ink-muted/70")}>{counts[t]}</span>}
+              {q.trim() && counts && <span className={cn("ml-1 tabular text-xs", type === t ? "text-brand-600" : "text-ink-muted/70")}>{counts[t] > 1000 ? "1000+" : counts[t]}</span>}
             </button>
           ))}
         </div>

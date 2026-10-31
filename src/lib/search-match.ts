@@ -48,7 +48,7 @@ const SYNONYMS = [
   "sandwich sandwiches sandwish sandwhich سندويش سندويشات",
   "chicken djej dajaj farrouj فروج دجاج",
   "fries frites batata batatas بطاطا",
-  "coffee cafe ahwe ahweh kahwa espresso latte قهوه",
+  "coffee ahwe ahweh kahwa espresso latte قهوه",
   "dessert desserts sweets helo halawiyat حلو حلويات",
   "juice juices asir aseer عصير",
   "grill grills grilled mashawi meshwe مشاوي",

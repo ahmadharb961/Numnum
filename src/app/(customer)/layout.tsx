@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import { BottomNav } from "@/components/customer/bottom-nav";
 import { DesktopSidebar } from "@/components/customer/desktop-sidebar";
 import { ReviewPrompt } from "@/components/customer/review-prompt";
-import { SearchPrefetch } from "@/components/customer/search-prefetch";
 import { prisma } from "@/server/db";
 import { customerLocation } from "@/server/location";
 
@@ -17,7 +16,6 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       </Suspense>
       <BottomNav />
       <ReviewPrompt />
-      <SearchPrefetch />
     </>
   );
 }

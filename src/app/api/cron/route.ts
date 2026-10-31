@@ -4,6 +4,7 @@ import { recoverStuckJobs, runPendingJobs } from "@/server/jobs";
 import { previousPeriod } from "@/lib/utils";
 import { syncStreamReels } from "@/server/stream";
 import { autoCompleteStaleOrders } from "@/server/orders";
+import { refreshAllSearchText } from "@/server/search-text";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -24,6 +25,7 @@ export async function GET(req: Request) {
   out.jobs = await runPendingJobs(20);
   out.streamReels = await syncStreamReels();
   out.autoCompleted = await autoCompleteStaleOrders();
+  out.search = await refreshAllSearchText();
   if (now.getUTCDate() <= 3) out.invoices = await runMonthlyBilling(previousPeriod(now));
   out.maintenance = await runBillingMaintenance(now);
   return Response.json(out);
