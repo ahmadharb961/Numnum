@@ -68,7 +68,7 @@ return (
     </Suspense>
       <div className="container-wide pt-2">
         <Suspense>
-          <ExploreResults dishes={dishesBody} reels={reelsBody} restaurants={restaurantsBody} />
+          <ExploreResults dishes={dishesBody} reels={reelsBody} restaurants={restaurantsBody} loc={loc ? { lat: loc.lat, lng: loc.lng } : null} />
         </Suspense>
       </div>
     </main>
