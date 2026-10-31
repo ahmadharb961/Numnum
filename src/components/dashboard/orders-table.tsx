@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, Bike, ChevronDown, Clock, MapPin, MessageCircle, Phone } from "lucide-react";
+import { Banknote, Bike, Check, ChevronDown, Clock, MapPin, MessageCircle, Phone, X } from "lucide-react";
 import { driverWhatsAppUrl } from "@/lib/driver-message";
 import { orderAction } from "@/actions/orders";
 import { formatMoney, formatRate } from "@/lib/money";
@@ -59,6 +59,7 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
   });
   const [reasonFor, setReasonFor] = useState<{ order: Order; kind: "REJECT" | "FAIL" } | null>(null);
   const [reason, setReason] = useState("");
+  const [etaFor, setEtaFor] = useState<Record<string, number>>({});
   const [pending, start] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -104,6 +105,49 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
               </div>
               <ChevronDown className={cn("h-5 w-5 text-ink-muted transition", expanded && "rotate-180")} />
             </button>
+            {o.status === "PLACED" && (
+              // New order: the decision comes first, with big green/red buttons.
+              <div className="border-t border-black/5 bg-white p-4">
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ink-muted">
+                  <Clock className="h-3.5 w-3.5" /> {delivery ? "Delivery time" : "Ready in"}
+                </div>
+                <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
+                  {Array.from(new Set([defaultEta, ...ETAS]))
+                    .sort((a, b) => a - b)
+                    .map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setEtaFor((e) => ({ ...e, [o.id]: m }))}
+                        className={cn("h-10 shrink-0 rounded-full border-2 px-4 text-sm font-bold transition", (etaFor[o.id] ?? defaultEta) === m ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-black/10 bg-white text-ink-soft")}
+                      >
+                        {m} min
+                      </button>
+                    ))}
+                </div>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      setReasonFor({ order: o, kind: "REJECT" });
+                      setReason("");
+                    }}
+                    className="flex h-14 items-center justify-center gap-1.5 rounded-2xl bg-red-600 text-base font-extrabold text-white shadow-lg shadow-red-600/25 transition active:scale-[0.97] disabled:opacity-60"
+                  >
+                    <X className="h-5 w-5" strokeWidth={3} /> Reject
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => act(o.id, "ACCEPT", { etaMinutes: etaFor[o.id] ?? defaultEta })}
+                    className="col-span-2 flex h-14 items-center justify-center gap-2 rounded-2xl bg-emerald-600 text-lg font-extrabold text-white shadow-lg shadow-emerald-600/30 transition active:scale-[0.97] disabled:opacity-60"
+                  >
+                    <Check className="h-6 w-6" strokeWidth={3} /> Accept · {etaFor[o.id] ?? defaultEta} min
+                  </button>
+                </div>
+              </div>
+            )}
             {expanded && (
               <div className="grid gap-4 border-t border-black/5 bg-cream/50 p-4 md:grid-cols-2">
                 <div className="space-y-1.5 text-sm">
@@ -174,23 +218,6 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                   </div>
                 </div>
                 <div className="space-y-3 md:col-span-2">
-                  {o.status === "PLACED" && (
-                    <>
-                      <div className="text-xs font-bold uppercase tracking-wide text-ink-muted">
-                        <Clock className="mr-1 inline h-3.5 w-3.5" /> Accept with {delivery ? "delivery" : "ready"} time
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {Array.from(new Set([defaultEta, ...ETAS])).sort((a, b) => a - b).map((m) => (
-                          <Button key={m} size="sm" variant={m === defaultEta ? "primary" : "outline"} onClick={() => act(o.id, "ACCEPT", { etaMinutes: m })}>
-                            {m} min
-                          </Button>
-                        ))}
-                        <Button size="sm" variant="ghost" className="text-red-600" onClick={() => { setReasonFor({ order: o, kind: "REJECT" }); setReason(""); }}>
-                          Reject
-                        </Button>
-                      </div>
-                    </>
-                  )}
                   {delivery && ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status) && (
                     <a href={driverWhatsAppUrl(o, restaurantName)} target="_blank" rel="noopener noreferrer" className="mb-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] text-sm font-bold text-white hover:bg-[#1ebe5b] sm:w-auto sm:px-5">
                       <Bike className="h-4 w-4" /> Send to driver on WhatsApp
