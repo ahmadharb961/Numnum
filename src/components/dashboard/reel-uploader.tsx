@@ -8,8 +8,10 @@ import { uploadFile } from "./upload";
 import { ItemPicker } from "./item-picker";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
+import { useT } from "@/i18n/client";
 
 export function ReelUploader({ items, defaultItemId, canPublish, stream }: { items: { id: string; label: string; sku: string }[]; defaultItemId?: string; canPublish: boolean; stream: boolean }) {
+  const t = useT();
   const router = useRouter();
   const [video, setVideo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export function ReelUploader({ items, defaultItemId, canPublish, stream }: { ite
   async function pickVideo(f: File) {
     setError(null);
     const max = stream ? 500 : 200;
-    if (f.size > max * 1024 * 1024) return setError(`Video is larger than ${max} MB`);
+    if (f.size > max * 1024 * 1024) return setError(t("Video is larger than {n} MB", { n: max }));
     setVideo(f);
     setPreview(URL.createObjectURL(f));
     setAssetId(null);
@@ -95,55 +97,55 @@ export function ReelUploader({ items, defaultItemId, canPublish, stream }: { ite
               </div>
             )}
             {assetId && (
-              <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Uploaded
+              <div className="absolute start-3 top-3 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white">
+                <CheckCircle2 className="h-3.5 w-3.5" /> {t("Uploaded")}
               </div>
             )}
           </div>
         ) : (
           <button onClick={() => vInput.current?.click()} className="mx-auto flex aspect-[9/16] w-full max-w-[320px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-black/15 bg-white text-center">
             <Film className="h-10 w-10 text-brand-500" />
-            <span className="font-bold">Choose or record a video</span>
+            <span className="font-bold">{t("Choose or record a video")}</span>
             <span className="px-6 text-xs text-ink-muted">MP4, MOV or WebM · vertical works best · up to {stream ? "500" : "200"} MB</span>
           </button>
         )}
         <input ref={vInput} type="file" accept="video/mp4,video/quicktime,video/webm,video/*" className="hidden" onChange={(e) => e.target.files?.[0] && pickVideo(e.target.files[0])} />
         {video && (
           <button onClick={() => vInput.current?.click()} className="mt-2 w-full text-center text-sm font-semibold text-brand-600">
-            Choose a different video
+            {t("Choose a different video")}
           </button>
         )}
       </div>
       <div className="card space-y-4 p-5">
         {error && <Alert tone="red">{error}</Alert>}
         <div>
-          <div className="label">Linked menu item *</div>
+          <div className="label">{t("Linked menu item *")}</div>
           <ItemPicker items={items} value={itemId} onChange={setItemId} />
           <p className="mt-1 text-xs text-ink-muted">The reel always shows this item&apos;s current name, price and rating, and opens its order screen.</p>
         </div>
         <Field label="Caption (optional)">
-          <textarea className="input" maxLength={300} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Smashed to order, every time 🔥" />
+          <textarea className="input" maxLength={300} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder={t("Smashed to order, every time 🔥")} />
         </Field>
         <div>
-          <div className="label">Thumbnail (optional)</div>
+          <div className="label">{t("Thumbnail (optional)")}</div>
           <div className="flex items-center gap-3">
             {poster && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={poster.url} alt="" className="h-20 w-12 rounded-lg object-cover" />
             )}
             <Button type="button" variant="outline" size="sm" onClick={() => pInput.current?.click()}>
-              <ImagePlus className="h-4 w-4" /> {poster ? "Replace" : "Upload custom thumbnail"}
+              <ImagePlus className="h-4 w-4" /> {poster ? t("Replace") : t("Upload custom thumbnail")}
             </Button>
           </div>
-          <p className="mt-1 text-xs text-ink-muted">We generate one automatically from the video if you skip this.</p>
+          <p className="mt-1 text-xs text-ink-muted">{t("We generate one automatically from the video if you skip this.")}</p>
           <input ref={pInput} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && pickPoster(e.target.files[0])} />
         </div>
         <label className="flex items-center gap-3 text-sm font-semibold">
           <input type="checkbox" checked={publish} disabled={!canPublish} onChange={(e) => setPublish(e.target.checked)} className="h-5 w-5 accent-brand-500" />
-          Publish automatically when processing finishes
+          {t("Publish automatically when processing finishes")}
         </label>
         <Button size="lg" block onClick={save} loading={saving} disabled={!assetId || !itemId}>
-          Save reel
+          {t("Save reel")}
         </Button>
       </div>
     </div>

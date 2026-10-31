@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, Badge, EmptyState } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 type Item = { id: string; sku: string; name: string; images: { id: string; assetId: string; isMain: boolean; thumbUrl: string }[] };
 type Lib = { id: string; thumbUrl: string; name: string | null; used: number };
@@ -18,15 +19,16 @@ type Pending = { file: File; name: string; status: "matched" | "unmatched" | "du
 const MAX_FILES = 500;
 
 export function BulkPhotos({ items, library }: { items: Item[]; library: Lib[] }) {
+  const t = useT();
   const [tab, setTab] = useState<"bulk" | "assign">("bulk");
   return (
     <div>
       <div className="mb-4 grid max-w-md grid-cols-2 rounded-xl bg-black/5 p-1 text-sm font-semibold">
         <button onClick={() => setTab("bulk")} className={cn("h-10 rounded-lg", tab === "bulk" && "bg-white shadow-sm")}>
-          Bulk upload
+          {t("Bulk upload")}
         </button>
         <button onClick={() => setTab("assign")} className={cn("h-10 rounded-lg", tab === "assign" && "bg-white shadow-sm")}>
-          Assign photos
+          {t("Assign photos")}
         </button>
       </div>
       {tab === "bulk" ? <BulkUpload items={items} onDone={() => setTab("assign")} /> : <Assign items={items} library={library} />}
@@ -35,6 +37,7 @@ export function BulkPhotos({ items, library }: { items: Item[]; library: Lib[] }
 }
 
 function BulkUpload({ items, onDone }: { items: Item[]; onDone: () => void }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
@@ -127,9 +130,9 @@ function BulkUpload({ items, onDone }: { items: Item[]; onDone: () => void }) {
         <div className="card p-5">
           <button onClick={() => input.current?.click()} disabled={!!busy} className="flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-black/15 px-6 py-12 text-center hover:border-brand-400">
             {busy ? <Loader2 className="h-10 w-10 animate-spin text-brand-500" /> : <FileArchive className="h-10 w-10 text-brand-500" />}
-            <div className="font-bold">{busy ? "Reading files…" : "Select photos or a ZIP file"}</div>
+            <div className="font-bold">{busy ? t("Reading files…") : t("Select photos or a ZIP file")}</div>
             <div className="max-w-md text-sm text-ink-muted">
-              Name files with your item SKUs to match automatically: <span className="font-mono">BRG001.jpg</span>, <span className="font-mono">BRG001_2.jpg</span>, <span className="font-mono">BRG001_3.jpg</span>. JPG, PNG, WebP (HEIC where supported).
+              {t("Name files with your item SKUs to match automatically:")} <span className="font-mono">{t("BRG001.jpg")}</span>, <span className="font-mono">{t("BRG001_2.jpg")}</span>, <span className="font-mono">{t("BRG001_3.jpg")}</span>{t(". JPG, PNG, WebP (HEIC where supported).")}
             </div>
           </button>
           <input ref={input} type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.zip,application/zip" className="hidden" onChange={(e) => e.target.files && onPick(e.target.files)} />
@@ -138,19 +141,19 @@ function BulkUpload({ items, onDone }: { items: Item[]; onDone: () => void }) {
       {files.length > 0 && (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <Count label="Matched" value={counts.matched} tone="green" />
-            <Count label="Unmatched" value={counts.unmatched} tone={counts.unmatched ? "amber" : undefined} />
-            <Count label="Duplicates" value={counts.duplicate} />
-            <Count label="Unsupported" value={counts.unsupported} tone={counts.unsupported ? "red" : undefined} />
-            <Count label="Items still missing photos" value={missing.length} tone={missing.length ? "amber" : "green"} />
+            <Count label={t("Matched")} value={counts.matched} tone="green" />
+            <Count label={t("Unmatched")} value={counts.unmatched} tone={counts.unmatched ? "amber" : undefined} />
+            <Count label={t("Duplicates")} value={counts.duplicate} />
+            <Count label={t("Unsupported")} value={counts.unsupported} tone={counts.unsupported ? "red" : undefined} />
+            <Count label={t("Items still missing photos")} value={missing.length} tone={missing.length ? "amber" : "green"} />
           </div>
           <div className="card max-h-[460px] overflow-auto">
             <table className="table-app">
               <thead className="sticky top-0 bg-white">
                 <tr>
-                  <th>File</th>
-                  <th>Match</th>
-                  <th>Status</th>
+                  <th>{t("File")}</th>
+                  <th>{t("Match")}</th>
+                  <th>{t("Status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -167,13 +170,13 @@ function BulkUpload({ items, onDone }: { items: Item[]; onDone: () => void }) {
                         (f.suggestion ? (
                           <label className="inline-flex items-center gap-2 text-xs">
                             <input type="checkbox" checked={!!f.acceptSuggestion} onChange={(e) => setFiles((p) => p.map((x, j) => (j === i ? { ...x, acceptSuggestion: e.target.checked } : x)))} className="accent-brand-500" />
-                            <Sparkles className="h-3.5 w-3.5 text-violet-500" /> Suggested: <b>{f.suggestion.name}</b>
+                            <Sparkles className="h-3.5 w-3.5 text-violet-500" /> {t("Suggested:")} <b>{f.suggestion.name}</b>
                           </label>
                         ) : (
-                          <span className="text-xs text-ink-muted">No match — goes to your photo library</span>
+                          <span className="text-xs text-ink-muted">{t("No match — goes to your photo library")}</span>
                         ))}
                       {f.status === "duplicate" && <span className="text-xs text-ink-muted">Duplicate of another file for {f.itemName} — skipped</span>}
-                      {f.status === "unsupported" && <span className="text-xs text-red-600">Unsupported file type — skipped</span>}
+                      {f.status === "unsupported" && <span className="text-xs text-red-600">{t("Unsupported file type — skipped")}</span>}
                     </td>
                     <td className="w-40">
                       {f.state === "uploading" && (
@@ -187,7 +190,7 @@ function BulkUpload({ items, onDone }: { items: Item[]; onDone: () => void }) {
                           <XCircle className="h-4 w-4" /> {f.error?.slice(0, 40)}
                         </span>
                       )}
-                      {f.state === "waiting" && (f.status === "matched" || f.status === "unmatched") && <Badge>Ready</Badge>}
+                      {f.state === "waiting" && (f.status === "matched" || f.status === "unmatched") && <Badge>{t("Ready")}</Badge>}
                     </td>
                   </tr>
                 ))}
@@ -209,16 +212,16 @@ function BulkUpload({ items, onDone }: { items: Item[]; onDone: () => void }) {
           <div className="flex flex-wrap gap-3">
             {doneCount < counts.matched + counts.unmatched && (
               <Button onClick={uploadAll} loading={busy === "uploading"}>
-                {failed ? <RotateCcw className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />} {failed ? `Retry ${failed} failed` : `Upload ${counts.matched + counts.unmatched} photos`}
+                {failed ? <RotateCcw className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />} {failed ? t("Retry {n} failed", { n: failed }) : t("Upload {n} photos", { n: counts.matched + counts.unmatched })}
               </Button>
             )}
             {doneCount > 0 && busy === null && (
               <Button variant="secondary" onClick={onDone}>
-                Review & assign photos
+                {t("Review & assign photos")}
               </Button>
             )}
             <Button variant="ghost" onClick={() => setFiles([])} disabled={busy === "uploading"}>
-              Start over
+              {t("Start over")}
             </Button>
           </div>
         </>
@@ -237,6 +240,7 @@ function Count({ label, value, tone }: { label: string; value: number; tone?: "g
 }
 
 function Assign({ items, library }: { items: Item[]; library: Lib[] }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const [sel, setSel] = useState<string | null>(items.find((i) => !i.images.length)?.id ?? items[0]?.id ?? null);
@@ -276,9 +280,9 @@ function Assign({ items, library }: { items: Item[]; library: Lib[] }) {
     <div className={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]", pending && "opacity-70")}>
       <div className="card flex max-h-[70vh] flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-black/5 p-3">
-          <span className="text-sm font-bold">1. Select an item</span>
+          <span className="text-sm font-bold">{t("1. Select an item")}</span>
           <label className="flex items-center gap-2 text-xs font-semibold">
-            <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} className="accent-brand-500" /> Missing photos only
+            <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} className="accent-brand-500" /> {t("Missing photos only")}
           </label>
         </div>
         <ul className="flex-1 divide-y divide-black/5 overflow-auto">
@@ -286,7 +290,7 @@ function Assign({ items, library }: { items: Item[]; library: Lib[] }) {
             .filter((i) => !onlyMissing || !i.images.length)
             .map((i) => (
               <li key={i.id}>
-                <button onClick={() => setSel(i.id)} className={cn("flex w-full items-center gap-3 px-3 py-2 text-left", sel === i.id ? "bg-brand-50" : "hover:bg-black/[0.02]")}>
+                <button onClick={() => setSel(i.id)} className={cn("flex w-full items-center gap-3 px-3 py-2 text-start", sel === i.id ? "bg-brand-50" : "hover:bg-black/[0.02]")}>
                   <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-black/5">
                     {i.images[0] && (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -313,30 +317,30 @@ function Assign({ items, library }: { items: Item[]; library: Lib[] }) {
                   <div key={im.id} className="relative h-20 w-20 overflow-hidden rounded-lg">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={im.thumbUrl} alt="" className="h-full w-full object-cover" />
-                    {im.isMain && <span className="absolute left-1 top-1 rounded bg-brand-500 px-1 text-[9px] font-bold text-white">Main</span>}
-                    <button onClick={() => run(() => removePhotoAction(im.id))} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white" aria-label="Remove from item">
+                    {im.isMain && <span className="absolute start-1 top-1 rounded bg-brand-500 px-1 text-[9px] font-bold text-white">{t("Main")}</span>}
+                    <button onClick={() => run(() => removePhotoAction(im.id))} className="absolute end-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white" aria-label={t("Remove from item")}>
                       <XCircle className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-ink-muted">No photos yet — tap a photo below to assign it.</p>
+              <p className="text-sm text-ink-muted">{t("No photos yet — tap a photo below to assign it.")}</p>
             )}
             <a href={`/dashboard/menu/items/${item.id}`} className="mt-2 inline-block text-xs font-semibold text-brand-600">
-              Reorder, crop or set main photo →
+              {t("Reorder, crop or set main photo →")}
             </a>
           </div>
         )}
         <div className="card p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-bold">2. Tap photos to assign</span>
+            <span className="text-sm font-bold">{t("2. Tap photos to assign")}</span>
             <div className="flex gap-2">
               <button onClick={() => setLibFilter(libFilter === "all" ? "unused" : "all")} className="chip h-8 text-xs">
-                {libFilter === "all" ? "Show unassigned" : "Show all"}
+                {libFilter === "all" ? t("Show unassigned") : t("Show all")}
               </button>
               <Button size="sm" variant="outline" onClick={() => input.current?.click()} loading={uploading > 0}>
-                <ImagePlus className="h-4 w-4" /> {uploading ? `${uploading} left` : "Upload"}
+                <ImagePlus className="h-4 w-4" /> {uploading ? t("{n} left", { n: uploading }) : t("Upload")}
               </Button>
             </div>
           </div>
@@ -362,13 +366,13 @@ function Assign({ items, library }: { items: Item[]; library: Lib[] }) {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={l.thumbUrl} alt={l.name ?? ""} className="h-full w-full object-cover" loading="lazy" />
                       {on && (
-                        <span className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-brand-500 text-white">
+                        <span className="absolute end-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-brand-500 text-white">
                           <Check className="h-4 w-4" />
                         </span>
                       )}
                     </button>
                     {l.used === 0 && !on && (
-                      <button onClick={() => confirm("Delete this photo from your library?") && run(() => deleteLibraryPhotoAction(l.id))} className="absolute bottom-1 right-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white" aria-label="Delete photo">
+                      <button onClick={() => confirm(t("Delete this photo from your library?")) && run(() => deleteLibraryPhotoAction(l.id))} className="absolute bottom-1 end-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white" aria-label={t("Delete photo")}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     )}
@@ -377,7 +381,7 @@ function Assign({ items, library }: { items: Item[]; library: Lib[] }) {
               })}
             </div>
           ) : (
-            <p className="py-8 text-center text-sm text-ink-muted">No unassigned photos. Upload some to get started.</p>
+            <p className="py-8 text-center text-sm text-ink-muted">{t("No unassigned photos. Upload some to get started.")}</p>
           )}
         </div>
       </div>

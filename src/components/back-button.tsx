@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
+import { useT } from "@/i18n/client";
 
 const KEY = "nn_pages";
 
@@ -21,6 +22,7 @@ export function NavHistory() {
 
 /** Back to the previous numnum page, or to `fallback` when the page was opened directly. */
 export function BackButton({ fallback = "/" }: { fallback?: string }) {
+  const t = useT();
   const router = useRouter();
   const back = () => {
     let seen = 0;
@@ -31,8 +33,8 @@ export function BackButton({ fallback = "/" }: { fallback?: string }) {
     else router.push(fallback);
   };
   return (
-    <button onClick={back} className="-ml-2 grid h-10 w-10 place-items-center rounded-full hover:bg-black/5" aria-label="Back">
-      <ChevronLeft className="h-6 w-6" />
+    <button onClick={back} className="-ms-2 grid h-10 w-10 place-items-center rounded-full hover:bg-black/5" aria-label={t("Back")}>
+      <ChevronLeft className="rtl:-scale-x-100 h-6 w-6" />
     </button>
   );
 }

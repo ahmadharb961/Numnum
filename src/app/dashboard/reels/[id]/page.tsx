@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
@@ -8,10 +9,15 @@ import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { formatMoney } from "@/lib/money";
 import { parseRange, reelInsight } from "@/server/insights";
 import { ReelPerformance } from "@/components/dashboard/reel-performance";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "Reel" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Reel") };
+}
 
 export default async function ReelDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ days?: string; from?: string; to?: string }> }) {
+  const t = await getT();
   const ctx = await requireRestaurant("MANAGER");
   await syncStreamReels({ restaurantId: ctx.restaurant.id }).catch((e) => console.error("stream sync", e));
   const reel = await prisma.reel.findFirst({ where: { id: (await params).id, restaurantId: ctx.restaurant.id }, include: { menuItem: true } });
@@ -22,10 +28,10 @@ export default async function ReelDetailPage({ params, searchParams }: { params:
   const created = new Date(Date.UTC(reel.createdAt.getUTCFullYear(), reel.createdAt.getUTCMonth(), reel.createdAt.getUTCDate()));
   const end = new Date();
   end.setUTCHours(24, 0, 0, 0);
-  const range = sp.days === "all" ? { from: new Date(Math.max(created.getTime(), end.getTime() - 366 * 86400_000)), to: end, label: "Since published" } : parseRange(sp);
+  const range = sp.days === "all" ? { from: new Date(Math.max(created.getTime(), end.getTime() - 366 * 86400_000)), to: end, label: t("Since published") } : parseRange(sp);
   const perf = reel.status === "READY" ? await reelInsight(ctx.restaurant.id, reel.id, range) : null;
   return (
-    <DashPage title={`Reel · ${reel.menuItem.name}`} description={`Shows ${reel.menuItem.name} at ${formatMoney(reel.menuItem.priceCents, reel.menuItem.currency)} (live price)`}>
+    <DashPage title={t("Reel · {name}", { name: reel.menuItem.name })} description={t("Shows {name} at {price} (live price)", { name: reel.menuItem.name, price: formatMoney(reel.menuItem.priceCents, reel.menuItem.currency) })}>
       {reel.status === "PROCESSING" && <AutoRefresh seconds={5} />}
       {perf && <ReelPerformance reelId={reel.id} currency={ctx.restaurant.currency} rangeLabel={range.label} days={sp.days === "all" ? "all" : sp.from ? null : [7, 30, 90].includes(Number(sp.days)) ? Number(sp.days) : 30} data={perf} />}
       <ReelEditor

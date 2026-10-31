@@ -10,10 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Alert, Badge, Field } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { HlsVideo } from "@/components/hls-video";
+import { useT } from "@/i18n/client";
 
 type Reel = { id: string; status: string; visibility: string; caption: string; videoUrl: string | null; posterUrl: string | null; menuItemId: string; processingError: string | null; removedReason: string | null };
 
 export function ReelEditor({ reel, items }: { reel: Reel; items: { id: string; label: string; sku: string }[] }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const [caption, setCaption] = useState(reel.caption);
@@ -37,11 +39,11 @@ export function ReelEditor({ reel, items }: { reel: Reel; items: { id: string; l
         ) : reel.status === "PROCESSING" ? (
           <div className="grid h-full place-items-center text-center text-sm text-white/80">
             <div>
-              <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin" /> Optimising video for mobile…
+              <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin" /> {t("Optimising video for mobile…")}
             </div>
           </div>
         ) : (
-          <div className="grid h-full place-items-center p-6 text-center text-sm text-white/80">Processing failed</div>
+          <div className="grid h-full place-items-center p-6 text-center text-sm text-white/80">{t("Processing failed")}</div>
         )}
       </div>
       <div className="card space-y-4 p-5">
@@ -51,15 +53,15 @@ export function ReelEditor({ reel, items }: { reel: Reel; items: { id: string; l
         </div>
         {reel.status === "FAILED" && (
           <Alert tone="red">
-            {reel.processingError ?? "We couldn't process this video."}{" "}
+            {t(reel.processingError ?? "We couldn't process this video.")}{" "}
             <button className="font-semibold underline" onClick={() => run(() => retryReelAction(reel.id))}>
-              Retry
+              {t("Retry")}
             </button>
           </Alert>
         )}
-        {reel.visibility === "REMOVED" && <Alert tone="red">Removed by moderation{reel.removedReason ? `: ${reel.removedReason}` : ""}.</Alert>}
+        {reel.visibility === "REMOVED" && <Alert tone="red">{reel.removedReason ? t("Removed by moderation: {reason}", { reason: reel.removedReason }) : t("Removed by moderation.")}</Alert>}
         <div>
-          <div className="label">Linked menu item</div>
+          <div className="label">{t("Linked menu item")}</div>
           <ItemPicker items={items} value={itemId} onChange={setItemId} />
         </div>
         <Field label="Caption">
@@ -67,10 +69,10 @@ export function ReelEditor({ reel, items }: { reel: Reel; items: { id: string; l
         </Field>
         <div className="flex flex-wrap gap-2">
           <Button loading={pending} onClick={() => run(() => updateReelAction(reel.id, { caption, menuItemId: itemId }))}>
-            Save changes
+            {t("Save changes")}
           </Button>
           <Button variant="outline" onClick={() => pInput.current?.click()}>
-            <ImagePlus className="h-4 w-4" /> Replace thumbnail
+            <ImagePlus className="h-4 w-4" /> {t("Replace thumbnail")}
           </Button>
           <input
             ref={pInput}
@@ -93,25 +95,25 @@ export function ReelEditor({ reel, items }: { reel: Reel; items: { id: string; l
         <div className="flex flex-wrap gap-2">
           {reel.visibility === "PUBLISHED" ? (
             <Button variant="outline" onClick={() => run(() => setReelVisibilityAction(reel.id, false))}>
-              Unpublish
+              {t("Unpublish")}
             </Button>
           ) : (
             reel.visibility !== "REMOVED" && (
               <Button variant="dark" disabled={reel.status !== "READY"} onClick={() => run(() => setReelVisibilityAction(reel.id, true))}>
-                Publish
+                {t("Publish")}
               </Button>
             )
           )}
           {reel.visibility === "PUBLISHED" && (
             <a href={`/reel/${reel.id}`} target="_blank" className="inline-flex h-11 items-center px-3 text-sm font-semibold text-brand-600">
-              View live
+              {t("View live")}
             </a>
           )}
           <Button
             variant="ghost"
             className="text-red-600"
             onClick={() => {
-              if (!confirm("Delete this reel permanently?")) return;
+              if (!confirm(t("Delete this reel permanently?"))) return;
               start(async () => {
                 const r = await deleteReelAction(reel.id);
                 if (r.ok) router.push("/dashboard/reels");
@@ -119,7 +121,7 @@ export function ReelEditor({ reel, items }: { reel: Reel; items: { id: string; l
               });
             }}
           >
-            Delete
+            {t("Delete")}
           </Button>
         </div>
       </div>

@@ -13,6 +13,8 @@ import { Badge, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
+import { useLocale, useT } from "@/i18n/client";
+import type { T } from "@/i18n/core";
 
 type Order = {
   id: string;
@@ -43,12 +45,14 @@ const REJECT_REASONS = ["Item(s) unavailable", "Outside delivery area", "Too bus
 const FAIL_REASONS = ["Customer unreachable", "Customer refused the order", "Wrong address", "Customer didn't pick up"];
 const ETAS = [15, 20, 30, 45, 60, 90];
 
-function minutesAgo(iso: string) {
+function minutesAgo(iso: string, t: T, lang: string) {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : formatDateTime(iso);
+  return m < 1 ? t("just now") : m < 60 ? t("{n} min ago", { n: m }) : formatDateTime(iso, lang);
 }
 
 export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Order[]; defaultEta: number; restaurantName: string }) {
+  const t = useT();
+  const lang = useLocale();
   // Active orders start open (staff need the address, phone and next step); closed ones start collapsed.
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const toggle = (id: string) => setToggled((t) => {
@@ -83,25 +87,25 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
         const due = o.acceptedAt && o.estimatedMinutes ? new Date(new Date(o.acceptedAt).getTime() + o.estimatedMinutes * 60000) : null;
         return (
           <div key={o.id} className={cn("card overflow-hidden", o.status === "PLACED" && "ring-2 ring-brand-500")}>
-            <button onClick={() => toggle(o.id)} className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 p-4 text-left">
+            <button onClick={() => toggle(o.id)} className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 p-4 text-start">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-sm font-bold">{o.reference}</span>
                   <Badge tone={s.tone}>{s.label}</Badge>
-                  <Badge>{delivery ? "Delivery" : "Pickup"}</Badge>
-                  {o.autoCompleted && <Badge tone="amber">auto-completed</Badge>}
+                  <Badge>{delivery ? t("Delivery") : t("Pickup")}</Badge>
+                  {o.autoCompleted && <Badge tone="amber">{t("auto-completed")}</Badge>}
                 </div>
                 <div className="mt-1 text-sm">
                   <span className="font-semibold">{o.customerName}</span>{" "}
                   <span className="text-ink-muted">
-                    · {o.items.reduce((n, i) => n + i.quantity, 0)} items · {minutesAgo(o.createdAt)}
-                    {due && ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"].includes(o.status) && <> · due {due.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Beirut" })}</>}
+                    · {t("{n} items", { n: o.items.reduce((n, i) => n + i.quantity, 0) })} · {minutesAgo(o.createdAt, t, lang)}
+                    {due && ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"].includes(o.status) && <> · {t("due")} {due.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Beirut" })}</>}
                   </span>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-end">
                 <div className="tabular font-extrabold">{formatMoney(o.totalCents, o.currency)}</div>
-                <div className="text-xs text-ink-muted">cash to collect</div>
+                <div className="text-xs text-ink-muted">{t("cash to collect")}</div>
               </div>
               <ChevronDown className={cn("h-5 w-5 text-ink-muted transition", expanded && "rotate-180")} />
             </button>
@@ -109,7 +113,7 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
               // New order: the decision comes first, with big green/red buttons.
               <div className="border-t border-black/5 bg-white p-4">
                 <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ink-muted">
-                  <Clock className="h-3.5 w-3.5" /> {delivery ? "Delivery time" : "Ready in"}
+                  <Clock className="h-3.5 w-3.5" /> {delivery ? t("Delivery time") : t("Ready in")}
                 </div>
                 <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
                   {Array.from(new Set([defaultEta, ...ETAS]))
@@ -121,7 +125,7 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                         onClick={() => setEtaFor((e) => ({ ...e, [o.id]: m }))}
                         className={cn("h-10 shrink-0 rounded-full border-2 px-4 text-sm font-bold transition", (etaFor[o.id] ?? defaultEta) === m ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-black/10 bg-white text-ink-soft")}
                       >
-                        {m} min
+                        {t("{n} min", { n: m })}
                       </button>
                     ))}
                 </div>
@@ -135,7 +139,7 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                     }}
                     className="flex h-14 items-center justify-center gap-1.5 rounded-2xl bg-red-600 text-base font-extrabold text-white shadow-lg shadow-red-600/25 transition active:scale-[0.97] disabled:opacity-60"
                   >
-                    <X className="h-5 w-5" strokeWidth={3} /> Reject
+                    <X className="h-5 w-5" strokeWidth={3} /> {t("Reject")}
                   </button>
                   <button
                     type="button"
@@ -143,7 +147,7 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                     onClick={() => act(o.id, "ACCEPT", { etaMinutes: etaFor[o.id] ?? defaultEta })}
                     className="col-span-2 flex h-14 items-center justify-center gap-2 rounded-2xl bg-emerald-600 text-lg font-extrabold text-white shadow-lg shadow-emerald-600/30 transition active:scale-[0.97] disabled:opacity-60"
                   >
-                    <Check className="h-6 w-6" strokeWidth={3} /> Accept · {etaFor[o.id] ?? defaultEta} min
+                    <Check className="h-6 w-6" strokeWidth={3} /> {t("Accept · {n} min", { n: etaFor[o.id] ?? defaultEta })}
                   </button>
                 </div>
               </div>
@@ -151,18 +155,18 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
             {expanded && (
               <div className="grid gap-4 border-t border-black/5 bg-cream/50 p-4 md:grid-cols-2">
                 <div className="space-y-1.5 text-sm">
-                  <div className="text-xs font-bold uppercase tracking-wide text-ink-muted">Customer</div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-ink-muted">{t("Customer")}</div>
                   <div className="font-semibold">{o.customerName}</div>
                   <div className="flex flex-wrap gap-2">
                     <a href={`tel:+${o.customerPhone}`} className="chip h-8 text-xs">
                       <Phone className="h-3.5 w-3.5" /> {formatPhone(o.customerPhone)}
                     </a>
                     <a href={`https://wa.me/${o.customerPhone}`} target="_blank" rel="noopener noreferrer" className="chip h-8 text-xs">
-                      <MessageCircle className="h-3.5 w-3.5" /> Message
+                      <MessageCircle className="h-3.5 w-3.5" /> {t("Message")}
                     </a>
                     {o.mapsUrl && (
                       <a href={o.mapsUrl} target="_blank" rel="noopener noreferrer" className="chip h-8 text-xs">
-                        <MapPin className="h-3.5 w-3.5" /> Map
+                        <MapPin className="h-3.5 w-3.5" /> {t("Map")}
                       </a>
                     )}
                   </div>
@@ -171,19 +175,19 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                   <div className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-emerald-900">
                     <Banknote className="h-4 w-4" />
                     <span>
-                      Collect <b>{formatMoney(o.totalCents, o.currency)}</b> cash
+                      {t("Collect")} <b>{formatMoney(o.totalCents, o.currency)}</b> {t("in cash")}
                       {o.changeForCents ? (
                         <>
                           {" "}
-                          · pays with {formatMoney(o.changeForCents, o.currency)}, bring <b>{formatMoney(o.changeForCents - o.totalCents, o.currency)}</b> change
+                          · pays with {formatMoney(o.changeForCents, o.currency)}, bring <b>{formatMoney(o.changeForCents - o.totalCents, o.currency)}</b> {t("change")}
                         </>
                       ) : null}
                     </span>
                   </div>
-                  {o.reason && <div className="text-xs text-red-600">{o.status === "CANCELED" ? `Canceled by ${o.canceledBy === "ADMIN" ? "numnum" : "customer"}` : "Reason"}: {o.reason}</div>}
+                  {o.reason && <div className="text-xs text-red-600">{o.status === "CANCELED" ? (o.canceledBy === "ADMIN" ? t("Canceled by numnum") : t("Canceled by the customer")) : t("Reason")}: {t(o.reason)}</div>}
                 </div>
                 <div className="text-sm">
-                  <div className="text-xs font-bold uppercase tracking-wide text-ink-muted">Items</div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-ink-muted">{t("Items")}</div>
                   <ul className="mt-1 space-y-1.5">
                     {o.items.map((i, idx) => (
                       <li key={idx} className="flex justify-between gap-3">
@@ -198,49 +202,49 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                   </ul>
                   <div className="mt-2 space-y-0.5 border-t border-black/10 pt-2">
                     <div className="flex justify-between text-ink-muted">
-                      <span>Subtotal</span>
+                      <span>{t("Subtotal")}</span>
                       <span className="tabular">{formatMoney(o.subtotalCents, o.currency)}</span>
                     </div>
                     {delivery && (
                       <div className="flex justify-between text-ink-muted">
-                        <span>Delivery fee</span>
+                        <span>{t("Delivery fee")}</span>
                         <span className="tabular">{formatMoney(o.deliveryFeeCents, o.currency)}</span>
                       </div>
                     )}
                     <div className="flex justify-between font-bold">
-                      <span>Total</span>
+                      <span>{t("Total")}</span>
                       <span className="tabular">{formatMoney(o.totalCents, o.currency)}</span>
                     </div>
                   </div>
                   <div className="mt-2 flex justify-between text-xs">
-                    <span className="text-ink-muted">Commission</span>
-                    <span>{o.commission ? `${formatMoney(o.commission.commissionCents)} (${formatRate(o.commission.rateBps)}) · ${o.commission.status.toLowerCase()}` : "None yet"}</span>
+                    <span className="text-ink-muted">{t("Commission")}</span>
+                    <span>{o.commission ? `${formatMoney(o.commission.commissionCents)} (${formatRate(o.commission.rateBps)}) · ${t(o.commission.status.toLowerCase())}` : t("None yet")}</span>
                   </div>
                 </div>
                 <div className="space-y-3 md:col-span-2">
                   {delivery && ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status) && (
                     <a href={driverWhatsAppUrl(o, restaurantName)} target="_blank" rel="noopener noreferrer" className="mb-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] text-sm font-bold text-white hover:bg-[#1ebe5b] sm:w-auto sm:px-5">
-                      <Bike className="h-4 w-4" /> Send to driver on WhatsApp
+                      <Bike className="h-4 w-4" /> {t("Send to driver on WhatsApp")}
                     </a>
                   )}
                   <div className="flex flex-wrap gap-2">
                     {o.status === "ACCEPTED" && (
                       <Button size="sm" variant="outline" onClick={() => act(o.id, "PREPARING")}>
-                        Start preparing
+                        {t("Start preparing")}
                       </Button>
                     )}
                     {(o.status === "ACCEPTED" || o.status === "PREPARING") && (
                       <Button size="sm" variant="dark" onClick={() => act(o.id, "DISPATCH")}>
-                        {delivery ? "Out for delivery" : "Ready for pickup"}
+                        {delivery ? t("Out for delivery") : t("Ready for pickup")}
                       </Button>
                     )}
                     {["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"].includes(o.status) && (
                       <>
                         <Button size="sm" onClick={() => act(o.id, "COMPLETE")}>
-                          {delivery ? "Delivered" : "Picked up"} · cash collected
+                          {delivery ? t("Delivered · cash collected") : t("Picked up · cash collected")}
                         </Button>
                         <Button size="sm" variant="ghost" className="text-red-600" onClick={() => { setReasonFor({ order: o, kind: "FAIL" }); setReason(""); }}>
-                          {delivery ? "Couldn't deliver" : "Not picked up"}
+                          {delivery ? t("Couldn't deliver") : t("Not picked up")}
                         </Button>
                       </>
                     )}
@@ -251,17 +255,17 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
           </div>
         );
       })}
-      <Sheet open={!!reasonFor} onClose={() => setReasonFor(null)} title={reasonFor?.kind === "REJECT" ? `Reject ${reasonFor.order.reference}` : `Report problem · ${reasonFor?.order.reference ?? ""}`}>
+      <Sheet open={!!reasonFor} onClose={() => setReasonFor(null)} title={reasonFor?.kind === "REJECT" ? t("Reject {ref}", { ref: reasonFor.order.reference }) : t("Report problem · {ref}", { ref: reasonFor?.order.reference ?? "" })}>
         <div className="space-y-3 p-5">
           <div className="flex flex-wrap gap-2">
             {(reasonFor?.kind === "REJECT" ? REJECT_REASONS : FAIL_REASONS).map((r) => (
-              <button key={r} onClick={() => setReason(r)} className={cn("chip text-xs", reason === r && "chip-active")}>
-                {r}
+              <button key={r} onClick={() => setReason(t(r))} className={cn("chip text-xs", reason === t(r) && "chip-active")}>
+                {t(r)}
               </button>
             ))}
           </div>
-          <textarea className="input" placeholder={reasonFor?.kind === "REJECT" ? "Reason (shown to the customer)" : "What happened?"} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} />
-          <p className="text-xs text-ink-muted">{reasonFor?.kind === "REJECT" ? "The customer is notified right away. Frequent rejections are reviewed by numnum." : "Failed deliveries are reviewed by numnum. Use this only when the customer didn't receive the order."}</p>
+          <textarea className="input" placeholder={reasonFor?.kind === "REJECT" ? t("Reason (shown to the customer)") : t("What happened?")} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} />
+          <p className="text-xs text-ink-muted">{reasonFor?.kind === "REJECT" ? t("The customer is notified right away. Frequent rejections are reviewed by numnum.") : t("Failed deliveries are reviewed by numnum. Use this only when the customer didn't receive the order.")}</p>
           <Button
             variant="danger"
             block
@@ -271,7 +275,7 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
               setReasonFor(null);
             }}
           >
-            {reasonFor?.kind === "REJECT" ? "Reject order" : "Mark as not delivered"}
+            {reasonFor?.kind === "REJECT" ? t("Reject order") : t("Mark as not delivered")}
           </Button>
         </div>
       </Sheet>

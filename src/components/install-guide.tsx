@@ -6,6 +6,8 @@ import { browserKind, externalBrowserUrl, getInstallPrompt, inAppBrowser, onInst
 import { Button, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
+import { rich, useT } from "@/i18n/client";
+import type { T } from "@/i18n/core";
 
 /** Mounted once in the root layout: keeps Android's one-tap install prompt for later. */
 export function InstallPromptListener() {
@@ -43,7 +45,7 @@ function Target({ children, className }: { children: React.ReactNode; className?
       <span className="absolute -inset-1.5 animate-ping rounded-full bg-brand-500/40" />
       <span className="absolute -inset-1 rounded-full ring-2 ring-brand-500" />
       <span className="relative">{children}</span>
-      <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -ml-3 animate-tap text-2xl leading-none drop-shadow" aria-hidden>
+      <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -ms-3 animate-tap text-2xl leading-none drop-shadow" aria-hidden>
         👆
       </span>
     </span>
@@ -55,7 +57,7 @@ function RowTarget({ children }: { children: React.ReactNode }) {
     <div className="relative">
       <div className="absolute inset-0 animate-pulse rounded-lg bg-brand-500/15 ring-2 ring-brand-500" />
       <div className="relative flex items-center justify-between px-3 py-2 font-semibold text-brand-700">{children}</div>
-      <span className="pointer-events-none absolute right-6 top-1/2 z-10 animate-tap text-2xl drop-shadow" aria-hidden>
+      <span className="pointer-events-none absolute end-6 top-1/2 z-10 animate-tap text-2xl drop-shadow" aria-hidden>
         👆
       </span>
     </div>
@@ -130,19 +132,24 @@ const SafariBarClassic = () => (
   />
 );
 
-const SafariMenu = () => (
+function SafariMenu() {
+  const t = useT();
+  return (
   <Page>
     <div className="absolute inset-x-6 bottom-2 rounded-2xl bg-white p-1 text-xs shadow-2xl ring-1 ring-black/10">
       <RowTarget>
-        Share <Share className="h-4 w-4" />
+        {t("Share")} <Share className="h-4 w-4" />
       </RowTarget>
-      <Row>Add to Bookmarks</Row>
-      <Row>Find on Page</Row>
+      <Row>{t("Add to Bookmarks")}</Row>
+      <Row>{t("Find on Page")}</Row>
     </div>
   </Page>
-);
+  );
+}
 
-const ShareSheet = () => (
+function ShareSheet() {
+  const t = useT();
+  return (
   <Page>
     <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-neutral-100 p-2 text-xs shadow-2xl">
       <div className="mb-1.5 flex gap-2 px-1">
@@ -152,21 +159,24 @@ const ShareSheet = () => (
       </div>
       <div className="rounded-xl bg-white">
         <Row>
-          Copy <Copy className="h-4 w-4" />
+          {t("Copy")} <Copy className="h-4 w-4" />
         </Row>
         <RowTarget>
-          Add to Home Screen <PlusSquare className="h-4 w-4" />
+          {t("Add to Home Screen")} <PlusSquare className="h-4 w-4" />
         </RowTarget>
       </div>
     </div>
   </Page>
-);
+  );
+}
 
-const AddDialog = ({ action = "Add" }: { action?: string }) => (
+function AddDialog({ action = "Add" }: { action?: string }) {
+  const t = useT();
+  return (
   <div className="flex h-full flex-col bg-neutral-100 text-xs">
     <div className="flex items-center justify-between bg-white px-3 py-2.5">
-      <span className="text-sky-500">Cancel</span>
-      <b>Add to Home Screen</b>
+      <span className="text-sky-500">{t("Cancel")}</span>
+      <b>{t("Add to Home Screen")}</b>
       <Target>
         <b className="px-1 text-sky-500">{action}</b>
       </Target>
@@ -179,7 +189,8 @@ const AddDialog = ({ action = "Add" }: { action?: string }) => (
       </div>
     </div>
   </div>
-);
+  );
+}
 
 const HomeScreen = ({ name }: { name: string }) => (
   <div className="grid h-full grid-cols-4 content-center gap-x-3 gap-y-3 bg-gradient-to-br from-sky-300 via-indigo-300 to-fuchsia-300 px-5">
@@ -209,36 +220,42 @@ const ChromeTop = ({ icon }: { icon: "menu" | "share" }) => (
   />
 );
 
-const ChromeMenu = () => (
+function ChromeMenu() {
+  const t = useT();
+  return (
   <Page>
-    <div className="absolute right-2 top-1 w-44 rounded-xl bg-white p-1 text-xs shadow-2xl ring-1 ring-black/10">
-      <Row>New tab</Row>
-      <Row>History</Row>
+    <div className="absolute end-2 top-1 w-44 rounded-xl bg-white p-1 text-xs shadow-2xl ring-1 ring-black/10">
+      <Row>{t("New tab")}</Row>
+      <Row>{t("History")}</Row>
       <RowTarget>
-        Add to home screen <PlusSquare className="h-4 w-4" />
+        {t("Add to home screen")} <PlusSquare className="h-4 w-4" />
       </RowTarget>
     </div>
   </Page>
-);
+  );
+}
 
-const AndroidInstall = () => (
+function AndroidInstall() {
+  const t = useT();
+  return (
   <Page>
     <div className="absolute inset-0 grid place-items-center bg-black/30 p-4">
       <div className="w-full rounded-2xl bg-white p-3 text-xs shadow-2xl">
-        <b className="text-sm">Add to home screen</b>
+        <b className="text-sm">{t("Add to home screen")}</b>
         <div className="mt-2 flex items-center gap-2">
           <AppIcon size="h-8 w-8" /> numnum
         </div>
         <div className="mt-3 flex justify-end gap-4 font-semibold text-sky-600">
-          <span>Cancel</span>
+          <span>{t("Cancel")}</span>
           <Target>
-            <span className="px-1">Install</span>
+            <span className="px-1">{t("Install")}</span>
           </Target>
         </div>
       </div>
     </div>
   </Page>
-);
+  );
+}
 
 const InAppTop = () => (
   <Page
@@ -255,18 +272,21 @@ const InAppTop = () => (
   />
 );
 
-const InAppMenu = ({ label }: { label: string }) => (
+function InAppMenu({ label }: { label: string }) {
+  const t = useT();
+  return (
   <Page>
     <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-2 text-xs shadow-2xl ring-1 ring-black/10">
       <Row>
-        Copy link <Copy className="h-4 w-4" />
+        {t("Copy link")} <Copy className="h-4 w-4" />
       </Row>
       <RowTarget>
         {label} <ExternalLink className="h-4 w-4" />
       </RowTarget>
     </div>
   </Page>
-);
+  );
+}
 
 // ---------------------------------------------------------------------------------------------
 
@@ -274,6 +294,7 @@ type Step = { screen: React.ReactNode; text: React.ReactNode };
 
 /** Auto-playing picture steps with a caption; tap the dots or arrows to move through them. */
 function StepPlayer({ steps }: { steps: Step[] }) {
+  const t = useT();
   const [i, setI] = useState(0);
   const [auto, setAuto] = useState(true);
   useEffect(() => {
@@ -299,14 +320,14 @@ function StepPlayer({ steps }: { steps: Step[] }) {
         </p>
       </div>
       <div className="mt-3 flex items-center justify-center gap-3">
-        <button type="button" onClick={() => go(i - 1)} className="grid h-8 w-8 place-items-center rounded-full bg-black/5" aria-label="Previous step">
-          <ChevronLeft className="h-4 w-4" />
+        <button type="button" onClick={() => go(i - 1)} className="grid h-8 w-8 place-items-center rounded-full bg-black/5" aria-label={t("Previous step")}>
+          <ChevronLeft className="rtl:-scale-x-100 h-4 w-4" />
         </button>
         {steps.map((_, n) => (
           <button key={n} type="button" onClick={() => go(n)} className={cn("h-2 rounded-full transition-all", n === i ? "w-6 bg-brand-500" : "w-2 bg-black/15")} aria-label={`Step ${n + 1}`} />
         ))}
-        <button type="button" onClick={() => go(i + 1)} className="grid h-8 w-8 place-items-center rounded-full bg-black/5" aria-label="Next step">
-          <ChevronRight className="h-4 w-4" />
+        <button type="button" onClick={() => go(i + 1)} className="grid h-8 w-8 place-items-center rounded-full bg-black/5" aria-label={t("Next step")}>
+          <ChevronRight className="rtl:-scale-x-100 h-4 w-4" />
         </button>
       </div>
     </div>
@@ -320,7 +341,7 @@ export function PointerArrow({ at }: { at: ArrowAt }) {
   const top = at === "top-right";
   return (
     <div
-      className={cn("pointer-events-none fixed z-[100] animate-bounce", at === "bottom-center" ? "left-1/2 -translate-x-1/2" : "right-3")}
+      className={cn("pointer-events-none fixed z-[100] animate-bounce", at === "bottom-center" ? "left-1/2 -translate-x-1/2" : "end-3")}
       style={top ? { top: "calc(var(--safe-top) + 6px)" } : { bottom: "calc(var(--safe-bottom) + 6px)" }}
       aria-hidden
     >
@@ -329,19 +350,21 @@ export function PointerArrow({ at }: { at: ArrowAt }) {
   );
 }
 
-function installSteps(kind: BrowserKind, appName: string): { steps: Step[]; arrow: ArrowAt | null } {
-  const open: Step = { screen: <HomeScreen name={appName} />, text: <>Open <b>{appName}</b> from your home screen. That&apos;s it!</> };
+function installSteps(kind: BrowserKind, appName: string, t: T): { steps: Step[]; arrow: ArrowAt | null } {
+  const B = (x: string) => <b>{t(x)}</b>;
+  const share = <Share className="inline h-4 w-4 align-text-bottom text-sky-500" />;
+  const open: Step = { screen: <HomeScreen name={appName} />, text: rich(t, "Open {app} from your home screen. That's it!", { app: <b>{appName}</b> }) };
   if (kind === "safari" || kind === "other-ios") {
     const modern = safariVersion() >= 26;
     return {
       arrow: modern ? "bottom-right" : "bottom-center",
       steps: [
         modern
-          ? { screen: <SafariBar26 />, text: <>Tap <b>⋯</b> at the bottom right of Safari.</> }
-          : { screen: <SafariBarClassic />, text: <>Tap <Share className="inline h-4 w-4 align-text-bottom text-sky-500" /> <b>Share</b> at the bottom of Safari.</> },
-        ...(modern ? [{ screen: <SafariMenu />, text: <>Tap <b>Share</b>.</> }] : []),
-        { screen: <ShareSheet />, text: <>Scroll down and tap <b>Add to Home Screen</b> (tap “View More” if you don&apos;t see it).</> },
-        { screen: <AddDialog />, text: <>Tap <b>Add</b> at the top right.</> },
+          ? { screen: <SafariBar26 />, text: rich(t, "Tap {dots} at the bottom right of Safari.", { dots: <b>⋯</b> }) }
+          : { screen: <SafariBarClassic />, text: rich(t, "Tap {icon} {share} at the bottom of Safari.", { icon: share, share: B("Share") }) },
+        ...(modern ? [{ screen: <SafariMenu />, text: rich(t, "Tap {share}.", { share: B("Share") }) }] : []),
+        { screen: <ShareSheet />, text: rich(t, "Scroll down and tap {add} (tap “View More” if you don't see it).", { add: B("Add to Home Screen") }) },
+        { screen: <AddDialog />, text: rich(t, "Tap {add} at the top right.", { add: B("Add") }) },
         open,
       ],
     };
@@ -350,18 +373,18 @@ function installSteps(kind: BrowserKind, appName: string): { steps: Step[]; arro
     return {
       arrow: "top-right",
       steps: [
-        { screen: <ChromeTop icon="share" />, text: <>Tap <Share className="inline h-4 w-4 align-text-bottom" /> <b>Share</b> next to the address bar.</> },
-        { screen: <ShareSheet />, text: <>Scroll down and tap <b>Add to Home Screen</b>.</> },
-        { screen: <AddDialog />, text: <>Tap <b>Add</b>.</> },
+        { screen: <ChromeTop icon="share" />, text: rich(t, "Tap {icon} {share} next to the address bar.", { icon: <Share className="inline h-4 w-4 align-text-bottom" />, share: B("Share") }) },
+        { screen: <ShareSheet />, text: rich(t, "Scroll down and tap {add}.", { add: B("Add to Home Screen") }) },
+        { screen: <AddDialog />, text: rich(t, "Tap {add}.", { add: B("Add") }) },
         open,
       ],
     };
   return {
     arrow: kind === "chrome-android" ? "top-right" : null,
     steps: [
-      { screen: <ChromeTop icon="menu" />, text: <>Tap <b>⋮</b> at the top right of {kind === "chrome-android" ? "Chrome" : "your browser"}.</> },
-      { screen: <ChromeMenu />, text: <>Tap <b>Add to home screen</b> (or <b>Install app</b>).</> },
-      { screen: <AndroidInstall />, text: <>Tap <b>Install</b>.</> },
+      { screen: <ChromeTop icon="menu" />, text: kind === "chrome-android" ? rich(t, "Tap {dots} at the top right of Chrome.", { dots: <b>⋮</b> }) : rich(t, "Tap {dots} at the top right of your browser.", { dots: <b>⋮</b> }) },
+      { screen: <ChromeMenu />, text: rich(t, "Tap {add} (or {install}).", { add: B("Add to home screen"), install: B("Install app") }) },
+      { screen: <AndroidInstall />, text: rich(t, "Tap {install}.", { install: B("Install") }) },
       open,
     ],
   };
@@ -369,24 +392,23 @@ function installSteps(kind: BrowserKind, appName: string): { steps: Step[]; arro
 
 /** Inside Instagram, TikTok…: "Add to Home Screen" only works in the phone's real browser. */
 export function OpenInBrowser({ app }: { app: Exclude<InApp, null> }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const android = /Android/i.test(navigator.userAgent);
-  const browser = android ? "Chrome" : "Safari";
-  const label = android ? (app === "TikTok" ? "Open in browser" : "Open in Chrome") : app === "TikTok" ? "Open in browser" : "Open in external browser";
+  const browser = android ? t("Chrome") : t("Safari");
+  const label = t(android ? (app === "TikTok" ? t("Open in browser") : t("Open in Chrome")) : app === "TikTok" ? t("Open in browser") : t("Open in external browser"));
   return (
     <div>
-      <h2 className="text-xl font-extrabold leading-tight">First, open numnum in {browser}</h2>
-      <p className="mt-1 text-ink-soft">
-        You&apos;re inside {app}&apos;s browser, which can&apos;t add apps to your home screen.
-      </p>
+      <h2 className="text-xl font-extrabold leading-tight">{t("First, open numnum in {browser}", { browser })}</h2>
+      <p className="mt-1 text-ink-soft">{t("You're inside {app}'s browser, which can't add apps to your home screen.", { app })}</p>
       <a href={externalBrowserUrl()} className={buttonClass("primary", "lg", "mt-4 w-full")}>
-        <ExternalLink className="h-5 w-5" /> Open in {browser}
+        <ExternalLink className="h-5 w-5" /> {t("Open in {browser}", { browser })}
       </a>
-      <p className="mb-4 mt-4 text-center text-sm text-ink-muted">If nothing happens, do it from the {app} menu:</p>
+      <p className="mb-4 mt-4 text-center text-sm text-ink-muted">{t("If nothing happens, do it from the {app} menu:", { app })}</p>
       <StepPlayer
         steps={[
-          { screen: <InAppTop />, text: <>Tap <b>⋯</b> at the top right of the screen.</> },
-          { screen: <InAppMenu label={label} />, text: <>Tap <b>{label}</b>.</> },
+          { screen: <InAppTop />, text: rich(t, "Tap {dots} at the top right of the screen.", { dots: <b>⋯</b> }) },
+          { screen: <InAppMenu label={label} />, text: rich(t, "Tap {label}.", { label: <b>{label}</b> }) },
         ]}
       />
       <Button
@@ -399,7 +421,7 @@ export function OpenInBrowser({ app }: { app: Exclude<InApp, null> }) {
           setCopied(true);
         }}
       >
-        <Copy className="h-4 w-4" /> {copied ? `Link copied: paste it in ${browser}` : "Copy link"}
+        <Copy className="h-4 w-4" /> {copied ? t("Link copied: paste it in {browser}", { browser }) : t("Copy link")}
       </Button>
       <PointerArrow at="top-right" />
     </div>
@@ -408,12 +430,13 @@ export function OpenInBrowser({ app }: { app: Exclude<InApp, null> }) {
 
 /** The right guide for this phone: open-in-browser first, Android's one-tap install, or picture steps. */
 export function InstallHelp({ appName = "numnum", arrow = true }: { appName?: string; arrow?: boolean }) {
+  const t = useT();
   const prompt = useInstallPrompt();
   const [env, setEnv] = useState<{ inApp: InApp; kind: BrowserKind } | null>(null);
   useEffect(() => setEnv({ inApp: inAppBrowser(), kind: browserKind() }), []);
   if (!env) return null;
   if (env.inApp) return <OpenInBrowser app={env.inApp} />;
-  const { steps, arrow: at } = installSteps(env.kind, appName);
+  const { steps, arrow: at } = installSteps(env.kind, appName, t);
   return (
     <div>
       {prompt && (
@@ -427,13 +450,13 @@ export function InstallHelp({ appName = "numnum", arrow = true }: { appName?: st
               setInstallPrompt(null);
             }}
           >
-            <PlusSquare className="h-5 w-5" /> Add {appName} to home screen
+            <PlusSquare className="h-5 w-5" /> {t("Add {app} to home screen", { app: appName })}
           </Button>
-          <p className="mb-4 mt-4 text-center text-sm text-ink-muted">Or add it from the browser menu:</p>
+          <p className="mb-4 mt-4 text-center text-sm text-ink-muted">{t("Or add it from the browser menu:")}</p>
         </>
       )}
       <StepPlayer steps={steps} />
-      {env.kind === "other-ios" && <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">If you can&apos;t find it, open numnum.me in <b>Safari</b>.</p>}
+      {env.kind === "other-ios" && <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{rich(t, "If you can't find it, open numnum.me in {safari}.", { safari: <b>Safari</b> })}</p>}
       {arrow && at && !prompt && <PointerArrow at={at} />}
     </div>
   );

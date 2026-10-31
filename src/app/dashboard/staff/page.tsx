@@ -1,18 +1,24 @@
+import type { Metadata } from "next";
 import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { DashPage, Section } from "@/components/dashboard/page";
 import { AddStaffForm } from "@/components/dashboard/staff-form";
 import { RemoveStaff } from "@/components/dashboard/simple-actions";
 import { Badge } from "@/components/ui/misc";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "Staff" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Staff") };
+}
 
 export default async function StaffPage() {
+  const t = await getT();
   const ctx = await requireRestaurant("OWNER");
   const staff = await prisma.restaurantStaff.findMany({ where: { restaurantId: ctx.restaurant.id }, include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: "asc" } });
   return (
-    <DashPage title="Staff & permissions">
-      <Section title="Team">
+    <DashPage title={t("Staff & permissions")}>
+      <Section title={t("Team")}>
         <ul className="divide-y divide-black/5">
           {staff.map((s) => (
             <li key={s.id} className="flex items-center justify-between gap-3 py-3">
@@ -28,17 +34,17 @@ export default async function StaffPage() {
           ))}
         </ul>
       </Section>
-      <Section title="Add a team member">
+      <Section title={t("Add a team member")}>
         <AddStaffForm />
         <div className="mt-4 grid gap-2 text-xs text-ink-muted sm:grid-cols-3">
           <p>
-            <b>Staff</b> — order requests, availability, reviews (read).
+            <b>{t("Staff")}</b> {t("— order requests, availability, reviews (read).")}
           </p>
           <p>
-            <b>Manager</b> — plus menu, photos, reels, reviews replies and business details.
+            <b>{t("Manager")}</b> {t("— plus menu, photos, reels, reviews replies and business details.")}
           </p>
           <p>
-            <b>Owner</b> — everything, including billing, payments, staff and verification.
+            <b>{t("Owner")}</b> {t("— everything, including billing, payments, staff and verification.")}
           </p>
         </div>
       </Section>

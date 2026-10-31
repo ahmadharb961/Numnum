@@ -1,12 +1,31 @@
 import type { Metadata } from "next";
 import { getSettings } from "@/server/settings";
+import { getLocale, getT } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Terms of service" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT())("Terms of service") };
+}
 
 export default async function TermsPage() {
   const s = await getSettings();
   const p = s.platformName;
+  if ((await getLocale()) === "ar")
+    return (
+      <div className="space-y-4 text-[15px] leading-relaxed text-ink-soft [&_h2]:mt-6 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-ink">
+        <h1 className="text-2xl font-black text-ink">شروط الخدمة</h1>
+        <h2>الخدمة</h2>
+        <p>يساعدك {p} على اكتشاف أكل المطاعم المستقلة والطلب منها أونلاين. المطعم — وليس {p} — هو من يقبل طلبك ويحضّر أكلك ويوصّله ويحصّل المبلغ. طريقة الدفع الوحيدة هي <b>الدفع نقداً عند التوصيل</b> (أو نقداً عند الاستلام)، مباشرة للمطعم. يتأكد طلبك عندما يقبله المطعم، ويمكنك إلغاؤه قبل ذلك.</p>
+        <h2>الأسعار والمعلومات</h2>
+        <p>تقدّم المطاعم القوائم والأسعار والمكوّنات ومعلومات مسبّبات الحساسية. نحن لا نستنتج المكوّنات أو مسبّبات الحساسية من الصور. إذا كانت لديك حساسية، تأكّد من المطعم قبل الطلب. يحدّد كل مطعم رسوم التوصيل وتظهر قبل إرسال طلبك.</p>
+        <h2>التقييمات والمحتوى</h2>
+        <p>يجب أن تعكس التقييمات تجارب حقيقية. قد نُخفي أو نزيل المحتوى المزيّف أو المسيء أو المضلّل أو المخالف، وفق قواعد المراجعة لدينا. تؤكد شارة التوثيق هوية المطعم كمؤسسة، وليست تقييماً لجودة الأكل. يتم تمييز المحتوى المموَّل.</p>
+        <h2>المطاعم</h2>
+        <p>توافق المطاعم على اتفاقية العمولة، وعلى إبقاء معلومات القائمة دقيقة، واستخدام بيانات الزبائن لتنفيذ الطلبات فقط.</p>
+        <h2>المسؤولية</h2>
+        <p>{p} ليس طرفاً في عملية البيع بينك وبين المطعم، وغير مسؤول عن جودة الأكل أو تحضيره أو توصيله أو أي خلاف على الدفع، ويجب حلّ ذلك مع المطعم. تواصل مع {s.supportEmail} للإبلاغ عن مشكلة.</p>
+      </div>
+    );
   return (
     <div className="space-y-4 text-[15px] leading-relaxed text-ink-soft [&_h2]:mt-6 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-ink">
       <h1 className="text-2xl font-black text-ink">Terms of service</h1>

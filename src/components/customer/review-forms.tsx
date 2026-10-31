@@ -8,19 +8,21 @@ import type { FormState } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 function StarInput({ name, label, required, size = 36 }: { name: string; label: string; required?: boolean; size?: number }) {
+  const t = useT();
   const [v, setV] = useState(0);
   return (
     <div>
       <div className="label">
         {label}
-        {!required && <span className="font-normal text-ink-muted"> (optional)</span>}
+        {!required && <span className="font-normal text-ink-muted"> {t("(optional)")}</span>}
       </div>
       <input type="hidden" name={name} value={v || ""} />
       <div className="flex gap-1" role="radiogroup" aria-label={label}>
         {[1, 2, 3, 4, 5].map((i) => (
-          <button key={i} type="button" role="radio" aria-checked={v === i} aria-label={`${i} star`} onClick={() => setV(i)} className="p-0.5">
+          <button key={i} type="button" role="radio" aria-checked={v === i} aria-label={t(i > 1 ? "{n} stars" : "{n} star", { n: i })} onClick={() => setV(i)} className="p-0.5">
             <Star style={{ width: size, height: size }} className={cn(i <= v ? "fill-amber-400 text-amber-400" : "text-black/15")} />
           </button>
         ))}
@@ -30,69 +32,73 @@ function StarInput({ name, label, required, size = 36 }: { name: string; label: 
 }
 
 function Done({ href, message }: { href: string; message?: string }) {
+  const t = useT();
   return (
     <div className="py-10 text-center">
       <div className="text-5xl">🙏</div>
-      <h2 className="mt-3 text-xl font-bold">{message}</h2>
+      <h2 className="mt-3 text-xl font-bold">{message ? t(message) : null}</h2>
       <Link href={href} className="mt-4 inline-block font-semibold text-brand-600">
-        Back
+        {t("Back")}
       </Link>
     </div>
   );
 }
 
 export function ItemReviewForm({ menuItemId, backHref, hasPhone }: { menuItemId: string; backHref: string; hasPhone: boolean }) {
+  const t = useT();
   const [state, action, pending] = useActionState<FormState, FormData>(itemReviewAction, undefined);
   if (state?.ok) return <Done href={backHref} message={state.message} />;
   return (
     <form action={action} className="space-y-5">
       {state?.error && <Alert tone="red">{state.error}</Alert>}
       <input type="hidden" name="menuItemId" value={menuItemId} />
-      <StarInput name="rating" label="Your rating" required />
+      <StarInput name="rating" label={t("Your rating")} required />
       <Field label="Your review (optional)" htmlFor="body">
-        <textarea id="body" name="body" className="input" maxLength={1500} placeholder="What did you love? Portion, taste, packaging…" />
+        <textarea id="body" name="body" className="input" maxLength={1500} placeholder={t("What did you love? Portion, taste, packaging…")} />
       </Field>
       <OrderRefField hasPhone={hasPhone} />
       <Button type="submit" size="lg" block loading={pending}>
-        Post review
+        {t("Post review")}
       </Button>
     </form>
   );
 }
 
 export function RestaurantReviewForm({ restaurantId, backHref, hasPhone }: { restaurantId: string; backHref: string; hasPhone: boolean }) {
+  const t = useT();
   const [state, action, pending] = useActionState<FormState, FormData>(restaurantReviewAction, undefined);
   if (state?.ok) return <Done href={backHref} message={state.message} />;
   return (
     <form action={action} className="space-y-5">
       {state?.error && <Alert tone="red">{state.error}</Alert>}
       <input type="hidden" name="restaurantId" value={restaurantId} />
-      <StarInput name="rating" label="Overall experience" required />
+      <StarInput name="rating" label={t("Overall experience")} required />
       <div className="grid grid-cols-2 gap-4">
-        <StarInput name="foodQuality" label="Food quality" size={24} />
-        <StarInput name="service" label="Service" size={24} />
-        <StarInput name="value" label="Value" size={24} />
-        <StarInput name="delivery" label="Delivery" size={24} />
+        <StarInput name="foodQuality" label={t("Food quality")} size={24} />
+        <StarInput name="service" label={t("Service")} size={24} />
+        <StarInput name="value" label={t("Value")} size={24} />
+        <StarInput name="delivery" label={t("Delivery")} size={24} />
       </div>
       <Field label="Your review (optional)" htmlFor="body">
         <textarea id="body" name="body" className="input" maxLength={1500} />
       </Field>
       <OrderRefField hasPhone={hasPhone} />
       <Button type="submit" size="lg" block loading={pending}>
-        Post review
+        {t("Post review")}
       </Button>
     </form>
   );
 }
 
 function OrderRefField({ hasPhone }: { hasPhone: boolean }) {
+  const t = useT();
   return (
     <Field
       label="Order reference (optional)"
       htmlFor="orderReference"
-      hint={hasPhone ? "Link your review to an order you placed. It's marked “Ordered via numnum” only if the restaurant confirmed that order." : "Add your phone number in your account to link reviews to your orders."}
+      hint={hasPhone ? t("Link your review to an order you placed. It's marked “Ordered via numnum” only if the restaurant confirmed that order.") : t("Add your phone number in your account to link reviews to your orders.")}
     >
-      <input id="orderReference" name="orderReference" className="input uppercase" placeholder="NN-2026-000125" disabled={!hasPhone} />
+      <input id="orderReference" name="orderReference" className="input uppercase" placeholder={t("NN-2026-000125")} disabled={!hasPhone} />
     </Field>
   );
 }

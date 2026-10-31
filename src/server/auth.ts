@@ -6,6 +6,7 @@ import type { Role, StaffRole } from "@prisma/client";
 import { prisma } from "./db";
 import { hmac, randomToken } from "./crypto";
 import { ipHash } from "./request";
+import { isLocale, LOCALE_COOKIE } from "@/i18n/core";
 
 export const SESSION_COOKIE = "nn_session";
 export const RESTAURANT_COOKIE = "nn_rest";
@@ -19,8 +20,12 @@ export async function createSession(userId: string, userAgent?: string | null) {
   await prisma.session.create({
     data: { tokenHash: hmac(token), userId, expiresAt, ipHash: await ipHash(), userAgent: userAgent?.slice(0, 200) },
   });
-  await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
   const jar = await cookies();
+  // Language follows the account: a saved choice applies on this device; otherwise this device's choice is saved.
+  const device = jar.get(LOCALE_COOKIE)?.value;
+  const u = await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() }, select: { locale: true } });
+  if (isLocale(u.locale)) jar.set(LOCALE_COOKIE, u.locale, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  else if (isLocale(device)) await prisma.user.update({ where: { id: userId }, data: { locale: device } });
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",

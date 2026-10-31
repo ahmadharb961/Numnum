@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import { getT } from "@/i18n/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ReelFeed } from "@/components/customer/reel-feed";
@@ -20,7 +21,7 @@ async function load(id: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const reel = await load((await params).id);
-  if (!reel) return { title: "Reel not found" };
+  if (!reel) return { title: (await getT())("Reel not found") };
   const title = `${reel.item.name} · ${reel.restaurant.name}`;
   const description = `${formatMoney(reel.item.priceCents, reel.item.currency)} — ${reel.caption || reel.item.description || "Watch and order on numnum"}`;
   return {

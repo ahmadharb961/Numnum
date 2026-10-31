@@ -4,8 +4,10 @@ import { useActionState } from "react";
 import { updateCustomerProfileAction, type FormState } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
+import { useT } from "@/i18n/client";
 
 export function AccountForm({ name, phone, email }: { name: string; phone: string; email: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState<FormState, FormData>(updateCustomerProfileAction, undefined);
   return (
     <form action={action} className="space-y-4">
@@ -20,7 +22,7 @@ export function AccountForm({ name, phone, email }: { name: string; phone: strin
         <input name="phone" type="tel" className="input" defaultValue={phone} />
       </Field>
       <Button type="submit" block loading={pending}>
-        Save
+        {t("Save")}
       </Button>
     </form>
   );

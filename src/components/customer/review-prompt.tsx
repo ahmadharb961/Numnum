@@ -8,14 +8,16 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { api } from "./track";
+import { useT } from "@/i18n/client";
 
 type Pending = { reference: string; fulfillment: "DELIVERY" | "PICKUP"; restaurant: { id: string; displayName: string; logoUrl: string | null }; items: { menuItemId: string; name: string; imageUrl: string | null }[] };
 
 function Stars({ value, onChange, size = 30, label }: { value: number; onChange: (v: number) => void; size?: number; label: string }) {
+  const t = useT();
   return (
-    <div className="flex gap-1" role="radiogroup" aria-label={label}>
+    <div className="flex gap-1" role="radiogroup" aria-label={t(label)}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <button key={i} type="button" role="radio" aria-checked={value === i} aria-label={`${i} star${i > 1 ? "s" : ""}`} onClick={() => onChange(i)} className="p-0.5 active:scale-90">
+        <button key={i} type="button" role="radio" aria-checked={value === i} aria-label={t(i > 1 ? "{n} stars" : "{n} star", { n: i })} onClick={() => onChange(i)} className="p-0.5 active:scale-90">
           <Star style={{ width: size, height: size }} className={cn(i <= value ? "fill-amber-400 text-amber-400" : "text-black/15")} />
         </button>
       ))}
@@ -28,6 +30,7 @@ function Stars({ value, onChange, size = 30, label }: { value: number; onChange:
  * Checked on every page change; "Not now" stops asking for that order.
  */
 export function ReviewPrompt() {
+  const t = useT();
   const pathname = usePathname();
   const router = useRouter();
   const toast = useToast();
@@ -85,7 +88,7 @@ export function ReviewPrompt() {
             </div>
             <div>
               <div className="font-bold">{p.restaurant.displayName}</div>
-              <div className="text-xs text-ink-muted">Rate the overall experience</div>
+              <div className="text-xs text-ink-muted">{t("Rate the overall experience")}</div>
             </div>
           </div>
           <Stars value={rest} onChange={setRest} size={36} label={`Rate ${p.restaurant.displayName}`} />
@@ -100,15 +103,15 @@ export function ReviewPrompt() {
                 ] as const
               ).map(([k, l]) => (
                 <div key={k}>
-                  <div className="mb-0.5 font-semibold text-ink-muted">{l}</div>
-                  <Stars value={sub[k]} onChange={(v) => setSub({ ...sub, [k]: v })} size={20} label={`Rate ${l}`} />
+                  <div className="mb-0.5 font-semibold text-ink-muted">{t(l)}</div>
+                  <Stars value={sub[k]} onChange={(v) => setSub({ ...sub, [k]: v })} size={20} label={t("Rate {what}", { what: t(l) })} />
                 </div>
               ))}
             </div>
           )}
         </section>
         <section className="space-y-3">
-          <div className="text-sm font-bold">Rate the dishes</div>
+          <div className="text-sm font-bold">{t("Rate the dishes")}</div>
           {p.items.map((i) => (
             <div key={i.menuItemId} className="flex items-center gap-3">
               <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-black/5">
@@ -124,13 +127,13 @@ export function ReviewPrompt() {
             </div>
           ))}
         </section>
-        {anyRating && <textarea className="input" maxLength={1500} placeholder="Tell others what you loved (optional)" value={body} onChange={(e) => setBody(e.target.value)} />}
+        {anyRating && <textarea className="input" maxLength={1500} placeholder={t("Tell others what you loved (optional)")} value={body} onChange={(e) => setBody(e.target.value)} />}
         <div className="grid grid-cols-3 gap-3">
           <Button variant="ghost" onClick={() => close(true)}>
-            Not now
+            {t("Not now")}
           </Button>
           <Button className="col-span-2" size="lg" disabled={!anyRating} loading={busy} onClick={submit}>
-            Submit rating
+            {t("Submit rating")}
           </Button>
         </div>
       </div>

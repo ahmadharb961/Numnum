@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requireRestaurant, canAccess } from "@/server/auth";
 import { getSettings } from "@/server/settings";
 import { DashPage, Section } from "@/components/dashboard/page";
@@ -8,10 +9,15 @@ import { formatPhone } from "@/lib/phone";
 import type { OpeningHours } from "@/lib/hours";
 import Link from "next/link";
 import { normalizeZones } from "@/lib/geo";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "Settings" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Settings") };
+}
 
 export default async function SettingsPage() {
+  const t = await getT();
   const ctx = await requireRestaurant("MANAGER");
   const r = ctx.restaurant;
   const settings = await getSettings();
@@ -19,18 +25,18 @@ export default async function SettingsPage() {
   const fmt = (c: number | null) => (c == null ? "" : (c / 10 ** d).toFixed(d));
   const social = (r.socialLinks ?? {}) as Record<string, string>;
   return (
-    <DashPage title="Restaurant settings">
-      <Section title="Business details" description="Shown on your public profile.">
+    <DashPage title={t("Restaurant settings")}>
+      <Section title={t("Business details")} description={t("Shown on your public profile.")}>
         <ProfileForm
           r={{ displayName: r.displayName, businessName: r.businessName, description: r.description ?? "", cuisine: r.cuisine ?? "", phone: r.phone ? formatPhone(r.phone) : "", email: r.email ?? "", address: r.address ?? "", area: r.area ?? "", city: r.city ?? "", mapsUrl: r.mapsUrl ?? "", latitude: r.latitude?.toString() ?? "", longitude: r.longitude?.toString() ?? "", logoUrl: r.logoUrl ?? "", coverUrl: r.coverUrl ?? "", ...social }}
         />
       </Section>
-      <Section id="ordering" title="Online ordering, delivery & pickup">
+      <Section id="ordering" title={t("Online ordering, delivery & pickup")}>
         {canAccess(ctx.staffRole, "OWNER") ? (
           <>
             {!r.agreementAcceptedAt && (
               <Alert className="mb-4">
-                Accept the <Link href="/dashboard/agreement" className="font-semibold underline">commission agreement</Link> to switch on online ordering.
+                {t("Accept the")} <Link href="/dashboard/agreement" className="font-semibold underline">{t("commission agreement")}</Link> {t("to switch on online ordering.")}
               </Alert>
             )}
             <OrderingForm
@@ -40,10 +46,10 @@ export default async function SettingsPage() {
             />
           </>
         ) : (
-          <p className="text-sm text-ink-muted">Only the owner can change ordering settings.</p>
+          <p className="text-sm text-ink-muted">{t("Only the owner can change ordering settings.")}</p>
         )}
       </Section>
-      <Section title="Opening hours" description="Times are in Beirut time. Use a closing time after midnight (e.g. 02:00) for late nights.">
+      <Section title={t("Opening hours")} description={t("Times are in Beirut time. Use a closing time after midnight (e.g. 02:00) for late nights.")}>
         <HoursEditor initial={(r.openingHours ?? {}) as OpeningHours} />
       </Section>
     </DashPage>

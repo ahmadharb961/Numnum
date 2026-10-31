@@ -6,6 +6,7 @@ import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { loginAction, registerCustomerAction, registerRestaurantAction, type FormState } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
+import { useT } from "@/i18n/client";
 
 /**
  * useActionState that remembers what was typed: React resets forms after every action, so
@@ -21,6 +22,7 @@ function useFormAction(serverAction: (prev: FormState, fd: FormData) => Promise<
 }
 
 export function LoginForm({ next }: { next?: string }) {
+  const t = useT();
   const [state, action, pending, v] = useFormAction(loginAction);
   const insecure = useInsecureOrigin();
   const [showPw, setShowPw] = useState(false);
@@ -30,7 +32,7 @@ export function LoginForm({ next }: { next?: string }) {
         <Alert tone="amber">
           This page isn&apos;t secure, so you can&apos;t stay logged in.{" "}
           <a href={insecure} className="font-semibold underline">
-            Open the secure (https) page
+            {t("Open the secure (https) page")}
           </a>
         </Alert>
       )}
@@ -38,27 +40,28 @@ export function LoginForm({ next }: { next?: string }) {
       <input type="hidden" name="next" value={next ?? ""} />
       <Field label="Email" htmlFor="email">
         <span className="relative block">
-          <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-muted" />
-          <input id="email" name="email" defaultValue={v.email} type="email" autoComplete="email" required placeholder="Enter your email" className="input h-14 rounded-2xl pl-12" />
+          <Mail className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-muted" />
+          <input id="email" name="email" defaultValue={v.email} type="email" autoComplete="email" required placeholder={t("Enter your email")} className="input h-14 rounded-2xl ps-12" />
         </span>
       </Field>
       <Field label="Password" htmlFor="password">
         <span className="relative block">
-          <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-muted" />
-          <input id="password" name="password" type={showPw ? "text" : "password"} autoComplete="current-password" required placeholder="Enter your password" className="input h-14 rounded-2xl pl-12 pr-12" />
-          <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-ink-muted hover:bg-black/5" aria-label={showPw ? "Hide password" : "Show password"}>
+          <Lock className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-muted" />
+          <input id="password" name="password" type={showPw ? "text" : "password"} autoComplete="current-password" required placeholder={t("Enter your password")} className="input h-14 rounded-2xl ps-12 pe-12" />
+          <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute end-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-ink-muted hover:bg-black/5" aria-label={showPw ? t("Hide password") : t("Show password")}>
             {showPw ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
           </button>
         </span>
       </Field>
       <Button type="submit" size="lg" block loading={pending} className="h-14 rounded-2xl text-base">
-        Log in <ArrowRight className="h-5 w-5" />
+        {t("Log in")} <ArrowRight className="rtl:-scale-x-100 h-5 w-5" />
       </Button>
     </form>
   );
 }
 
 export function CustomerRegisterForm({ next }: { next?: string }) {
+  const t = useT();
   const [state, action, pending, v] = useFormAction(registerCustomerAction);
   const fe = state?.fieldErrors ?? {};
   return (
@@ -78,13 +81,14 @@ export function CustomerRegisterForm({ next }: { next?: string }) {
         <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />
       </Field>
       <Button type="submit" size="lg" block loading={pending}>
-        Create account
+        {t("Create account")}
       </Button>
     </form>
   );
 }
 
 export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: string }) {
+  const t = useT();
   const [state, action, pending, v] = useFormAction(registerRestaurantAction);
   const fe = state?.fieldErrors ?? {};
   return (
@@ -92,16 +96,16 @@ export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: stri
       {state?.error && <Alert tone="red">{state.error}</Alert>}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Restaurant name (shown to customers)" error={fe.displayName} htmlFor="displayName">
-          <input id="displayName" name="displayName" defaultValue={v.displayName} required className="input" placeholder="Burger House" />
+          <input id="displayName" name="displayName" defaultValue={v.displayName} required className="input" placeholder={t("Burger House")} />
         </Field>
         <Field label="Legal business name" error={fe.businessName} htmlFor="businessName">
-          <input id="businessName" name="businessName" defaultValue={v.businessName} required className="input" placeholder="Burger House SARL" />
+          <input id="businessName" name="businessName" defaultValue={v.businessName} required className="input" placeholder={t("Burger House SARL")} />
         </Field>
         <Field label="Cuisine" error={fe.cuisine} htmlFor="cuisine">
-          <input id="cuisine" name="cuisine" defaultValue={v.cuisine} className="input" placeholder="Burgers, American" />
+          <input id="cuisine" name="cuisine" defaultValue={v.cuisine} className="input" placeholder={t("Burgers, American")} />
         </Field>
         <Field label="Area" error={fe.area} htmlFor="area">
-          <input id="area" name="area" defaultValue={v.area} className="input" placeholder="Hamra, Beirut" />
+          <input id="area" name="area" defaultValue={v.area} className="input" placeholder={t("Hamra, Beirut")} />
         </Field>
         <Field label="Restaurant phone" error={fe.phone} hint="Customers and numnum call this number about orders. You can change it later." htmlFor="phone">
           <input id="phone" name="phone" defaultValue={v.phone} type="tel" required className="input" placeholder="70 123 456" />
@@ -112,7 +116,7 @@ export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: stri
         <Field label="Email" error={fe.email} htmlFor="email">
           <input id="email" name="email" type="email" autoComplete="email" required className="input" defaultValue={loggedInEmail ?? v.email} readOnly={!!loggedInEmail} />
         </Field>
-        <Field label="Password" error={fe.password} hint={loggedInEmail ? "Your current account password" : "At least 8 characters"} htmlFor="password">
+        <Field label="Password" error={fe.password} hint={loggedInEmail ? t("Your current account password") : t("At least 8 characters")} htmlFor="password">
           <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />
         </Field>
       </div>
@@ -121,18 +125,18 @@ export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: stri
         <span>
           I agree to the{" "}
           <Link href="/terms" className="font-semibold text-brand-600 underline" target="_blank">
-            Terms of Service
+            {t("Terms of Service")}
           </Link>{" "}
           and{" "}
           <Link href="/privacy" className="font-semibold text-brand-600 underline" target="_blank">
-            Privacy Policy
+            {t("Privacy Policy")}
           </Link>
           . I&apos;ll review the commission agreement before enabling online ordering.
         </span>
       </label>
       {fe.terms && <p className="text-xs font-medium text-red-600">{fe.terms}</p>}
       <Button type="submit" size="lg" block loading={pending}>
-        Create restaurant account
+        {t("Create restaurant account")}
       </Button>
     </form>
   );

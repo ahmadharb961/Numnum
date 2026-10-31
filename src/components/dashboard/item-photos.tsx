@@ -9,10 +9,12 @@ import { uploadFile } from "./upload";
 import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { ImageCropper } from "./image-cropper";
+import { useT } from "@/i18n/client";
 
 type Photo = { id: string; url: string; thumbUrl: string | null; isMain: boolean };
 
 export function ItemPhotos({ itemId, photos }: { itemId: string; photos: Photo[] }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -57,13 +59,13 @@ export function ItemPhotos({ itemId, photos }: { itemId: string; photos: Photo[]
           <div key={p.id} className="group relative aspect-square overflow-hidden rounded-xl bg-black/5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.thumbUrl ?? p.url} alt="" className="h-full w-full object-cover" />
-            {p.isMain && <span className="absolute left-1.5 top-1.5 rounded-md bg-brand-500 px-1.5 py-0.5 text-[10px] font-bold text-white">Main</span>}
+            {p.isMain && <span className="absolute start-1.5 top-1.5 rounded-md bg-brand-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{t("Main")}</span>}
             <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/70 to-transparent p-1">
-              <button type="button" disabled={i === 0} onClick={() => run(() => movePhotoAction(p.id, -1))} className="grid h-8 w-8 place-items-center text-white disabled:opacity-30" aria-label="Move left">
-                <ArrowLeft className="h-4 w-4" />
+              <button type="button" disabled={i === 0} onClick={() => run(() => movePhotoAction(p.id, -1))} className="grid h-8 w-8 place-items-center text-white disabled:opacity-30" aria-label={t("Move left")}>
+                <ArrowLeft className="rtl:-scale-x-100 h-4 w-4" />
               </button>
               {!p.isMain && (
-                <button type="button" onClick={() => run(() => setMainPhotoAction(p.id))} className="grid h-8 w-8 place-items-center text-white" aria-label="Set as main photo">
+                <button type="button" onClick={() => run(() => setMainPhotoAction(p.id))} className="grid h-8 w-8 place-items-center text-white" aria-label={t("Set as main photo")}>
                   <Star className="h-4 w-4" />
                 </button>
               )}
@@ -74,24 +76,24 @@ export function ItemPhotos({ itemId, photos }: { itemId: string; photos: Photo[]
                   galleryRef.current?.click();
                 }}
                 className="grid h-8 w-8 place-items-center text-white"
-                aria-label="Replace photo"
+                aria-label={t("Replace photo")}
               >
                 <Crop className="h-4 w-4" />
               </button>
-              <button type="button" onClick={() => confirm("Remove this photo?") && run(() => removePhotoAction(p.id))} className="grid h-8 w-8 place-items-center text-white" aria-label="Remove photo">
+              <button type="button" onClick={() => confirm("Remove this photo?") && run(() => removePhotoAction(p.id))} className="grid h-8 w-8 place-items-center text-white" aria-label={t("Remove photo")}>
                 <Trash2 className="h-4 w-4" />
               </button>
-              <button type="button" disabled={i === photos.length - 1} onClick={() => run(() => movePhotoAction(p.id, 1))} className="grid h-8 w-8 place-items-center text-white disabled:opacity-30" aria-label="Move right">
-                <ArrowRight className="h-4 w-4" />
+              <button type="button" disabled={i === photos.length - 1} onClick={() => run(() => movePhotoAction(p.id, 1))} className="grid h-8 w-8 place-items-center text-white disabled:opacity-30" aria-label={t("Move right")}>
+                <ArrowRight className="rtl:-scale-x-100 h-4 w-4" />
               </button>
             </div>
           </div>
         ))}
         <button type="button" onClick={() => galleryRef.current?.click()} className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-black/15 text-xs font-semibold text-ink-muted">
-          <ImagePlus className="h-6 w-6" /> Gallery
+          <ImagePlus className="h-6 w-6" /> {t("Gallery")}
         </button>
         <button type="button" onClick={() => cameraRef.current?.click()} className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-black/15 text-xs font-semibold text-ink-muted">
-          <Camera className="h-6 w-6" /> Take photo
+          <Camera className="h-6 w-6" /> {t("Take photo")}
         </button>
       </div>
       {progress !== null && (

@@ -1,12 +1,18 @@
+import type { Metadata } from "next";
 import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { DashPage } from "@/components/dashboard/page";
 import { CustomizationManager } from "@/components/dashboard/customization-manager";
 import { minorDigits } from "@/lib/money";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "Customizations" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Customizations") };
+}
 
 export default async function CustomizationsPage() {
+  const t = await getT();
   const ctx = await requireRestaurant("MANAGER");
   const r = ctx.restaurant;
   const groups = await prisma.customizationGroup.findMany({
@@ -16,7 +22,7 @@ export default async function CustomizationsPage() {
   });
   const d = minorDigits(r.currency);
   return (
-    <DashPage title="Customizations" description="Reusable option groups — sizes, extras, sauces, cooking preferences. Attach them to any number of menu items.">
+    <DashPage title={t("Customizations")} description={t("Reusable option groups — sizes, extras, sauces, cooking preferences. Attach them to any number of menu items.")}>
       <CustomizationManager
         currency={r.currency}
         groups={groups.map((g) => ({

@@ -7,12 +7,14 @@ import { cn } from "@/lib/utils";
 import { RatingPill, EmptyState } from "@/components/ui/misc";
 import { ReelThumb } from "./cards";
 import { ItemSheet } from "./item-sheet";
+import { useT } from "@/i18n/client";
 
 type Item = { id: string; name: string; description: string | null; priceCents: number; currency: string; ratingAvg: number; ratingCount: number; available: boolean; dietaryLabels: string[]; image: { url: string; thumbUrl: string | null } | null };
 type Section = { id: string; name: string; items: Item[] };
 type Reel = { id: string; posterUrl: string | null; viewCount: number; menuItem: { name: string } };
 
 export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: string; sections: Section[]; reels: Reel[]; orderingEnabled: boolean }) {
+  const t = useT();
   const [tab, setTab] = useState<"menu" | "reels">("menu");
   const [itemId, setItemId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState(sections[0]?.id);
@@ -40,7 +42,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
               ] as const
             ).map(([k, label, Icon]) => (
               <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn("flex h-12 items-center justify-center gap-2 border-b-2 text-sm font-bold transition", tab === k ? "border-ink text-ink" : "border-transparent text-ink-muted")}>
-                <Icon className="h-4 w-4" /> {label}
+                <Icon className="h-4 w-4" /> {t(label)}
               </button>
             ))}
           </div>
@@ -63,14 +65,14 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
 
       {tab === "menu" ? (
         <div className="container-app pt-3">
-          {sections.length === 0 && <EmptyState icon={<UtensilsCrossed />} title="Menu coming soon" />}
+          {sections.length === 0 && <EmptyState icon={<UtensilsCrossed />} title={t("Menu coming soon")} />}
           {sections.map((s) => (
             <section key={s.id} id={`sec-${s.id}`} className="scroll-mt-32 pb-4">
               <h2 className="mb-2 text-lg font-extrabold">{s.name}</h2>
               <div className="grid gap-2.5 lg:grid-cols-2">
                 {s.items.map((i) => (
                   <div key={i.id} className="card flex gap-3 p-2.5">
-                    <button onClick={() => setItemId(i.id)} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-black/5" aria-label={`View ${i.name}`}>
+                    <button onClick={() => setItemId(i.id)} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-black/5" aria-label={t("View {name}", { name: i.name })}>
                       {i.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={i.image.thumbUrl ?? i.image.url} alt={i.name} className="h-full w-full object-cover" loading="lazy" />
@@ -79,7 +81,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
                       )}
                     </button>
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <button onClick={() => setItemId(i.id)} className="text-left">
+                      <button onClick={() => setItemId(i.id)} className="text-start">
                         <div className="line-clamp-1 font-bold">{i.name}</div>
                         {i.description && <p className="mt-0.5 line-clamp-2 text-xs text-ink-muted">{i.description}</p>}
                       </button>
@@ -90,12 +92,12 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
                         </div>
                         {i.available ? (
                           orderingEnabled && (
-                            <button onClick={() => setItemId(i.id)} className="grid h-9 w-9 place-items-center rounded-full bg-brand-500 text-white shadow-md shadow-brand-500/30 active:scale-90" aria-label={`Add ${i.name}`}>
+                            <button onClick={() => setItemId(i.id)} className="grid h-9 w-9 place-items-center rounded-full bg-brand-500 text-white shadow-md shadow-brand-500/30 active:scale-90" aria-label={t("Add {name}", { name: i.name })}>
                               <Plus className="h-5 w-5" />
                             </button>
                           )
                         ) : (
-                          <span className="text-xs font-semibold text-ink-muted">Unavailable</span>
+                          <span className="text-xs font-semibold text-ink-muted">{t("Unavailable")}</span>
                         )}
                       </div>
                     </div>
@@ -112,7 +114,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
           ))}
         </div>
       ) : (
-        <EmptyState icon={<Grid3x3 />} title="No reels yet" body="Check back soon for videos from this kitchen." />
+        <EmptyState icon={<Grid3x3 />} title={t("No reels yet")} body={t("Check back soon for videos from this kitchen.")} />
       )}
       <ItemSheet itemId={itemId} open={!!itemId} onClose={() => setItemId(null)} />
     </div>
@@ -120,6 +122,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled }: { slug: 
 }
 
 export function ShareButton({ title, path, className, children }: { title: string; path: string; className?: string; children: React.ReactNode }) {
+  const t = useT();
   return (
     <button
       className={className}
@@ -129,7 +132,7 @@ export function ShareButton({ title, path, className, children }: { title: strin
           if (navigator.share) await navigator.share({ title, url });
           else {
             await navigator.clipboard.writeText(url);
-            alert("Link copied");
+            alert(t("Link copied"));
           }
         } catch {}
       }}
@@ -140,6 +143,7 @@ export function ShareButton({ title, path, className, children }: { title: strin
 }
 
 export function SaveToggle({ type, refId, initial, className }: { type: "RESTAURANT" | "ITEM"; refId: string; initial: boolean; className?: string }) {
+  const t = useT();
   const [saved, setSaved] = useState(initial);
   return (
     <button
@@ -151,7 +155,7 @@ export function SaveToggle({ type, refId, initial, className }: { type: "RESTAUR
         else setSaved(saved);
       }}
     >
-      {saved ? "Saved" : "Save"}
+      {saved ? t("Saved") : t("Save")}
     </button>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireAdmin } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { AdminNav } from "@/components/admin/nav";
+import { I18nProvider } from "@/i18n/client";
 
 export const metadata: Metadata = { title: { default: "Admin", template: "%s · numnum admin" }, robots: { index: false } };
 
@@ -19,9 +20,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     prisma.notification.count({ where: { audience: "ADMIN", readAt: null } }),
   ]);
   return (
-    <div className="min-h-dvh bg-cream">
+    // The admin panel stays in English, left to right, whatever language is chosen.
+    <div className="min-h-dvh bg-cream" dir="ltr" lang="en">
+      <I18nProvider locale="en" dict={null}>
       <AdminNav counts={{ pendingRestaurants, verifications, suspicious, pendingAdjustments, overdue, payments, disputes, reports, notifications }} />
       <div className="lg:pl-60">{children}</div>
+      </I18nProvider>
     </div>
   );
 }

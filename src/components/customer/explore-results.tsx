@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/ui/misc";
 import { DishCard, ReelThumb, RestaurantCard } from "./cards";
 import { rememberSearch } from "./search-controls";
 import { setCounts, setQuery, setSearching, useQuery } from "./search-state";
+import { useLocale, useT } from "@/i18n/client";
+import { localName } from "@/i18n/core";
 
 type Category = { slug: string; name: string; nameAr: string | null; emoji: string | null; imageUrl: string | null };
 type Tab = "dishes" | "reels" | "restaurants";
@@ -63,6 +65,8 @@ export const formatCount = (n: number) => (n > 1000 ? "1000+" : String(n));
 
 /** Explore results: one page of the active tab from /api/search, as the person types. */
 export function ExploreResults({ initial, categories }: { initial: ExploreResult; categories: Category[] }) {
+  const t = useT();
+  const locale = useLocale();
   const sp = useSearchParams();
   const type = (sp.get("type") as Tab) || "dishes";
   const live = useQuery().trim();
@@ -158,7 +162,7 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
       <div className="py-6 text-center">
         <Search className="mx-auto h-10 w-10 text-ink-muted/50" />
         <h2 className="mt-3 text-lg font-extrabold">No {what} for “{shown.q}”</h2>
-        <p className="mx-auto mt-1 max-w-xs text-sm text-ink-muted">Check the spelling, or try a dish, a restaurant or an area. Popular right now:</p>
+        <p className="mx-auto mt-1 max-w-xs text-sm text-ink-muted">{t("Check the spelling, or try a dish, a restaurant or an area. Popular right now:")}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           {categories.slice(0, 8).map((c) => (
             <CategoryChip key={c.slug} c={c} onClick={() => pickCategory(c.slug)} />
@@ -166,7 +170,7 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
         </div>
       </div>
     ) : (
-      <EmptyState icon={<Search />} title={`No ${what} found`} body="Try removing some filters." />
+      <EmptyState icon={<Search />} title={`No ${what} found`} body={t("Try removing some filters.")} />
     );
 
   return (
@@ -174,7 +178,7 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
       {matchedCategories.length > 0 && (
         <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0">
           {matchedCategories.map((c) => (
-            <CategoryChip key={c.slug} c={c} onClick={() => pickCategory(c.slug)} label={`All ${c.name}`} />
+            <CategoryChip key={c.slug} c={c} onClick={() => pickCategory(c.slug)} label={t("All {name}", { name: localName(locale, c.name, c.nameAr) })} />
           ))}
         </div>
       )}
@@ -182,23 +186,23 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
       <div className="mb-2 flex min-h-5 items-center gap-2 text-xs font-semibold text-ink-muted">
         {busy ? (
           <span className="flex items-center gap-1.5 text-brand-600">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("Searching…")}
           </span>
         ) : (
           shown &&
           total > 0 && (
             <span>
-              {formatCount(total)} {type === "dishes" ? (total === 1 ? "dish" : "dishes") : type === "reels" ? (total === 1 ? "reel" : "reels") : total === 1 ? "restaurant" : "restaurants"}
+              {t(type === "dishes" ? (total === 1 ? "{n} dish" : "{n} dishes") : type === "reels" ? (total === 1 ? "{n} reel" : "{n} reels") : total === 1 ? "{n} restaurant" : "{n} restaurants", { n: formatCount(total) })}
             </span>
           )
         )}
       </div>
       {shown?.corrected && total > 0 && !busy && (
         <p className="mb-2 text-sm text-ink-soft">
-          No exact match for “{shown.q}”. Showing <b>similar results</b>:
+          No exact match for “{shown.q}”. Showing <b>{t("similar results")}</b>:
         </p>
       )}
-      {error && <p className="mb-2 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}. Check your connection and try again.</p>}
+      {error && <p className="mb-2 rounded-xl bg-red-50 p-3 text-sm text-red-700">{t(error)}. {t("Check your connection and try again.")}</p>}
 
       {!shown ? (
         <Skeleton type={type} />
@@ -274,15 +278,16 @@ function Skeleton({ type }: { type: Tab }) {
 }
 
 function CategoryChip({ c, onClick, label }: { c: Category; onClick: () => void; label?: string }) {
+  const locale = useLocale();
   return (
-    <button type="button" onClick={onClick} className="chip h-10 shrink-0 gap-2 pl-1.5">
+    <button type="button" onClick={onClick} className="chip h-10 shrink-0 gap-2 ps-1.5">
       {c.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={c.imageUrl} alt="" className="h-7 w-7 rounded-full" />
       ) : (
         <span>{c.emoji}</span>
       )}
-      {label ?? c.name}
+      {label ?? localName(locale, c.name, c.nameAr)}
     </button>
   );
 }

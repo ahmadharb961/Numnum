@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Compass, Home, ShoppingBag, Store, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "./cart";
+import { useT } from "@/i18n/client";
 
 const items = [
   { href: "/", label: "Home", icon: Home, match: (p: string) => p === "/" || p.startsWith("/reel/") },
@@ -17,6 +18,7 @@ const items = [
 ];
 
 export function BottomNav() {
+  const t = useT();
   const pathname = usePathname();
   const { count } = useCart();
   const dark = pathname === "/" || pathname.startsWith("/reel/") || /^\/r\/[^/]+\/reels/.test(pathname);
@@ -31,7 +33,7 @@ export function BottomNav() {
     <nav
       className={cn("fixed inset-x-0 bottom-0 z-50 border-t backdrop-blur-xl lg:hidden", dark ? "border-white/10 bg-black/90 text-white" : "border-black/5 bg-white/95 text-ink")}
       style={{ paddingBottom: "var(--safe-bottom)" }}
-      aria-label="Main"
+      aria-label={t("Main")}
     >
       <ul className="mx-auto grid h-[var(--nav-h)] max-w-screen-sm grid-cols-5">
         {items.map(({ href, label, icon: Icon, match }) => {
@@ -42,10 +44,10 @@ export function BottomNav() {
                 <span className="relative">
                   <Icon className={cn("h-6 w-6", active && "stroke-[2.4]")} />
                   {href === "/cart" && count > 0 && (
-                    <span className="absolute -right-2.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">{count > 99 ? "99+" : count}</span>
+                    <span className="absolute -end-2.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">{count > 99 ? "99+" : count}</span>
                   )}
                 </span>
-                {label}
+                {t(label)}
               </Link>
             </li>
           );

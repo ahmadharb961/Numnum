@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { localName } from "@/i18n/core";
+import { getLocale, getT } from "@/i18n/server";
 
-type Cat = { slug: string; name: string; emoji: string | null; imageUrl: string | null };
+type Cat = { slug: string; name: string; nameAr?: string | null; emoji: string | null; imageUrl: string | null };
 
 function Tile({ href, active, label, children }: { href: string; active: boolean; label: string; children: React.ReactNode }) {
   return (
@@ -21,14 +23,16 @@ function Tile({ href, active, label, children }: { href: string; active: boolean
 }
 
 /** Round 3D food tiles: scroll sideways on phones, wrap into rows on desktop. */
-export function CategoryTiles({ categories, active, hrefFor }: { categories: Cat[]; active?: string; hrefFor: (slug?: string) => string }) {
+export async function CategoryTiles({ categories, active, hrefFor }: { categories: Cat[]; active?: string; hrefFor: (slug?: string) => string }) {
+  const t = await getT();
+  const locale = await getLocale();
   return (
     <div className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto px-4 pb-1 pt-1 lg:mx-0 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] lg:gap-x-2 lg:gap-y-4 lg:overflow-visible lg:px-0">
-      <Tile href={hrefFor()} active={!active} label="All">
+      <Tile href={hrefFor()} active={!active} label={t("All")}>
         <LayoutGrid className="h-7 w-7 text-brand-500 lg:h-8 lg:w-8" />
       </Tile>
       {categories.map((c) => (
-        <Tile key={c.slug} href={hrefFor(c.slug)} active={active === c.slug} label={c.name}>
+        <Tile key={c.slug} href={hrefFor(c.slug)} active={active === c.slug} label={localName(locale, c.name, c.nameAr)}>
           {c.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={c.imageUrl} alt="" width={84} height={84} loading="lazy" decoding="async" className="h-full w-full object-cover" />

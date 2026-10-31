@@ -5,8 +5,10 @@ import { addStaffAction } from "@/actions/restaurant";
 import type { FormState } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
+import { useT } from "@/i18n/client";
 
 export function AddStaffForm() {
+  const t = useT();
   const [state, action, pending] = useActionState<FormState, FormData>(addStaffAction, undefined);
   const fe = state?.fieldErrors ?? {};
   return (
@@ -19,9 +21,9 @@ export function AddStaffForm() {
         </Field>
         <Field label="Role">
           <select name="role" className="input" defaultValue="STAFF">
-            <option value="STAFF">Staff</option>
-            <option value="MANAGER">Manager</option>
-            <option value="OWNER">Owner</option>
+            <option value="STAFF">{t("Staff")}</option>
+            <option value="MANAGER">{t("Manager")}</option>
+            <option value="OWNER">{t("Owner")}</option>
           </select>
         </Field>
         <Field label="Name (for new accounts)" error={fe.name}>
@@ -32,7 +34,7 @@ export function AddStaffForm() {
         </Field>
       </div>
       <Button type="submit" loading={pending}>
-        Add team member
+        {t("Add team member")}
       </Button>
     </form>
   );

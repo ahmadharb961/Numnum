@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getT } from "@/i18n/server";
 import { notFound } from "next/navigation";
 import { getPublicItem } from "@/server/items";
 import { ItemDetail } from "@/components/customer/item-detail";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const item = await getPublicItem((await params).id);
-  if (!item) return { title: "Dish not found" };
+  if (!item) return { title: (await getT())("Dish not found") };
   const title = `${item.name} · ${item.restaurant.name}`;
   const description = `${formatMoney(item.priceCents, item.currency)} — ${item.description ?? `Order ${item.name} from ${item.restaurant.name} with cash on delivery.`}`.slice(0, 200);
   return { title, description, alternates: { canonical: `/item/${item.id}` }, openGraph: { title, description, images: item.images[0] ? [{ url: item.images[0].url }] : undefined } };

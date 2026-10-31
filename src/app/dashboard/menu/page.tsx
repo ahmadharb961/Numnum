@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus, Upload, Image as ImageIcon } from "lucide-react";
 import { requireRestaurant, canAccess } from "@/server/auth";
@@ -6,10 +7,15 @@ import { getMainImages } from "@/server/menu";
 import { DashPage } from "@/components/dashboard/page";
 import { MenuManager } from "@/components/dashboard/menu-manager";
 import { buttonClass } from "@/components/ui/button";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "Menu" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Menu") };
+}
 
 export default async function MenuPage({ searchParams }: { searchParams: Promise<{ archived?: string }> }) {
+  const t = await getT();
   const ctx = await requireRestaurant();
   const r = ctx.restaurant;
   const showArchived = (await searchParams).archived === "1";
@@ -21,19 +27,19 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
   const manager = canAccess(ctx.staffRole, "MANAGER");
   return (
     <DashPage
-      title="Menu"
-      description={`${items.length} ${showArchived ? "archived" : "active"} items · ${categories.length} categories`}
+      title={t("Menu")}
+      description={t(showArchived ? "{n} archived items · {c} categories" : "{n} active items · {c} categories", { n: items.length, c: categories.length })}
       actions={
         manager && (
           <>
             <Link href="/dashboard/menu/import" className={buttonClass("outline", "sm")}>
-              <Upload className="h-4 w-4" /> Import CSV
+              <Upload className="h-4 w-4" /> {t("Import CSV")}
             </Link>
             <Link href="/dashboard/menu/photos" className={buttonClass("outline", "sm")}>
-              <ImageIcon className="h-4 w-4" /> Photos
+              <ImageIcon className="h-4 w-4" /> {t("Photos")}
             </Link>
             <Link href="/dashboard/menu/items/new" className={buttonClass("primary", "sm")}>
-              <Plus className="h-4 w-4" /> Add item
+              <Plus className="h-4 w-4" /> {t("Add item")}
             </Link>
           </>
         )

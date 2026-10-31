@@ -2,6 +2,8 @@ import "server-only";
 import webpush from "web-push";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
+import { tFor } from "@/i18n/server";
+import type { T } from "@/i18n/core";
 
 const PUB = "push.vapidPublic";
 const PRIV = "push.vapidPrivate";
@@ -74,7 +76,19 @@ export async function pushToDevices(where: Prisma.PushSubscriptionWhereInput, ms
   }
 }
 
-export async function pushToRestaurantStaff(restaurantId: string, msg: PushMessage) {
-  const staff = await prisma.restaurantStaff.findMany({ where: { restaurantId }, select: { userId: true } });
-  return pushToUsers(staff.map((s) => s.userId), msg);
+/** Pushes to every staff device; a function message is built in each person's language. */
+export async function pushToRestaurantStaff(restaurantId: string, msg: PushMessage | ((t: T) => PushMessage)) {
+  const staff = await prisma.restaurantStaff.findMany({ where: { restaurantId }, select: { userId: true, user: { select: { locale: true } } } });
+  return pushInLanguages(staff.map((s) => ({ id: s.userId, locale: s.user.locale })), msg);
+}
+
+/** Groups people by language and sends each group its own message. */
+export async function pushInLanguages(people: { id: string; locale: string | null }[], msg: PushMessage | ((t: T) => PushMessage)) {
+  if (typeof msg !== "function") return pushToUsers(people.map((p) => p.id), msg);
+  const groups = new Map<string, string[]>();
+  for (const p of people) {
+    const l = p.locale === "ar" ? "ar" : "en";
+    groups.set(l, [...(groups.get(l) ?? []), p.id]);
+  }
+  await Promise.all([...groups].map(([l, ids]) => pushToUsers(ids, msg(tFor(l)))));
 }

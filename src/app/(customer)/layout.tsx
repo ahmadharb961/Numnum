@@ -6,11 +6,11 @@ import { prisma } from "@/server/db";
 import { customerLocation } from "@/server/location";
 
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
-  const [categories, loc] = await Promise.all([prisma.foodCategory.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" }, select: { slug: true, name: true, emoji: true, imageUrl: true } }), customerLocation()]);
+  const [categories, loc] = await Promise.all([prisma.foodCategory.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" }, select: { slug: true, name: true, nameAr: true, emoji: true, imageUrl: true } }), customerLocation()]);
   return (
     <>
       {/* Browsing is open; customers are asked to add numnum to their home screen after ordering. */}
-      <div className="lg:pl-64">{children}</div>
+      <div className="lg:ps-64">{children}</div>
       <Suspense>
         <DesktopSidebar categories={categories} locationLabel={loc?.label ?? null} />
       </Suspense>

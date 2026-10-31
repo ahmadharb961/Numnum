@@ -5,8 +5,9 @@ import { prisma, type Tx } from "./db";
 import { getSettings, type Settings } from "./settings";
 import { nextCounter } from "./counters";
 import { ensureCommission, isUniqueViolation } from "./commission";
-import { notifyRestaurant, notifyUser } from "./notifications";
+import { notifyRestaurant, notifyUser, render, type Text } from "./notifications";
 import { sendEmail } from "./email";
+import { tFor } from "@/i18n/server";
 import { randomToken } from "./crypto";
 import { validateSelections, unitPrice, type CustomizationGroupDef } from "@/lib/customization";
 import { formatPhone, normalizePhone } from "@/lib/phone";
@@ -302,21 +303,21 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
       if (reelIds.length) await tx.reel.updateMany({ where: { id: { in: reelIds }, restaurantId: restaurant.id }, data: { orderInits: { increment: 1 } } });
       await notifyRestaurant(
         restaurant.id,
-        { type: "NEW_ORDER", title: `New order ${reference} · ${formatMoney(totalCents, currency)}`, body: `${c.name} · ${input.fulfillment === "DELIVERY" ? "Delivery" : "Pickup"} · cash on delivery`, link: `/dashboard/orders?ref=${reference}` },
+        { type: "NEW_ORDER", title: { k: "New order {ref} · {total}", v: { ref: reference, total: formatMoney(totalCents, currency) } }, body: { k: input.fulfillment === "DELIVERY" ? "{name} · Delivery · cash on delivery" : "{name} · Pickup · cash on delivery", v: { name: c.name } }, link: `/dashboard/orders?ref=${reference}` },
         tx,
       );
       return created;
     });
     // Phone notification to every staff device (never blocks the order).
-    void pushToRestaurantStaff(restaurant.id, {
-      title: `🔔 New order · ${formatMoney(totalCents, currency)}`,
-      body: `${c.name} · ${input.fulfillment === "DELIVERY" ? `Delivery${distance != null ? ` (${formatKm(distance)})` : ""}` : "Pickup"} · ${priced.lines.reduce((n, l) => n + l.quantity, 0)} items`,
+    void pushToRestaurantStaff(restaurant.id, (t) => ({
+      title: `🔔 ${t("New order · {total}", { total: formatMoney(totalCents, currency) })}`,
+      body: `${c.name} · ${input.fulfillment === "DELIVERY" ? `${t("Delivery")}${distance != null ? ` (${formatKm(distance)})` : ""}` : t("Pickup")} · ${t("{n} items", { n: priced.lines.reduce((n, l) => n + l.quantity, 0) })}`,
       url: `/dashboard/orders?ref=${order.reference}`,
       tag: `order-${order.reference}`,
-    });
+    }));
     void emailNewOrder(restaurant.id, order.reference, {
       customer: `${c.name} · ${formatPhone(e164)}`,
-      fulfillment: input.fulfillment === "DELIVERY" ? `Delivery${distance != null ? ` (${formatKm(distance)})` : ""}: ${[c.area, c.address, c.building].filter(Boolean).join(", ")}` : "Pickup",
+      delivery: input.fulfillment === "DELIVERY" ? { km: distance != null ? formatKm(distance) : null, address: [c.area, c.address, c.building].filter(Boolean).join(", ") } : null,
       lines: priced.lines.map((l) => `${l.quantity}× ${l.name}${l.chosen.length ? ` (${l.chosen.map((x) => x.optionName).join(", ")})` : ""}${l.specialInstructions ? ` — ${l.specialInstructions}` : ""}  ${formatMoney(l.lineTotalCents, currency)}`),
       total: formatMoney(totalCents, currency),
       notes: c.notes || null,
@@ -332,14 +333,23 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
 }
 
 /** Email the restaurant (its contact email + owners/managers) about a new order. Never throws. */
-async function emailNewOrder(restaurantId: string, reference: string, o: { customer: string; fulfillment: string; lines: string[]; total: string; notes: string | null }) {
+async function emailNewOrder(restaurantId: string, reference: string, o: { customer: string; delivery: { km: string | null; address: string } | null; lines: string[]; total: string; notes: string | null }) {
   try {
-    const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { displayName: true, email: true, staff: { where: { role: { in: ["OWNER", "MANAGER"] } }, select: { user: { select: { email: true } } } } } });
+    const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { displayName: true, email: true, staff: { where: { role: { in: ["OWNER", "MANAGER"] } }, orderBy: { role: "asc" }, select: { user: { select: { email: true, locale: true } } } } } });
     if (!r) return;
-    const to = Array.from(new Set([r.email, ...r.staff.map((s) => s.user.email)].filter((e): e is string => !!e)));
+    // Each person gets the email in their language; the restaurant's contact address in the owner's.
+    const recipients = new Map<string, string | null>();
+    for (const s of r.staff) if (!recipients.has(s.user.email)) recipients.set(s.user.email, s.user.locale);
+    if (r.email && !recipients.has(r.email)) recipients.set(r.email, r.staff[0]?.user.locale ?? null);
     const link = `${process.env.APP_URL ?? ""}/dashboard/orders?ref=${reference}`;
-    const text = [`New order ${reference} for ${r.displayName}`, "", `Customer: ${o.customer}`, o.fulfillment, "", ...o.lines, "", `Total (cash on delivery): ${o.total}`, ...(o.notes ? ["", `Note: ${o.notes}`] : []), "", `Accept it in your dashboard: ${link}`].join("\n");
-    await Promise.all(to.map((addr) => sendEmail(addr, `🔔 New order ${reference} · ${o.total}`, text)));
+    await Promise.all(
+      [...recipients].map(([addr, locale]) => {
+        const t = tFor(locale);
+        const how = o.delivery ? `${t("Delivery")}${o.delivery.km ? ` (${o.delivery.km})` : ""}: ${o.delivery.address}` : t("Pickup");
+        const text = [t("New order {ref} for {name}", { ref: reference, name: r.displayName }), "", `${t("Customer")}: ${o.customer}`, how, "", ...o.lines, "", `${t("Total (cash on delivery)")}: ${o.total}`, ...(o.notes ? ["", `${t("Note")}: ${o.notes}`] : []), "", `${t("Accept it in your dashboard")}: ${link}`].join("\n");
+        return sendEmail(addr, `🔔 ${t("New order {ref} · {total}", { ref: reference, total: o.total })}`, text);
+      }),
+    );
   } catch (e) {
     console.error("[email] new order", e);
   }
@@ -358,14 +368,17 @@ const ALLOWED_FROM: Record<RestaurantOrderAction, OrderStatus[]> = {
   FAIL: ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"],
 };
 
-async function notifyCustomer(tx: Tx, order: { id: string; userId: string | null; reference: string; restaurantName: string; trackingToken: string }, status: OrderStatusKey, extra?: string) {
+async function notifyCustomer(tx: Tx, order: { id: string; userId: string | null; reference: string; restaurantName: string; trackingToken: string }, status: OrderStatusKey, extra?: Text) {
   if (!order.userId) return;
-  const title = `${order.restaurantName}: ${STATUS_META[status].customer}`;
-  await notifyUser(order.userId, { type: "ORDER_STATUS", title, body: extra, link: `/order/${order.reference}` }, tx);
-  const u = await tx.user.findUnique({ where: { id: order.userId }, select: { email: true } });
-  if (u?.email) void sendEmail(u.email, `Order ${order.reference} — ${STATUS_META[status].label}`, `${title}${extra ? `\n${extra}` : ""}\n\n${process.env.APP_URL ?? ""}/order/${order.reference}?t=${order.trackingToken}`);
+  // Everything goes out in the customer's language (their account setting).
+  const u = await tx.user.findUnique({ where: { id: order.userId }, select: { email: true, locale: true } });
+  const t = tFor(u?.locale);
+  const title = `${order.restaurantName}: ${t(STATUS_META[status].customer)}`;
+  const note = render(t, extra);
+  await notifyUser(order.userId, { type: "ORDER_STATUS", title, body: note, link: `/order/${order.reference}` }, tx);
+  if (u?.email) void sendEmail(u.email, t("Order {ref} — {status}", { ref: order.reference, status: t(STATUS_META[status].label) }), `${title}${note ? `\n${note}` : ""}\n\n${process.env.APP_URL ?? ""}/order/${order.reference}?t=${order.trackingToken}`);
   // Phone notification (if they turned notifications on); tapping opens the order.
-  void pushToUsers([order.userId], { title, body: extra || "Tap to see your order", url: `/order/${order.reference}`, tag: `status-${order.reference}` });
+  void pushToUsers([order.userId], { title, body: note || t("Tap to see your order"), url: `/order/${order.reference}`, tag: `status-${order.reference}` });
 }
 
 /**
@@ -383,14 +396,14 @@ export async function restaurantOrderAction(restaurantId: string, userId: string
     if (!ALLOWED_FROM[action].includes(order.status)) throw new OrderError(`This order is already ${STATUS_META[order.status].label.toLowerCase()}`);
     const now = new Date();
     const data: Prisma.OrderUpdateInput = { status: target[action] };
-    let extra: string | undefined;
+    let extra: Text | undefined;
     switch (action) {
       case "ACCEPT": {
         const eta = Math.round(opts.etaMinutes ?? order.restaurant.avgPrepMinutes);
         if (!Number.isFinite(eta) || eta < 5 || eta > 240) throw new OrderError("Choose a time between 5 and 240 minutes");
         data.acceptedAt = now;
         data.estimatedMinutes = eta;
-        extra = `Estimated ${order.fulfillment === "DELIVERY" ? "delivery" : "ready"} time: about ${eta} minutes.`;
+        extra = { k: order.fulfillment === "DELIVERY" ? "Estimated delivery time: about {n} minutes." : "Estimated ready time: about {n} minutes.", v: { n: eta } };
         break;
       }
       case "REJECT":
@@ -440,7 +453,7 @@ export async function customerCancelOrder(reference: string, viewer: OrderViewer
     if (order.status !== "PLACED") throw new OrderError("The restaurant already accepted this order. Please call them to change it.");
     const updated = await tx.order.update({ where: { id: order.id }, data: { status: "CANCELED", canceledAt: new Date(), canceledBy: "CUSTOMER", cancelReason: reason?.slice(0, 300) || null } });
     await tx.orderEvent.create({ data: { orderId: order.id, type: "CANCELED", actorType: "CUSTOMER", actorId: viewer.userId, data: { reason: reason ?? null } } });
-    await notifyRestaurant(order.restaurantId, { type: "ORDER_CANCELED", title: `Order ${order.reference} was canceled by the customer`, link: `/dashboard/orders?ref=${order.reference}` }, tx);
+    await notifyRestaurant(order.restaurantId, { type: "ORDER_CANCELED", title: { k: "Order {ref} was canceled by the customer", v: { ref: order.reference } }, link: `/dashboard/orders?ref=${order.reference}` }, tx);
     return updated;
   });
 }
@@ -458,7 +471,7 @@ export async function autoCompleteStaleOrders(settingsIn?: Settings, now = new D
     await prisma.$transaction(async (tx) => {
       const o = await tx.order.update({ where: { id }, data: { status: "COMPLETED", completedAt: now, autoCompleted: true } });
       await tx.orderEvent.create({ data: { orderId: id, type: "AUTO_COMPLETED", actorType: "SYSTEM", data: { afterHours: settings.autoCompleteHours } } });
-      await notifyRestaurant(o.restaurantId, { type: "ORDER_AUTO_COMPLETED", title: `Order ${o.reference} was marked completed automatically`, body: `It stayed open for more than ${settings.autoCompleteHours} hours. If it wasn't delivered, open a dispute from Billing.`, link: `/dashboard/orders?ref=${o.reference}` }, tx);
+      await notifyRestaurant(o.restaurantId, { type: "ORDER_AUTO_COMPLETED", title: { k: "Order {ref} was marked completed automatically", v: { ref: o.reference } }, body: { k: "It stayed open for more than {n} hours. If it wasn't delivered, open a dispute from Billing.", v: { n: settings.autoCompleteHours } }, link: `/dashboard/orders?ref=${o.reference}` }, tx);
       await ensureCommission(tx, id, settings);
     });
   }

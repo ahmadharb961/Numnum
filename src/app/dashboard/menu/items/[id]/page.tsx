@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRestaurant } from "@/server/auth";
@@ -7,10 +8,15 @@ import { ItemForm } from "@/components/dashboard/item-form";
 import { ItemPhotos } from "@/components/dashboard/item-photos";
 import { buttonClass } from "@/components/ui/button";
 import { compactNumber } from "@/lib/utils";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "Edit item" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Edit item") };
+}
 
 export default async function EditItemPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
+  const t = await getT();
   const ctx = await requireRestaurant("MANAGER");
   const r = ctx.restaurant;
   const item = await prisma.menuItem.findFirst({
@@ -34,18 +40,18 @@ export default async function EditItemPage({ params, searchParams }: { params: P
       actions={
         <>
           <Link href={`/item/${item.id}`} target="_blank" className={buttonClass("outline", "sm")}>
-            View public page
+            {t("View public page")}
           </Link>
           <Link href={`/dashboard/reels/new?item=${item.id}`} className={buttonClass("secondary", "sm")}>
-            Upload reel for this item
+            {t("Upload reel for this item")}
           </Link>
         </>
       }
     >
-      <Section title="Photos" description="The main photo is shown on menus. Tap the star to change it.">
+      <Section title={t("Photos")} description={t("The main photo is shown on menus. Tap the star to change it.")}>
         <ItemPhotos itemId={item.id} photos={item.images.map((i) => ({ id: i.id, url: i.asset.url, thumbUrl: i.asset.thumbUrl, isMain: i.isMain }))} />
       </Section>
-      <Section title="Details">
+      <Section title={t("Details")}>
         <ItemForm
           created={(await searchParams).created === "1"}
           item={{ ...item, groupIds: item.customizations.map((c) => c.groupId) }}

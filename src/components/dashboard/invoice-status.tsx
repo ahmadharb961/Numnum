@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui/misc";
 
 const MAP: Record<string, { label: string; tone: "gray" | "blue" | "amber" | "green" | "red" | "purple" | "brand" }> = {

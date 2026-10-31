@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 const ASPECTS = [
   { label: "4:3", value: 4 / 3 },
@@ -12,6 +13,7 @@ const ASPECTS = [
 
 /** Touch-friendly crop: drag to position, slider to zoom. Never distorts the image. */
 export function ImageCropper({ file, onCancel, onDone }: { file: File; onCancel: () => void; onDone: (blob: Blob) => void }) {
+  const t = useT();
   const [src, setSrc] = useState<string>("");
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [aspect, setAspect] = useState(4 / 3);
@@ -69,7 +71,7 @@ export function ImageCropper({ file, onCancel, onDone }: { file: File; onCancel:
       <div className="flex gap-2">
         {ASPECTS.map((a) => (
           <button key={a.label} type="button" onClick={() => setAspect(a.value)} className={cn("chip h-8 text-xs", aspect === a.value && "chip-active")}>
-            {a.label}
+            {t(a.label)}
           </button>
         ))}
       </div>
@@ -91,7 +93,7 @@ export function ImageCropper({ file, onCancel, onDone }: { file: File; onCancel:
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={src}
-            alt="Crop preview"
+            alt={t("Crop preview")}
             draggable={false}
             className="pointer-events-none absolute left-1/2 top-1/2 max-w-none select-none"
             style={{ width: geometry().w, height: geometry().h, transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))` }}
@@ -104,15 +106,15 @@ export function ImageCropper({ file, onCancel, onDone }: { file: File; onCancel:
         </div>
       </div>
       <label className="flex items-center gap-3 text-sm">
-        Zoom
+        {t("Zoom")}
         <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="flex-1 accent-brand-500" />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <Button variant="outline" type="button" onClick={onCancel}>
-          Cancel
+          {t("Cancel")}
         </Button>
         <Button type="button" onClick={done} disabled={!img}>
-          Use photo
+          {t("Use photo")}
         </Button>
       </div>
     </div>

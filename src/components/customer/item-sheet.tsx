@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/i18n/client";
 import type { PublicItem } from "@/server/items";
 import { Sheet } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/misc";
@@ -10,6 +11,7 @@ import { track } from "./track";
 const cache = new Map<string, PublicItem>();
 
 export function ItemSheet({ itemId, reelId, open, onClose }: { itemId: string | null; reelId?: string | null; open: boolean; onClose: () => void }) {
+  const t = useT();
   const [item, setItem] = useState<PublicItem | null>(itemId ? cache.get(itemId) ?? null : null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +43,7 @@ export function ItemSheet({ itemId, reelId, open, onClose }: { itemId: string | 
       {item ? (
         <ItemDetail item={item} reelId={reelId} onAdded={onClose} compact />
       ) : (
-        <div className="grid h-full place-items-center p-10 text-ink-muted">{error ?? <Spinner className="text-brand-500" />}</div>
+        <div className="grid h-full place-items-center p-10 text-ink-muted">{error ? t(error) : <Spinner className="text-brand-500" />}</div>
       )}
     </Sheet>
   );

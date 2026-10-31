@@ -5,8 +5,12 @@ import { ExploreResults } from "@/components/customer/explore-results";
 import { facets, parseSearchParams, restaurantsDeliveringTo } from "@/server/search";
 import { exploreSearch } from "@/server/explore-search";
 import { customerLocation } from "@/server/location";
+import { getT } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Explore food", description: "Search dishes, reels and restaurants across Lebanon." };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Explore food"), description: t("Search dishes, reels and restaurants across Lebanon.") };
+}
 export const dynamic = "force-dynamic";
 
 export default async function ExplorePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

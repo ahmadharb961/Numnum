@@ -63,7 +63,7 @@ export async function submitItemReview(user: CurrentUser, input: { menuItemId: s
     update: { rating: input.rating, body, photoUrl: input.photoUrl ?? undefined, evidence: ev.evidence, orderId: ev.orderId },
   });
   await recomputeItemRating(item.id);
-  await notifyRestaurant(item.restaurantId, { type: "NEW_REVIEW", title: `New ${input.rating}★ review on ${item.name}`, body: body?.slice(0, 120), link: "/dashboard/reviews" });
+  await notifyRestaurant(item.restaurantId, { type: "NEW_REVIEW", title: { k: "New {n}★ review on {name}", v: { n: input.rating, name: item.name } }, body: body?.slice(0, 120), link: "/dashboard/reviews" });
   return review;
 }
 
@@ -84,7 +84,7 @@ export async function submitRestaurantReview(user: CurrentUser, input: { restaur
     update: data,
   });
   await recomputeRestaurantRating(r.id);
-  await notifyRestaurant(r.id, { type: "NEW_REVIEW", title: `New ${input.rating}★ restaurant review`, body: body?.slice(0, 120), link: "/dashboard/reviews" });
+  await notifyRestaurant(r.id, { type: "NEW_REVIEW", title: { k: "New {n}★ restaurant review", v: { n: input.rating } }, body: body?.slice(0, 120), link: "/dashboard/reviews" });
   return review;
 }
 

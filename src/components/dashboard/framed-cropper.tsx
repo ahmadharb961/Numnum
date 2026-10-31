@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 
 type Props = {
   file: File | null;
@@ -21,6 +22,7 @@ const MAX_ZOOM = 4;
 
 /** Fixed-shape crop for logos and covers: drag to position, zoom with the slider or wheel; exports the framed area as JPEG. */
 export function FramedCropper({ file, title, aspect, outputWidth, guide, onCancel, onDone }: Props) {
+  const t = useT();
   const frameRef = useRef<HTMLDivElement>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [src, setSrc] = useState<string | null>(null);
@@ -129,32 +131,32 @@ export function FramedCropper({ file, title, aspect, outputWidth, guide, onCance
               src={src}
               alt=""
               draggable={false}
-              className="pointer-events-none absolute left-0 top-0 max-w-none origin-top-left"
+              className="pointer-events-none absolute start-0 top-0 max-w-none origin-top-left"
               style={{ width: img.naturalWidth * scale, height: img.naturalHeight * scale, transform: `translate(${pos.x}px, ${pos.y}px)` }}
             />
           )}
           {guide && guideH > 0 && guideH < frameH && (
             <div className="pointer-events-none absolute inset-x-0 border-y-2 border-dashed border-white/80" style={{ top: (frameH - guideH) / 2, height: guideH }}>
-              <span className="absolute left-2 top-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">{guide.label}</span>
+              <span className="absolute start-2 top-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">{guide.label}</span>
             </div>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => zoomTo(zoom / 1.2)} className="grid h-9 w-9 place-items-center rounded-full bg-black/5" aria-label="Zoom out">
+          <button type="button" onClick={() => zoomTo(zoom / 1.2)} className="grid h-9 w-9 place-items-center rounded-full bg-black/5" aria-label={t("Zoom out")}>
             <ZoomOut className="h-4 w-4" />
           </button>
-          <input type="range" min={1} max={MAX_ZOOM} step={0.01} value={zoom} onChange={(e) => zoomTo(Number(e.target.value))} className="flex-1 accent-brand-500" aria-label="Zoom" />
-          <button type="button" onClick={() => zoomTo(zoom * 1.2)} className="grid h-9 w-9 place-items-center rounded-full bg-black/5" aria-label="Zoom in">
+          <input type="range" min={1} max={MAX_ZOOM} step={0.01} value={zoom} onChange={(e) => zoomTo(Number(e.target.value))} className="flex-1 accent-brand-500" aria-label={t("Zoom")} />
+          <button type="button" onClick={() => zoomTo(zoom * 1.2)} className="grid h-9 w-9 place-items-center rounded-full bg-black/5" aria-label={t("Zoom in")}>
             <ZoomIn className="h-4 w-4" />
           </button>
         </div>
-        <p className="text-center text-xs text-ink-muted">Drag the photo to position it. Zoom with the slider{guide ? "; the dashed band is what wide screens show" : ""}.</p>
+        <p className="text-center text-xs text-ink-muted">{guide ? t("Drag the photo to position it. Zoom with the slider; the dashed band is what wide screens show.") : t("Drag the photo to position it. Zoom with the slider.")}</p>
         <div className="flex gap-2">
           <Button type="button" variant="outline" block onClick={onCancel}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button type="button" block loading={saving} disabled={!img} onClick={save}>
-            Use this photo
+            {t("Use this photo")}
           </Button>
         </div>
       </div>

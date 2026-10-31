@@ -2,8 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Store, User, UtensilsCrossed } from "lucide-react";
 import { LoginForm } from "@/components/auth-forms";
+import { getT } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Log in", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Log in"), robots: { index: false } };
+}
 
 function LinkCard({ href, icon: Icon, title, action }: { href: string; icon: typeof User; title: string; action: string }) {
   return (
@@ -15,43 +19,44 @@ function LinkCard({ href, icon: Icon, title, action }: { href: string; icon: typ
         <span className="block font-bold">{title}</span>
         <span className="block font-semibold text-brand-600">{action}</span>
       </span>
-      <ChevronRight className="h-5 w-5 shrink-0 text-ink-muted" />
+      <ChevronRight className="rtl:-scale-x-100 h-5 w-5 shrink-0 text-ink-muted" />
     </Link>
   );
 }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const t = await getT();
   const { next } = await searchParams;
   const q = next ? `?next=${encodeURIComponent(next)}` : "";
   return (
     <div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/illustrations/login-hero.webp" alt="A chef cooking and a customer enjoying her meal" className="-mx-4 w-[calc(100%+2rem)] max-w-none lg:hidden" />
+      <img src="/illustrations/login-hero.webp" alt={t("A chef cooking and a customer enjoying her meal")} className="-mx-4 w-[calc(100%+2rem)] max-w-none lg:hidden" />
       <div className="mt-2 text-center lg:mt-0">
         <h1 className="relative inline-block text-[2.4rem] font-black leading-tight tracking-tight">
-          Welcome back
-          <svg viewBox="0 0 24 24" className="absolute -right-7 top-1 h-6 w-6 text-brand-500" aria-hidden="true">
+          {t("Welcome back")}
+          <svg viewBox="0 0 24 24" className="absolute -end-7 top-1 h-6 w-6 text-brand-500" aria-hidden="true">
             <path d="M6 14 L14 6 M9 19 L19 15" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" fill="none" />
           </svg>
         </h1>
-        <p className="mx-auto mt-1 max-w-xs text-[15px] font-medium text-ink-soft">Log in to your restaurant dashboard or customer account.</p>
+        <p className="mx-auto mt-1 max-w-xs text-[15px] font-medium text-ink-soft">{t("Log in to your restaurant dashboard or customer account.")}</p>
       </div>
       <div className="mt-6">
         <LoginForm next={next} />
       </div>
       <div className="my-6 flex items-center gap-4 text-sm text-ink-muted">
         <span className="h-px flex-1 bg-black/10" />
-        or
+        {t("or")}
         <span className="h-px flex-1 bg-black/10" />
       </div>
       <div className="space-y-3">
-        <LinkCard href={`/account/register${q}`} icon={User} title="New here?" action="Create a customer account" />
-        <LinkCard href="/business/register" icon={Store} title="Own a restaurant?" action="Register your restaurant" />
+        <LinkCard href={`/account/register${q}`} icon={User} title={t("New here?")} action={t("Create a customer account")} />
+        <LinkCard href="/business/register" icon={Store} title={t("Own a restaurant?")} action={t("Register your restaurant")} />
       </div>
       <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-ink-muted">
         <UtensilsCrossed className="h-4 w-4 shrink-0" />
         <span>
-          Browsing is open to everyone — an account is only <b className="font-semibold text-ink-soft">needed to order.</b>
+          {t("Browsing is open to everyone — an account is only")} <b className="font-semibold text-ink-soft">{t("needed to order.")}</b>
         </span>
       </p>
     </div>

@@ -58,8 +58,21 @@ body {
   overscroll-behavior-y: none;
 }
 
-[dir="rtl"] body {
-  font-family: "Noto Sans Arabic", var(--font-sans);
+/* Arabic: the Cairo font (bundled, clear at small sizes), and no letter-spacing (it breaks the joined letters). */
+:root[lang="ar"] {
+  --font-sans: "Cairo Variable", "Noto Sans Arabic", ui-sans-serif, -apple-system, system-ui, sans-serif;
+  --font-display: "Cairo Variable", "Noto Sans Arabic", ui-sans-serif, -apple-system, system-ui, sans-serif;
+}
+:root[lang="ar"] * {
+  letter-spacing: 0 !important;
+}
+/* Phone numbers, prices and codes stay left-to-right inside Arabic text. */
+[dir="rtl"] .tabular,
+[dir="rtl"] .font-mono,
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="email"] {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 @layer components {
@@ -95,7 +108,7 @@ body {
     @apply h-auto min-h-[96px] py-3;
   }
   .table-app {
-    @apply w-full text-left text-sm;
+    @apply w-full text-start text-sm;
   }
   .table-app th {
     @apply whitespace-nowrap border-b border-black/5 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted;

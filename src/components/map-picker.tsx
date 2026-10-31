@@ -5,6 +5,7 @@ import { LocateFixed, Loader2 } from "lucide-react";
 import type { Map as LMap, Marker, Circle } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 
 export type Pin = { lat: number; lng: number };
 
@@ -17,6 +18,7 @@ const BEIRUT: Pin = { lat: 33.8938, lng: 35.5018 };
  * fainter inner circles (km) for delivery fee zones.
  */
 export function MapPicker({ value, onChange, radiusKm, rings = [], height = 260, autoLocate }: { value: Pin | null; onChange: (p: Pin) => void; radiusKm?: number; rings?: number[]; height?: number; autoLocate?: boolean }) {
+  const t = useT();
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<LMap | null>(null);
   const marker = useRef<Marker | null>(null);
@@ -102,12 +104,12 @@ export function MapPicker({ value, onChange, radiusKm, rings = [], height = 260,
   return (
     <div>
       <div className="relative overflow-hidden rounded-2xl border border-black/10" style={{ height }}>
-        <div ref={el} className="h-full w-full" aria-label="Map — drag the pin to the exact location" />
-        <Button type="button" size="sm" variant="outline" onClick={locate} className="absolute bottom-3 right-3 z-[500] shadow-md">
+        <div ref={el} className="h-full w-full" aria-label={t("Map — drag the pin to the exact location")} />
+        <Button type="button" size="sm" variant="outline" onClick={locate} className="absolute bottom-3 end-3 z-[500] shadow-md">
           {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />} Use my location
         </Button>
       </div>
-      <p className="mt-1 text-xs text-ink-muted">{error ?? "Drag the pin or tap the map to set the exact spot."}</p>
+      <p className="mt-1 text-xs text-ink-muted">{t(error ?? "Drag the pin or tap the map to set the exact spot.")}</p>
     </div>
   );
 }

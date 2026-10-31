@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { getT } from "@/i18n/server";
 
-export default function LegalLayout({ children }: { children: React.ReactNode }) {
+export default async function LegalLayout({ children }: { children: React.ReactNode }) {
+  const t = await getT();
   return (
     <div className="min-h-dvh bg-cream">
       <header className="container-app flex items-center" style={{ paddingTop: "var(--safe-top)", height: "calc(4rem + var(--safe-top))" }}>
-        <Link href="/" className="text-brand-600" aria-label="numnum home">
+        <Link href="/" className="text-brand-600" aria-label={t("numnum home")}>
           <Logo className="h-10" />
         </Link>
       </header>

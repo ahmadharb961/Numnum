@@ -9,11 +9,13 @@ import { archiveItemsAction, deleteCategoryAction, moveCategoryAction, restoreIt
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Badge } from "@/components/ui/misc";
+import { useT } from "@/i18n/client";
 
 type Item = { id: string; sku: string; name: string; priceCents: number; currency: string; available: boolean; menuCategoryId: string | null; ratingAvg: number; ratingCount: number; image: string | null; _count: { images: number; reels: number; customizations: number } };
 type Cat = { id: string; name: string; count: number };
 
 export function MenuManager({ items, categories, manager, showArchived }: { items: Item[]; categories: Cat[]; manager: boolean; showArchived: boolean }) {
+  const t = useT();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -34,15 +36,15 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <label className="relative min-w-[200px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
-          <input className="input h-10 pl-9 text-sm" placeholder="Search name or SKU" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+          <input className="input h-10 ps-9 text-sm" placeholder={t("Search name or SKU")} value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
         <Link href={showArchived ? "/dashboard/menu" : "/dashboard/menu?archived=1"} className="chip h-10">
-          {showArchived ? "Show active" : "Show archived"}
+          {showArchived ? t("Show active") : t("Show archived")}
         </Link>
         {manager && (
           <button onClick={() => setEditCats((v) => !v)} className={cn("chip h-10", editCats && "chip-active")}>
-            <SlidersHorizontal className="h-4 w-4" /> Categories
+            <SlidersHorizontal className="h-4 w-4" /> {t("Categories")}
           </button>
         )}
       </div>
@@ -51,7 +53,7 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
 
       <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
         <button onClick={() => setCat("all")} className={cn("chip h-8 text-xs", cat === "all" && "chip-active")}>
-          All ({items.length})
+          {t("All")} ({items.length})
         </button>
         {categories.map((c) => (
           <button key={c.id} onClick={() => setCat(c.id)} className={cn("chip h-8 text-xs", cat === c.id && "chip-active")}>
@@ -60,7 +62,7 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
         ))}
         {items.some((i) => !i.menuCategoryId) && (
           <button onClick={() => setCat("none")} className={cn("chip h-8 text-xs", cat === "none" && "chip-active")}>
-            Uncategorized
+            {t("Uncategorized")}
           </button>
         )}
       </div>
@@ -70,12 +72,12 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
           <span>{selected.size} selected</span>
           <div className="flex gap-2">
             <button className="font-semibold" onClick={() => setSelected(new Set())}>
-              Clear
+              {t("Clear")}
             </button>
             <button
               className="inline-flex items-center gap-1 font-semibold text-brand-300"
               onClick={() => {
-                if (!confirm(`Archive ${selected.size} item(s)? They'll be hidden from customers. Reviews, photos and order history are kept.`)) return;
+                if (!confirm(t("Archive {n} item(s)? They'll be hidden from customers. Reviews, photos and order history are kept.", { n: selected.size }))) return;
                 run(async () => {
                   const r = await archiveItemsAction(Array.from(selected));
                   setSelected(new Set());
@@ -83,7 +85,7 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
                 });
               }}
             >
-              <Archive className="h-4 w-4" /> Archive
+              <Archive className="h-4 w-4" /> {t("Archive")}
             </button>
           </div>
         </div>
@@ -91,7 +93,7 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
 
       {filtered.length === 0 ? (
         <div className="card">
-          <EmptyState title={items.length ? "No matching items" : "Your menu is empty"} body={items.length ? undefined : "Import your menu from a CSV file or add items one by one."} action={!items.length && manager ? <Link href="/dashboard/menu/import" className="chip chip-active">Import CSV</Link> : undefined} />
+          <EmptyState title={items.length ? "No matching items" : "Your menu is empty"} body={items.length ? undefined : "Import your menu from a CSV file or add items one by one."} action={!items.length && manager ? <Link href="/dashboard/menu/import" className="chip chip-active">{t("Import CSV")}</Link> : undefined} />
         </div>
       ) : (
         <ul className={cn("card divide-y divide-black/5", pending && "opacity-70")}>
@@ -108,7 +110,7 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
                     else s.delete(i.id);
                     setSelected(s);
                   }}
-                  aria-label={`Select ${i.name}`}
+                  aria-label={t("Select {name}", { name: i.name })}
                 />
               )}
               <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-black/5">
@@ -132,25 +134,25 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
                       {i._count.reels}
                     </span>
                   )}
-                  {i._count.customizations > 0 && <span>{i._count.customizations} options</span>}
-                  {i._count.images === 0 && <Badge tone="amber">No photo</Badge>}
+                  {i._count.customizations > 0 && <span>{t("{n} options", { n: i._count.customizations })}</span>}
+                  {i._count.images === 0 && <Badge tone="amber">{t("No photo")}</Badge>}
                 </div>
               </div>
               {showArchived ? (
                 manager && (
                   <Button size="sm" variant="outline" onClick={() => run(() => restoreItemAction(i.id))}>
-                    <RotateCcw className="h-4 w-4" /> Restore
+                    <RotateCcw className="h-4 w-4" /> {t("Restore")}
                   </Button>
                 )
               ) : (
                 <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink-muted">
-                  <span className="hidden sm:inline">{i.available ? "Available" : "Sold out"}</span>
+                  <span className="hidden sm:inline">{i.available ? t("Available") : t("Sold out")}</span>
                   <input type="checkbox" className="peer sr-only" checked={i.available} onChange={(e) => run(() => toggleAvailabilityAction(i.id, e.target.checked))} />
-                  <span className="relative h-6 w-11 rounded-full bg-black/15 transition peer-checked:bg-emerald-500 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" />
+                  <span className="relative h-6 w-11 rounded-full bg-black/15 transition peer-checked:bg-emerald-500 after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5" />
                 </label>
               )}
               {manager && !showArchived && (
-                <Link href={`/dashboard/menu/items/${i.id}`} className="grid h-9 w-9 place-items-center rounded-lg hover:bg-black/5" aria-label={`Edit ${i.name}`}>
+                <Link href={`/dashboard/menu/items/${i.id}`} className="grid h-9 w-9 place-items-center rounded-lg hover:bg-black/5" aria-label={t("Edit {name}", { name: i.name })}>
                   <Pencil className="h-4 w-4" />
                 </Link>
               )}
@@ -163,6 +165,7 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
 }
 
 function CategoryEditor({ categories }: { categories: Cat[] }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -175,7 +178,7 @@ function CategoryEditor({ categories }: { categories: Cat[] }) {
     });
   return (
     <div className={cn("card mb-4 p-4", pending && "opacity-70")}>
-      <h3 className="mb-3 font-bold">Menu categories</h3>
+      <h3 className="mb-3 font-bold">{t("Menu categories")}</h3>
       <ul className="divide-y divide-black/5">
         {categories.map((c, idx) => (
           <li key={c.id} className="flex items-center gap-2 py-2">
@@ -183,7 +186,7 @@ function CategoryEditor({ categories }: { categories: Cat[] }) {
               <>
                 <input className="input h-9 flex-1 text-sm" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
                 <Button size="sm" onClick={() => run(async () => { const r = await saveCategoryAction(c.id, editName); if (r.ok) setEditing(null); return r; })}>
-                  Save
+                  {t("Save")}
                 </Button>
               </>
             ) : (
@@ -191,16 +194,16 @@ function CategoryEditor({ categories }: { categories: Cat[] }) {
                 <span className="flex-1 text-sm font-semibold">
                   {c.name} <span className="font-normal text-ink-muted">({c.count})</span>
                 </span>
-                <button disabled={idx === 0} onClick={() => run(() => moveCategoryAction(c.id, -1))} className="grid h-8 w-8 place-items-center rounded disabled:opacity-30" aria-label="Move up">
+                <button disabled={idx === 0} onClick={() => run(() => moveCategoryAction(c.id, -1))} className="grid h-8 w-8 place-items-center rounded disabled:opacity-30" aria-label={t("Move up")}>
                   <ArrowUp className="h-4 w-4" />
                 </button>
-                <button disabled={idx === categories.length - 1} onClick={() => run(() => moveCategoryAction(c.id, 1))} className="grid h-8 w-8 place-items-center rounded disabled:opacity-30" aria-label="Move down">
+                <button disabled={idx === categories.length - 1} onClick={() => run(() => moveCategoryAction(c.id, 1))} className="grid h-8 w-8 place-items-center rounded disabled:opacity-30" aria-label={t("Move down")}>
                   <ArrowDown className="h-4 w-4" />
                 </button>
-                <button onClick={() => { setEditing(c.id); setEditName(c.name); }} className="grid h-8 w-8 place-items-center rounded" aria-label="Rename">
+                <button onClick={() => { setEditing(c.id); setEditName(c.name); }} className="grid h-8 w-8 place-items-center rounded" aria-label={t("Rename")}>
                   <Pencil className="h-4 w-4" />
                 </button>
-                <button onClick={() => confirm(`Delete “${c.name}”? Items stay on the menu without a category.`) && run(() => deleteCategoryAction(c.id))} className="grid h-8 w-8 place-items-center rounded text-red-600" aria-label="Delete">
+                <button onClick={() => confirm(t("Delete “{name}”? Items stay on the menu without a category.", { name: c.name })) && run(() => deleteCategoryAction(c.id))} className="grid h-8 w-8 place-items-center rounded text-red-600" aria-label={t("Delete")}>
                   <Trash2 className="h-4 w-4" />
                 </button>
               </>
@@ -219,9 +222,9 @@ function CategoryEditor({ categories }: { categories: Cat[] }) {
           });
         }}
       >
-        <input className="input h-10 flex-1 text-sm" placeholder="New category name" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input h-10 flex-1 text-sm" placeholder={t("New category name")} value={name} onChange={(e) => setName(e.target.value)} />
         <Button size="sm" type="submit" className="h-10">
-          Add
+          {t("Add")}
         </Button>
       </form>
     </div>

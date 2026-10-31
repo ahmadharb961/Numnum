@@ -9,6 +9,7 @@ import { Badge, EmptyState, Field } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 type Option = { id?: string; name: string; price: string; available: boolean; isDefault: boolean };
 type Group = { id?: string; name: string; type: "SINGLE" | "MULTIPLE" | "TEXT"; required: boolean; minSelect: number; maxSelect: number; options: Option[]; usedBy?: string[] };
@@ -22,6 +23,7 @@ const TEMPLATES: { label: string; group: Group }[] = [
 ];
 
 export function CustomizationManager({ groups, currency }: { groups: Group[]; currency: string }) {
+  const t = useT();
   const [editing, setEditing] = useState<Group | null>(null);
   const router = useRouter();
   const toast = useToast();
@@ -31,11 +33,11 @@ export function CustomizationManager({ groups, currency }: { groups: Group[]; cu
     <div>
       <div className="mb-4 flex flex-wrap gap-2">
         <Button size="sm" onClick={() => setEditing({ name: "", type: "SINGLE", required: false, minSelect: 0, maxSelect: 1, options: [{ name: "", price: "0", available: true, isDefault: false }] })}>
-          <Plus className="h-4 w-4" /> New group
+          <Plus className="h-4 w-4" /> {t("New group")}
         </Button>
-        {TEMPLATES.map((t) => (
-          <button key={t.label} onClick={() => setEditing(structuredClone(t.group))} className="chip h-9 text-xs">
-            + {t.label}
+        {TEMPLATES.map((tpl) => (
+          <button key={tpl.label} onClick={() => { const g = structuredClone(tpl.group); g.name = t(g.name); g.options = g.options.map((o) => ({ ...o, name: t(o.name) })); setEditing(g); }} className="chip h-9 text-xs">
+            + {t(tpl.label)}
           </button>
         ))}
       </div>
@@ -51,24 +53,24 @@ export function CustomizationManager({ groups, currency }: { groups: Group[]; cu
                 <div>
                   <div className="font-bold">{g.name}</div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    <Badge>{g.type === "SINGLE" ? "Single choice" : g.type === "MULTIPLE" ? `Multiple${g.maxSelect ? ` · max ${g.maxSelect}` : ""}` : "Free text"}</Badge>
-                    <Badge tone={g.required ? "brand" : "gray"}>{g.required ? "Required" : "Optional"}</Badge>
+                    <Badge>{g.type === "SINGLE" ? t("Single choice") : g.type === "MULTIPLE" ? t("Multiple") + (g.maxSelect ? ` · ${t("max {n}", { n: g.maxSelect })}` : "") : t("Free text")}</Badge>
+                    <Badge tone={g.required ? "brand" : "gray"}>{g.required ? t("Required") : t("Optional")}</Badge>
                   </div>
                 </div>
                 <div className="flex">
-                  <button onClick={() => setEditing(structuredClone(g))} className="grid h-9 w-9 place-items-center rounded-lg hover:bg-black/5" aria-label="Edit">
+                  <button onClick={() => setEditing(structuredClone(g))} className="grid h-9 w-9 place-items-center rounded-lg hover:bg-black/5" aria-label={t("Edit")}>
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() =>
-                      confirm(`Delete “${g.name}”? It will be removed from ${g.usedBy?.length ?? 0} item(s).`) &&
+                      confirm(t("Delete “{name}”? It will be removed from {n} item(s).", { name: g.name, n: g.usedBy?.length ?? 0 })) &&
                       start(async () => {
                         await deleteGroupAction(g.id!);
                         router.refresh();
                       })
                     }
                     className="grid h-9 w-9 place-items-center rounded-lg text-red-600 hover:bg-red-50"
-                    aria-label="Delete"
+                    aria-label={t("Delete")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -80,19 +82,19 @@ export function CustomizationManager({ groups, currency }: { groups: Group[]; cu
                     <li key={o.id} className={cn("flex justify-between", !o.available && "text-ink-muted line-through")}>
                       <span>
                         {o.name}
-                        {o.isDefault && <span className="ml-1 text-xs text-ink-muted">(default)</span>}
+                        {o.isDefault && <span className="ms-1 text-xs text-ink-muted">{t("(default)")}</span>}
                       </span>
                       <span className="tabular text-ink-muted">{Number(o.price) === 0 ? "—" : `${Number(o.price) > 0 ? "+" : ""}${o.price} ${currency}`}</span>
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="mt-3 text-xs text-ink-muted">{g.usedBy?.length ? `Used by: ${g.usedBy.slice(0, 4).join(", ")}${g.usedBy.length > 4 ? ` +${g.usedBy.length - 4}` : ""}` : "Not attached to any item yet"}</p>
+              <p className="mt-3 text-xs text-ink-muted">{g.usedBy?.length ? `${t("Used by:")} ${g.usedBy.slice(0, 4).join(", ")}${g.usedBy.length > 4 ? ` +${g.usedBy.length - 4}` : ""}` : t("Not attached to any item yet")}</p>
             </div>
           ))}
         </div>
       )}
-      <Sheet open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? "Edit customization" : "New customization"}>
+      <Sheet open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? t("Edit customization") : t("New customization")}>
         {editing && (
           <GroupEditor
             initial={editing}
@@ -110,6 +112,7 @@ export function CustomizationManager({ groups, currency }: { groups: Group[]; cu
 }
 
 function GroupEditor({ initial, currency, onSaved }: { initial: Group; currency: string; onSaved: () => void }) {
+  const t = useT();
   const [g, setG] = useState<Group>(initial);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -135,18 +138,18 @@ function GroupEditor({ initial, currency, onSaved }: { initial: Group; currency:
       }}
     >
       <Field label="Group name">
-        <input className="input" value={g.name} onChange={(e) => setG({ ...g, name: e.target.value })} placeholder="e.g. Choose your sauce" required />
+        <input className="input" value={g.name} onChange={(e) => setG({ ...g, name: e.target.value })} placeholder={t("e.g. Choose your sauce")} required />
       </Field>
       <div className="grid grid-cols-3 gap-2">
-        {(["SINGLE", "MULTIPLE", "TEXT"] as const).map((t) => (
-          <button type="button" key={t} onClick={() => setG({ ...g, type: t, maxSelect: t === "SINGLE" ? 1 : g.maxSelect })} className={cn("rounded-xl border-2 px-2 py-2.5 text-xs font-bold", g.type === t ? "border-brand-500 bg-brand-50 text-brand-700" : "border-black/10")}>
-            {t === "SINGLE" ? "Single choice" : t === "MULTIPLE" ? "Multiple choice" : "Free text"}
+        {(["SINGLE", "MULTIPLE", "TEXT"] as const).map((k) => (
+          <button type="button" key={k} onClick={() => setG({ ...g, type: k, maxSelect: k === "SINGLE" ? 1 : g.maxSelect })} className={cn("rounded-xl border-2 px-2 py-2.5 text-xs font-bold", g.type === k ? "border-brand-500 bg-brand-50 text-brand-700" : "border-black/10")}>
+            {k === "SINGLE" ? t("Single choice") : k === "MULTIPLE" ? t("Multiple choice") : t("Free text")}
           </button>
         ))}
       </div>
       <label className="flex items-center gap-3 text-sm font-semibold">
         <input type="checkbox" checked={g.required} onChange={(e) => setG({ ...g, required: e.target.checked, minSelect: e.target.checked ? Math.max(1, g.minSelect) : 0 })} className="h-5 w-5 accent-brand-500" />
-        Customer must choose (required)
+        {t("Customer must choose (required)")}
       </label>
       {g.type === "MULTIPLE" && (
         <div className="grid grid-cols-2 gap-3">
@@ -160,29 +163,29 @@ function GroupEditor({ initial, currency, onSaved }: { initial: Group; currency:
       )}
       {g.type !== "TEXT" && (
         <div>
-          <div className="label">Options</div>
+          <div className="label">{t("Options")}</div>
           <div className="space-y-2">
             {g.options.map((o, i) => (
               <div key={i} className="rounded-xl border border-black/10 p-2">
                 <div className="flex gap-2">
-                  <input className="input h-10 flex-1 text-sm" placeholder="Option name" value={o.name} onChange={(e) => setOpt(i, { name: e.target.value })} />
+                  <input className="input h-10 flex-1 text-sm" placeholder={t("Option name")} value={o.name} onChange={(e) => setOpt(i, { name: e.target.value })} />
                   <input className="input h-10 w-24 text-sm" inputMode="decimal" placeholder="+0.00" value={o.price} onChange={(e) => setOpt(i, { price: e.target.value })} aria-label={`Price adjustment in ${currency}`} />
                 </div>
                 <div className="mt-1.5 flex items-center gap-3 px-1 text-xs">
                   <label className="flex items-center gap-1.5">
-                    <input type="checkbox" checked={o.available} onChange={(e) => setOpt(i, { available: e.target.checked })} className="accent-brand-500" /> Available
+                    <input type="checkbox" checked={o.available} onChange={(e) => setOpt(i, { available: e.target.checked })} className="accent-brand-500" /> {t("Available")}
                   </label>
                   <label className="flex items-center gap-1.5">
-                    <input type="checkbox" checked={o.isDefault} onChange={(e) => setOpt(i, { isDefault: e.target.checked })} className="accent-brand-500" /> Pre-selected
+                    <input type="checkbox" checked={o.isDefault} onChange={(e) => setOpt(i, { isDefault: e.target.checked })} className="accent-brand-500" /> {t("Pre-selected")}
                   </label>
                   <span className="flex-1" />
-                  <button type="button" onClick={() => move(i, -1)} aria-label="Move up">
+                  <button type="button" onClick={() => move(i, -1)} aria-label={t("Move up")}>
                     <ArrowUp className="h-4 w-4" />
                   </button>
-                  <button type="button" onClick={() => move(i, 1)} aria-label="Move down">
+                  <button type="button" onClick={() => move(i, 1)} aria-label={t("Move down")}>
                     <ArrowDown className="h-4 w-4" />
                   </button>
-                  <button type="button" onClick={() => setG({ ...g, options: g.options.filter((_, j) => j !== i) })} className="text-red-600" aria-label="Remove option">
+                  <button type="button" onClick={() => setG({ ...g, options: g.options.filter((_, j) => j !== i) })} className="text-red-600" aria-label={t("Remove option")}>
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -190,14 +193,14 @@ function GroupEditor({ initial, currency, onSaved }: { initial: Group; currency:
             ))}
           </div>
           <button type="button" onClick={() => setG({ ...g, options: [...g.options, { name: "", price: "0", available: true, isDefault: false }] })} className="mt-2 text-sm font-semibold text-brand-600">
-            + Add option
+            {t("+ Add option")}
           </button>
           <p className="mt-1 text-xs text-ink-muted">Price adjustments can be positive, zero, or negative (e.g. -1.00 for “no meat”).</p>
         </div>
       )}
-      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      {error && <p className="text-sm font-medium text-red-600">{t(error)}</p>}
       <Button type="submit" block size="lg" loading={busy}>
-        Save
+        {t("Save")}
       </Button>
     </form>
   );

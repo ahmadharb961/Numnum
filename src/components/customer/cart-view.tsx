@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, Spinner } from "@/components/ui/misc";
 import { track } from "./track";
 import { useEffect } from "react";
+import { useT } from "@/i18n/client";
 
 export function CartView() {
+  const t = useT();
   const { cart, ready, subtotalCents, updateQty, remove, clear } = useCart();
   const router = useRouter();
   useEffect(() => {
@@ -22,7 +24,7 @@ export function CartView() {
     <main className="pb-nav">
       <header className="container-app flex items-end justify-between pb-3" style={{ paddingTop: "calc(var(--safe-top) + 14px)" }}>
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Your cart</h1>
+          <h1 className="text-2xl font-black tracking-tight">{t("Your cart")}</h1>
           {cart && (
             <Link href={`/r/${cart.restaurantSlug}`} className="text-sm font-semibold text-brand-600">
               {cart.restaurantName}
@@ -30,8 +32,8 @@ export function CartView() {
           )}
         </div>
         {cart && cart.lines.length > 0 && (
-          <button onClick={() => confirm("Clear your cart?") && clear()} className="text-sm font-semibold text-ink-muted">
-            Clear
+          <button onClick={() => confirm(t("Clear your cart?")) && clear()} className="text-sm font-semibold text-ink-muted">
+            {t("Clear")}
           </button>
         )}
       </header>
@@ -40,7 +42,7 @@ export function CartView() {
           <Spinner className="text-brand-500" />
         </div>
       ) : !cart || !cart.lines.length ? (
-        <EmptyState icon={<ShoppingBag />} title="Your cart is empty" body="Find something delicious in the reels and tap Order." action={<Link href="/" className="chip chip-active">Watch reels</Link>} />
+        <EmptyState icon={<ShoppingBag />} title={t("Your cart is empty")} body={t("Find something delicious in the reels and tap Order.")} action={<Link href="/" className="chip chip-active">{t("Watch reels")}</Link>} />
       ) : (
         <div className="container-app">
           <ul className="space-y-2.5">
@@ -65,20 +67,20 @@ export function CartView() {
                   {l.note && <p className="mt-0.5 text-xs italic text-ink-muted">“{l.note}”</p>}
                   <div className="mt-2 flex items-center justify-between">
                     <div className="flex items-center rounded-xl bg-black/5">
-                      <button className="grid h-9 w-9 place-items-center" onClick={() => updateQty(l.key, l.quantity - 1)} aria-label="Decrease">
+                      <button className="grid h-9 w-9 place-items-center" onClick={() => updateQty(l.key, l.quantity - 1)} aria-label={t("Decrease")}>
                         {l.quantity === 1 ? <Trash2 className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
                       </button>
                       <span className="tabular w-6 text-center text-sm font-bold">{l.quantity}</span>
-                      <button className="grid h-9 w-9 place-items-center" onClick={() => updateQty(l.key, l.quantity + 1)} aria-label="Increase">
+                      <button className="grid h-9 w-9 place-items-center" onClick={() => updateQty(l.key, l.quantity + 1)} aria-label={t("Increase")}>
                         <Plus className="h-4 w-4" />
                       </button>
                     </div>
                     <div className="flex gap-3 text-xs font-semibold">
                       <Link href={`/item/${l.menuItemId}`} className="text-brand-600">
-                        Edit
+                        {t("Edit")}
                       </Link>
                       <button onClick={() => remove(l.key)} className="text-ink-muted">
-                        Remove
+                        {t("Remove")}
                       </button>
                     </div>
                   </div>
@@ -91,14 +93,14 @@ export function CartView() {
           </Link>
           <div className="card mt-4 space-y-1.5 p-4 text-sm">
             <div className="flex justify-between">
-              <span className="text-ink-muted">Item subtotal</span>
+              <span className="text-ink-muted">{t("Item subtotal")}</span>
               <span className="tabular font-bold">{formatMoney(subtotalCents, cart.currency)}</span>
             </div>
             <div className="flex justify-between text-ink-muted">
-              <span>Delivery fee</span>
-              <span>Shown at checkout</span>
+              <span>{t("Delivery fee")}</span>
+              <span>{t("Shown at checkout")}</span>
             </div>
-            <p className="pt-1 text-xs text-ink-muted">💵 Pay cash on delivery — no card needed.</p>
+            <p className="pt-1 text-xs text-ink-muted">{t("💵 Pay cash on delivery — no card needed.")}</p>
           </div>
           <div className="sticky mt-4" style={{ bottom: "calc(var(--nav-h) + var(--safe-bottom) + 12px)" }}>
             <Button size="lg" block onClick={() => router.push("/checkout")}>

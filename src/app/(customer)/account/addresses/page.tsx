@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { PageHeader } from "@/components/customer/page-header";
 import { AddressBook } from "@/components/customer/address-book";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "Saved addresses", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Saved addresses"), robots: { index: false } };
+}
 
 export default async function AddressesPage() {
   const user = await requireUser("/account/addresses");

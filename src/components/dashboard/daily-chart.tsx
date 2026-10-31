@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
+import { useT } from "@/i18n/client";
 
 export type ChartMetric = { key: string; label: string; money?: boolean };
 type Day = { date: string } & Record<string, number | string>;
@@ -18,6 +19,7 @@ const short = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("
 
 /** Single-series daily bars (one metric at a time — never two scales on one chart), hover/tap tooltip, table view. */
 export function DailyChart({ days, currency, metrics = DEFAULT_METRICS }: { days: Day[]; currency: string; metrics?: ChartMetric[] }) {
+  const t = useT();
   const [key, setKey] = useState(metrics[0].key);
   const [hover, setHover] = useState<number | null>(null);
   const [table, setTable] = useState(false);
@@ -32,10 +34,10 @@ export function DailyChart({ days, currency, metrics = DEFAULT_METRICS }: { days
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Metric">
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={t("Metric")}>
           {metrics.map((m) => (
             <button key={m.key} role="tab" aria-selected={key === m.key} onClick={() => setKey(m.key)} className={cn("chip h-8 text-xs", key === m.key && "chip-active")}>
-              {m.label}
+              {t(m.label)}
             </button>
           ))}
         </div>
@@ -44,16 +46,16 @@ export function DailyChart({ days, currency, metrics = DEFAULT_METRICS }: { days
         </button>
       </div>
       <div className="mb-2 text-sm text-ink-muted">
-        {metric.label}: <b className="tabular text-ink">{fmtFor(metric, total)}</b> total
+        {t(metric.label)}: <b className="tabular text-ink">{fmtFor(metric, total)}</b> {t("total")}
       </div>
       {table ? (
         <div className="max-h-72 overflow-auto">
           <table className="table-app">
             <thead>
               <tr>
-                <th>Date</th>
+                <th>{t("Date")}</th>
                 {metrics.map((m) => (
-                  <th key={m.key}>{m.label}</th>
+                  <th key={m.key}>{t(m.label)}</th>
                 ))}
               </tr>
             </thead>
@@ -72,7 +74,7 @@ export function DailyChart({ days, currency, metrics = DEFAULT_METRICS }: { days
           </table>
         </div>
       ) : (
-        <div className="relative" onMouseLeave={() => setHover(null)}>
+        <div className="relative" dir="ltr" onMouseLeave={() => setHover(null)}>
           <div className="flex items-end border-b border-black/10" style={{ height: H, gap: 2 }} role="img" aria-label={`Daily ${metric.label.toLowerCase()}`}>
             {days.map((d, i) => {
               const v = Number(d[key]) || 0;

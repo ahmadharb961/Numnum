@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
@@ -5,14 +6,20 @@ import { DashPage } from "@/components/dashboard/page";
 import { MarkAllRead } from "@/components/dashboard/simple-actions";
 import { EmptyState } from "@/components/ui/misc";
 import { cn, formatDateTime } from "@/lib/utils";
+import { getLocale, getT } from "@/i18n/server";
 
-export const metadata = { title: "Notifications" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Notifications") };
+}
 
 export default async function NotificationsPage() {
+  const t = await getT();
+  const lang = await getLocale();
   const ctx = await requireRestaurant();
   const items = await prisma.notification.findMany({ where: { restaurantId: ctx.restaurant.id, audience: "RESTAURANT" }, orderBy: { createdAt: "desc" }, take: 100 });
   return (
-    <DashPage title="Notifications" actions={items.some((i) => !i.readAt) && <MarkAllRead />}>
+    <DashPage title={t("Notifications")} actions={items.some((i) => !i.readAt) && <MarkAllRead />}>
       {items.length ? (
         <ul className="card divide-y divide-black/5">
           {items.map((n) => {
@@ -22,7 +29,7 @@ export default async function NotificationsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold">{n.title}</div>
                   {n.body && <div className="text-sm text-ink-muted">{n.body}</div>}
-                  <div className="mt-0.5 text-xs text-ink-muted">{formatDateTime(n.createdAt)}</div>
+                  <div className="mt-0.5 text-xs text-ink-muted">{formatDateTime(n.createdAt, lang)}</div>
                 </div>
               </div>
             );

@@ -16,6 +16,7 @@ import { pooledVideo, unlockPooledVideos } from "./video-pool";
 import { LocationChip } from "./location-picker";
 import { formatKm } from "@/lib/geo";
 import { Logo } from "@/components/logo";
+import { useT } from "@/i18n/client";
 
 export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean };
 
@@ -32,6 +33,7 @@ type Props = {
 };
 
 export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref, locationLabel = null }: Props) {
+  const t = useT();
   const router = useRouter();
   const [reels, setReels] = useState<FeedReel[]>(initial);
   const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
@@ -181,11 +183,11 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
 
   async function share(r: FeedReel) {
     const url = `${location.origin}/reel/${r.id}`;
-    const title = `${r.item.name} at ${r.restaurant.name}`;
+    const title = t("{dish} at {restaurant}", { dish: r.item.name, restaurant: r.restaurant.name });
     track("reel_shared", { reelId: r.id });
     patch(r.id, { shareCount: r.shareCount + 1 });
     try {
-      if (navigator.share) await navigator.share({ title, text: `${title} on numnum`, url });
+      if (navigator.share) await navigator.share({ title, text: t("{title} on numnum", { title }), url });
       else {
         await navigator.clipboard.writeText(url);
         toast("Link copied");
@@ -196,17 +198,17 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
           await navigator.clipboard.writeText(url);
           toast("Link copied");
         } catch {
-          prompt("Copy this link", url);
+          prompt(t("Copy this link"), url);
         }
       }
     }
   }
 
   return (
-    <div className={cn("relative bg-black text-white transition-[padding] duration-300", panel && "lg:pr-[400px]")}>
+    <div className={cn("relative bg-black text-white transition-[padding] duration-300", panel && "lg:pe-[400px]")}>
       {(fixed || backHref) && (
-        <button onClick={() => (backHref ? router.push(backHref) : router.back())} className="absolute left-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label="Back">
-          <ChevronLeft className="h-6 w-6" />
+        <button onClick={() => (backHref ? router.push(backHref) : router.back())} className="absolute start-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={t("Back")}>
+          <ChevronLeft className="rtl:-scale-x-100 h-6 w-6" />
         </button>
       )}
       {!fixed && !backHref && (
@@ -219,10 +221,10 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
       )}
       {soundBlocked && (
         <button onClick={toggleMute} className={cn("absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/60 px-3.5 py-2 text-xs font-bold backdrop-blur")} style={{ top: "calc(var(--safe-top) + 64px)" }}>
-          <VolumeX className="h-4 w-4" /> Tap for sound
+          <VolumeX className="h-4 w-4" /> {t("Tap for sound")}
         </button>
       )}
-      <button onClick={toggleMute} className={cn("absolute right-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur", panel && "lg:right-[412px]")} style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={muted ? "Unmute" : "Mute"}>
+      <button onClick={toggleMute} className={cn("absolute end-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur", panel && "lg:end-[412px]")} style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={muted ? t("Unmute") : t("Mute")}>
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
@@ -258,10 +260,10 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
           <div className="grid h-feed place-items-center px-8 text-center">
             <div>
               <div className="text-5xl">🍔</div>
-              <h2 className="mt-4 text-xl font-bold">No reels yet</h2>
-              <p className="mt-1 text-sm text-white/70">Restaurants are cooking up their first videos. Explore menus in the meantime.</p>
+              <h2 className="mt-4 text-xl font-bold">{t("No reels yet")}</h2>
+              <p className="mt-1 text-sm text-white/70">{t("Restaurants are cooking up their first videos. Explore menus in the meantime.")}</p>
               <Link href="/restaurants" className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-500 px-5 font-semibold">
-                Browse restaurants
+                {t("Browse restaurants")}
               </Link>
             </div>
           </div>
@@ -309,6 +311,7 @@ function ReelSlide({
   onRestaurant: () => void;
   onOpen: () => void;
 }) {
+  const t = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   // Pooled <video> elements exist only in the browser: attach after mount (poster shows meanwhile).
   const [mounted, setMounted] = useState(false);
@@ -421,7 +424,7 @@ function ReelSlide({
           onError={() => setFailed(true)}
         />
       )}
-      <button className="absolute inset-0 z-[1] h-full w-full" onClick={onTap} aria-label={paused ? "Play" : "Pause"} />
+      <button className="absolute inset-0 z-[1] h-full w-full" onClick={onTap} aria-label={paused ? t("Play") : t("Pause")} />
 
       {active && buffering && !paused && (
         <div className="pointer-events-none absolute inset-0 z-[2] grid place-items-center">
@@ -443,7 +446,7 @@ function ReelSlide({
             }}
           >
             <RotateCcw className="h-8 w-8" />
-            Video unavailable · Tap to retry
+            {t("Video unavailable · Tap to retry")}
           </button>
         </div>
       )}
@@ -457,8 +460,8 @@ function ReelSlide({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-2/3 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
 
       {/* Right action rail */}
-      <div className="absolute bottom-6 right-2 z-10 flex flex-col items-center gap-4">
-        <Link href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="relative mb-1" aria-label={`Open ${reel.restaurant.name}`}>
+      <div className="absolute bottom-6 end-2 z-10 flex flex-col items-center gap-4">
+        <Link href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="relative mb-1" aria-label={t("Open {name}", { name: reel.restaurant.name })}>
           <span className="block h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-white">
             {reel.restaurant.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -468,13 +471,13 @@ function ReelSlide({
             )}
           </span>
         </Link>
-        <RailButton onClick={onLike} label={compactNumber(reel.likeCount)} aria={reel.liked ? "Unlike" : "Like"}>
+        <RailButton onClick={onLike} label={compactNumber(reel.likeCount)} aria={reel.liked ? t("Unlike") : t("Like")}>
           <Heart className={cn("h-8 w-8 drop-shadow", reel.liked ? "fill-brand-500 text-brand-500" : "fill-white/10")} />
         </RailButton>
-        <RailButton onClick={onSave} label={reel.saved ? "Saved" : "Save"} aria={reel.saved ? "Unsave" : "Save"}>
+        <RailButton onClick={onSave} label={reel.saved ? t("Saved") : t("Save")} aria={reel.saved ? t("Unsave") : t("Save")}>
           <Bookmark className={cn("h-7 w-7 drop-shadow", reel.saved ? "fill-amber-400 text-amber-400" : "fill-white/10")} />
         </RailButton>
-        <RailButton onClick={onShare} label={reel.shareCount ? compactNumber(reel.shareCount) : "Share"} aria="Share">
+        <RailButton onClick={onShare} label={reel.shareCount ? compactNumber(reel.shareCount) : t("Share")} aria={t("Share")}>
           <Send className="h-7 w-7 drop-shadow" />
         </RailButton>
         <div className="flex flex-col items-center text-[11px] font-semibold text-shadow">
@@ -484,8 +487,8 @@ function ReelSlide({
       </div>
 
       {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pr-20 *:pointer-events-auto">
-        {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">Sponsored</span>}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pe-20 *:pointer-events-auto">
+        {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">{t("Sponsored")}</span>}
         <Link href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
           {reel.restaurant.name}
           {reel.restaurant.verified && <VerifiedBadge />}
@@ -495,10 +498,10 @@ function ReelSlide({
             <MapPin className="h-3.5 w-3.5" />
             {reel.restaurant.location}
             {reel.restaurant.distanceKm != null && <span>· {formatKm(reel.restaurant.distanceKm)}</span>}
-            {reel.restaurant.deliversToYou === false && <span className="rounded bg-white/20 px-1.5 text-[10px] font-bold uppercase">Pickup only</span>}
+            {reel.restaurant.deliversToYou === false && <span className="rounded bg-white/20 px-1.5 text-[10px] font-bold uppercase">{t("Pickup only")}</span>}
           </div>
         )}
-        <button onClick={onOpen} className="mt-2 block text-left">
+        <button onClick={onOpen} className="mt-2 block text-start">
           <div className="flex items-center gap-2">
             <span className="text-xl font-extrabold leading-tight text-shadow">{reel.item.name}</span>
           </div>
@@ -510,11 +513,11 @@ function ReelSlide({
         {(reel.caption || reel.item.description) && <ReelCaption text={(reel.caption || reel.item.description)!} />}
         {reel.restaurant.orderingEnabled && reel.item.available ? (
           <button onClick={onOpen} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 text-base font-bold shadow-lg shadow-brand-500/40 active:scale-[0.98]">
-            Order · {formatMoney(reel.item.priceCents, reel.item.currency)}
+            {t("Order")} · {formatMoney(reel.item.priceCents, reel.item.currency)}
           </button>
         ) : (
           <button onClick={onOpen} className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-white/15 text-sm font-bold backdrop-blur">
-            {reel.item.available ? "View dish" : "Currently unavailable"}
+            {reel.item.available ? t("View dish") : t("Currently unavailable")}
           </button>
         )}
       </div>
@@ -525,6 +528,7 @@ function ReelSlide({
 
 /** Like Instagram: one line ending in "… more"; tap to read it all, "less" folds it back. */
 function ReelCaption({ text }: { text: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [long, setLong] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
@@ -543,7 +547,7 @@ function ReelCaption({ text }: { text: string }) {
         <p className="whitespace-pre-line break-words text-sm text-white/90 text-shadow" onClick={() => setOpen(false)}>
           {text}{" "}
           <button type="button" onClick={(e) => (e.stopPropagation(), setOpen(false))} className="font-semibold text-white">
-            less
+            {t("less")}
           </button>
         </p>
       </div>
@@ -554,8 +558,8 @@ function ReelCaption({ text }: { text: string }) {
         {text.split("\n")[0]}
       </span>
       {long && (
-        <button type="button" onClick={() => setOpen(true)} className="shrink-0 pl-1 font-semibold text-white">
-          more
+        <button type="button" onClick={() => setOpen(true)} className="shrink-0 ps-1 font-semibold text-white">
+          {t("more")}
         </button>
       )}
     </div>
@@ -584,6 +588,7 @@ type PanelMenu = { description: string | null; openNow: boolean | null; reelCoun
 
 /** Desktop right-hand panel (like the left sidebar): the current reel's restaurant and its menu. */
 function RestaurantPanel({ reel, onClose, onItem }: { reel: FeedReel; onClose: () => void; onItem: (itemId: string) => void }) {
+  const t = useT();
   const r = reel.restaurant;
   const [menu, setMenu] = useState<PanelMenu | null>(null);
   useEffect(() => {
@@ -604,16 +609,16 @@ function RestaurantPanel({ reel, onClose, onItem }: { reel: FeedReel; onClose: (
   }, [onClose]);
 
   return (
-    <aside className="fixed inset-y-0 right-0 z-40 hidden w-[400px] animate-fade-in flex-col border-l border-black/5 bg-white text-ink lg:flex" aria-label={`${r.name} menu`}>
+    <aside className="fixed inset-y-0 end-0 z-40 hidden w-[400px] animate-fade-in flex-col border-s border-black/5 bg-white text-ink lg:flex" aria-label={`${r.name} menu`}>
       <div className="relative aspect-[16/9] shrink-0 bg-gradient-to-br from-brand-100 to-brand-300">
         {r.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={r.coverUrl} alt="" className="h-full w-full object-cover" />
         )}
-        <button onClick={onClose} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur hover:bg-black/60" aria-label="Close">
+        <button onClick={onClose} className="absolute end-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur hover:bg-black/60" aria-label={t("Close")}>
           <X className="h-5 w-5" />
         </button>
-        <span className="absolute bottom-3 left-4 h-16 w-16 overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg">
+        <span className="absolute bottom-3 start-4 h-16 w-16 overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg">
           {r.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={r.logoUrl} alt="" className="h-full w-full object-cover" />
@@ -639,18 +644,18 @@ function RestaurantPanel({ reel, onClose, onItem }: { reel: FeedReel; onClose: (
             )}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 text-sm">
-            {menu?.openNow != null && <span className={cn("font-semibold", menu.openNow ? "text-emerald-700" : "text-ink-muted")}>{menu.openNow ? "Open now" : "Closed"}</span>}
-            {r.deliversToYou === true && <span className="font-semibold text-emerald-700">Delivers to you{r.distanceKm != null ? ` · ${formatKm(r.distanceKm)}` : ""}</span>}
-            {r.deliversToYou === false && <span className="text-ink-muted">Pickup only for your location</span>}
-            {r.avgPrepMinutes > 0 && <span className="text-ink-muted">{r.avgPrepMinutes}–{r.avgPrepMinutes + 15} mins</span>}
+            {menu?.openNow != null && <span className={cn("font-semibold", menu.openNow ? "text-emerald-700" : "text-ink-muted")}>{menu.openNow ? t("Open now") : t("Closed")}</span>}
+            {r.deliversToYou === true && <span className="font-semibold text-emerald-700">{t("Delivers to you")}{r.distanceKm != null ? ` · ${formatKm(r.distanceKm)}` : ""}</span>}
+            {r.deliversToYou === false && <span className="text-ink-muted">{t("Pickup only for your location")}</span>}
+            {r.avgPrepMinutes > 0 && <span className="text-ink-muted">{t("{a}–{b} mins", { a: r.avgPrepMinutes, b: r.avgPrepMinutes + 15 })}</span>}
           </div>
           {menu?.description && <p className="mt-3 text-sm text-ink-soft">{menu.description}</p>}
           <Link href={`/r/${r.slug}`} className="mt-4 flex h-10 items-center justify-center rounded-xl border border-black/10 text-sm font-bold hover:bg-black/5">
-            Open restaurant page
+            {t("Open restaurant page")}
           </Link>
         </div>
         <div className="border-t border-black/5 px-5 pb-8 pt-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Menu</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-muted">{t("Menu")}</h3>
           {!menu && (
             <div className="grid h-32 place-items-center">
               <Loader2 className="h-6 w-6 animate-spin text-ink-muted" />
@@ -661,7 +666,7 @@ function RestaurantPanel({ reel, onClose, onItem }: { reel: FeedReel; onClose: (
               <h4 className="mb-2 font-extrabold">{s.name}</h4>
               <div className="space-y-1">
                 {s.items.map((i) => (
-                  <button key={i.id} onClick={() => onItem(i.id)} disabled={!i.available} className={cn("flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-black/5 disabled:opacity-50", i.id === reel.item.id && "bg-brand-50 ring-1 ring-brand-200")}>
+                  <button key={i.id} onClick={() => onItem(i.id)} disabled={!i.available} className={cn("flex w-full items-center gap-3 rounded-xl p-2 text-start transition hover:bg-black/5 disabled:opacity-50", i.id === reel.item.id && "bg-brand-50 ring-1 ring-brand-200")}>
                     <span className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-black/5">
                       {i.image && (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -671,7 +676,7 @@ function RestaurantPanel({ reel, onClose, onItem }: { reel: FeedReel; onClose: (
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-bold">{i.name}</span>
                       <span className="tabular text-sm font-extrabold text-brand-600">{formatMoney(i.priceCents, i.currency)}</span>
-                      {i.id === reel.item.id && <span className="ml-2 text-xs font-semibold text-brand-600">In this reel</span>}
+                      {i.id === reel.item.id && <span className="ms-2 text-xs font-semibold text-brand-600">{t("In this reel")}</span>}
                     </span>
                     {i.available && (
                       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-500 text-white">

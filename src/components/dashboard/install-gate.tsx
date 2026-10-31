@@ -6,6 +6,7 @@ import { isInstalled, isIos, isMobile, pushState, resyncDevice, turnOn, type Pus
 import { InstallHelp } from "@/components/install-guide";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
+import { useT } from "@/i18n/client";
 
 const APP = "numnum Orders";
 type Step = "loading" | "install" | "notify" | "blocked" | "ok";
@@ -16,6 +17,7 @@ type Step = "loading" | "install" | "notify" | "blocked" | "ok";
  * Desktop browsers aren't gated; they get a reminder banner.
  */
 export function InstallGate({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [step, setStep] = useState<Step>("loading");
   const [mobile, setMobile] = useState(false);
   const [push, setPush] = useState<PushState>("off");
@@ -59,13 +61,13 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
     return (
       <>
         {!mobile && push !== "on" && push !== "unsupported" && (
-          <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-900 lg:ml-[18rem] lg:mr-8">
+          <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-900 lg:ms-[18rem] lg:me-8">
             <span className="inline-flex items-center gap-2 font-semibold">
-              <BellRing className="h-4 w-4" /> {push === "blocked" ? "Notifications are blocked in this browser — allow them in the site settings to hear about new orders." : "Turn on notifications to be alerted about new orders even when this tab is in the background."}
+              <BellRing className="h-4 w-4" /> {push === "blocked" ? t("Notifications are blocked in this browser — allow them in the site settings to hear about new orders.") : t("Turn on notifications to be alerted about new orders even when this tab is in the background.")}
             </span>
             {push === "off" && (
               <Button size="sm" onClick={enable} loading={busy}>
-                Turn on
+                {t("Turn on")}
               </Button>
             )}
           </div>
@@ -79,14 +81,14 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
       <div className="mx-auto max-w-md px-6">
         <Logo className="h-12 text-brand-600" />
         <ol className="mt-6 flex gap-2 text-xs font-bold">
-          <li className={`flex-1 rounded-full px-3 py-1.5 text-center ${step === "install" ? "bg-ink text-white" : "bg-emerald-100 text-emerald-700"}`}>1. Add to home screen</li>
-          <li className={`flex-1 rounded-full px-3 py-1.5 text-center ${step === "install" ? "bg-black/5 text-ink-muted" : "bg-ink text-white"}`}>2. Allow notifications</li>
+          <li className={`flex-1 rounded-full px-3 py-1.5 text-center ${step === "install" ? "bg-ink text-white" : "bg-emerald-100 text-emerald-700"}`}>{t("1. Add to home screen")}</li>
+          <li className={`flex-1 rounded-full px-3 py-1.5 text-center ${step === "install" ? "bg-black/5 text-ink-muted" : "bg-ink text-white"}`}>{t("2. Allow notifications")}</li>
         </ol>
 
         {step === "install" && (
           <>
-            <h1 className="mt-6 text-2xl font-extrabold leading-tight">Add numnum to your home screen to receive orders</h1>
-            <p className="mb-6 mt-2 text-ink-soft">Orders arrive as notifications, like a regular app, even when your phone is locked. This takes 20 seconds.</p>
+            <h1 className="mt-6 text-2xl font-extrabold leading-tight">{t("Add numnum to your home screen to receive orders")}</h1>
+            <p className="mb-6 mt-2 text-ink-soft">{t("Orders arrive as notifications, like a regular app, even when your phone is locked. This takes 20 seconds.")}</p>
             <InstallHelp appName={APP} />
           </>
         )}
@@ -94,10 +96,10 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
         {step === "notify" && (
           <>
             <BellRing className="mt-8 h-12 w-12 text-brand-500" />
-            <h1 className="mt-3 text-2xl font-extrabold leading-tight">Allow notifications for new orders</h1>
-            <p className="mt-2 text-ink-soft">Your phone will ask for permission. Tap <b>Allow</b> so you never miss an order.</p>
+            <h1 className="mt-3 text-2xl font-extrabold leading-tight">{t("Allow notifications for new orders")}</h1>
+            <p className="mt-2 text-ink-soft">{t("Your phone will ask for permission. Tap")} <b>{t("Allow")}</b> {t("so you never miss an order.")}</p>
             <Button size="lg" block className="mt-6" onClick={enable} loading={busy}>
-              <BellRing className="h-5 w-5" /> Turn on order notifications
+              <BellRing className="h-5 w-5" /> {t("Turn on order notifications")}
             </Button>
             {push === "unsupported" && <p className="mt-3 text-sm text-ink-muted">This phone doesn&apos;t support web notifications. Update your phone&apos;s software, or keep the Orders screen open.</p>}
           </>
@@ -106,10 +108,10 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
         {step === "blocked" && (
           <>
             <BellRing className="mt-8 h-12 w-12 text-red-500" />
-            <h1 className="mt-3 text-2xl font-extrabold leading-tight">Notifications are turned off</h1>
-            <p className="mt-2 text-ink-soft">numnum needs notifications to alert you about new orders. Turn them back on, then reopen the app:</p>
+            <h1 className="mt-3 text-2xl font-extrabold leading-tight">{t("Notifications are turned off")}</h1>
+            <p className="mt-2 text-ink-soft">{t("numnum needs notifications to alert you about new orders. Turn them back on, then reopen the app:")}</p>
             <ul className="mt-4 space-y-2 text-[15px]">
-              {isIos() ? <li>iPhone: <b>Settings → Notifications → {APP} → Allow Notifications</b></li> : <li>Android: <b>Settings → Apps → {APP} → Notifications → On</b></li>}
+              {isIos() ? <li>{t("iPhone:")} <b>Settings → Notifications → {APP} → Allow Notifications</b></li> : <li>{t("Android:")} <b>Settings → Apps → {APP} → Notifications → On</b></li>}
             </ul>
             <Button size="lg" block variant="outline" className="mt-6" onClick={() => void evaluate()}>
               <CheckCircle2 className="h-5 w-5" /> I&apos;ve turned them on

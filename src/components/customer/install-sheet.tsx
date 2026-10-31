@@ -5,6 +5,7 @@ import { InstallHelp } from "@/components/install-guide";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { isInstalled, isMobile } from "@/lib/push-client";
+import { useT } from "@/i18n/client";
 
 const KEY = "nn-install-later";
 
@@ -14,6 +15,7 @@ const KEY = "nn-install-later";
  * With `open`/`onClose` it's shown on demand instead (e.g. a "Show me how" button).
  */
 export function InstallSheet({ reference, open, onClose }: { reference?: string; open?: boolean; onClose?: () => void }) {
+  const t = useT();
   const [auto, setAuto] = useState(false);
   useEffect(() => {
     if (!reference || !isMobile() || isInstalled()) return;
@@ -46,14 +48,14 @@ export function InstallSheet({ reference, open, onClose }: { reference?: string;
           <div className="text-5xl" aria-hidden>
             🛵
           </div>
-          <h2 className="mt-2 text-xl font-extrabold leading-tight">Know the moment your order is on its way</h2>
+          <h2 className="mt-2 text-xl font-extrabold leading-tight">{t("Know the moment your order is on its way")}</h2>
           <p className="mx-auto mt-1 max-w-sm text-sm text-ink-soft">Add numnum to your home screen and we&apos;ll notify you when the restaurant accepts your order, when it leaves and when it arrives.</p>
         </div>
         <div className="mt-5">
           <InstallHelp />
         </div>
         <Button type="button" variant="ghost" block className="mt-3" onClick={close}>
-          Maybe later
+          {t("Maybe later")}
         </Button>
       </div>
     </Sheet>

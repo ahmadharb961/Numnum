@@ -8,8 +8,10 @@ import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { LocationChip } from "./location-picker";
 import { setCounts, setQuery, setSearching, useCounts, useQuery, useSearching } from "./search-state";
+import { useLocale, useT } from "@/i18n/client";
+import { localName } from "@/i18n/core";
 
-type Facets = { categories: { slug: string; name: string; emoji: string | null }[]; areas: string[]; cuisines: string[] };
+type Facets = { categories: { slug: string; name: string; nameAr?: string | null; emoji: string | null }[]; areas: string[]; cuisines: string[] };
 
 const RECENT = "nn-recent-searches";
 export function recentSearches(): string[] {
@@ -29,6 +31,8 @@ export function rememberSearch(q: string) {
 }
 
 export function SearchControls({ facets, locationLabel }: { facets: Facets; locationLabel: string | null }) {
+  const t = useT();
+  const locale = useLocale();
   const pathname = usePathname();
   const sp = useSearchParams();
   const [q, setQ] = useState(sp.get("q") ?? "");
@@ -104,7 +108,7 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
         </div>
         <div className="flex gap-2">
           <label className="relative flex-1">
-            {busy ? <Loader2 className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-brand-500" aria-label="Searching" /> : <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-muted" />}
+            {busy ? <Loader2 className="pointer-events-none absolute start-3.5 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-brand-500" aria-label={t("Searching")} /> : <Search className="pointer-events-none absolute start-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-muted" />}
             <input
               value={q}
               onChange={(e) => type_(e.target.value)}
@@ -115,29 +119,29 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
                 setTimeout(() => setFocused(document.activeElement === el), 150);
               }}
               onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur(), rememberSearch(q))}
-              placeholder="Search food or restaurants"
-              className="input pl-11 pr-10"
+              placeholder={t("Search food or restaurants")}
+              className="input ps-11 pe-10"
               type="search"
               enterKeyHint="search"
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
-              aria-label="Search"
+              aria-label={t("Search")}
             />
             {q && (
-              <button onClick={() => type_("")} className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full" aria-label="Clear search">
+              <button onClick={() => type_("")} className="absolute end-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full" aria-label={t("Clear search")}>
                 <X className="h-4 w-4" />
               </button>
             )}
           </label>
-          <button onClick={() => setOpen(true)} className="relative grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-black/10 bg-white" aria-label="Filters">
+          <button onClick={() => setOpen(true)} className="relative grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-black/10 bg-white" aria-label={t("Filters")}>
             <SlidersHorizontal className="h-5 w-5" />
-            {activeFilters > 0 && <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-[10px] font-bold text-white">{activeFilters}</span>}
+            {activeFilters > 0 && <span className="absolute -end-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-[10px] font-bold text-white">{activeFilters}</span>}
           </button>
         </div>
         {showRecent && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-ink-muted">Recent</span>
+            <span className="text-xs font-semibold text-ink-muted">{t("Recent")}</span>
             {recent.map((r) => (
               <button key={r} onMouseDown={(e) => e.preventDefault()} onClick={() => type_(r)} className="chip h-8 text-xs">
                 <History className="h-3.5 w-3.5" /> {r}
@@ -146,20 +150,20 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
           </div>
         )}
         <div className="mt-3 grid grid-cols-3 rounded-xl bg-black/5 p-1 text-sm font-semibold">
-          {(["dishes", "reels", "restaurants"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={cn("h-9 rounded-lg capitalize transition", type === t ? "bg-white shadow-sm" : "text-ink-muted")}>
-              {t}
-              {q.trim() && counts && <span className={cn("ml-1 tabular text-xs", type === t ? "text-brand-600" : "text-ink-muted/70")}>{counts[t] > 1000 ? "1000+" : counts[t]}</span>}
+          {(["dishes", "reels", "restaurants"] as const).map((k) => (
+            <button key={k} onClick={() => setTab(k)} className={cn("h-9 rounded-lg transition", type === k ? "bg-white shadow-sm" : "text-ink-muted")}>
+              {t(k === "dishes" ? "Dishes" : k === "reels" ? "Reels" : "Restaurants")}
+              {q.trim() && counts && <span className={cn("ms-1 tabular text-xs", type === k ? "text-brand-600" : "text-ink-muted/70")}>{counts[k] > 1000 ? "1000+" : counts[k]}</span>}
             </button>
           ))}
         </div>
         <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible px-4">
           <button onClick={() => setParams({ category: null })} className={cn("chip", !sp.get("category") && "chip-active")}>
-            All
+            {t("All")}
           </button>
           {facets.categories.map((c) => (
             <button key={c.slug} onClick={() => setParams({ category: sp.get("category") === c.slug ? null : c.slug })} className={cn("chip", sp.get("category") === c.slug && "chip-active")}>
-              {c.emoji} {c.name}
+              {c.emoji} {localName(locale, c.name, c.nameAr)}
             </button>
           ))}
         </div>
@@ -175,6 +179,7 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
 }
 
 function FilterSheet({ open, onClose, facets, current, apply }: { open: boolean; onClose: () => void; facets: Facets; current: URLSearchParams; apply: (p: Record<string, string | null>) => void }) {
+  const t = useT();
   const [f, setF] = useState<Record<string, string>>({});
   useEffect(() => {
     if (open) setF(Object.fromEntries(current.entries()));
@@ -185,27 +190,27 @@ function FilterSheet({ open, onClose, facets, current, apply }: { open: boolean;
     <Sheet open={open} onClose={onClose} title="Filters">
       <div className="space-y-5 p-5">
         <div>
-          <div className="label">Price range (USD)</div>
+          <div className="label">{t("Price range (USD)")}</div>
           <div className="flex items-center gap-2">
-            <input className="input" inputMode="decimal" placeholder="Min" value={f.minPrice ?? ""} onChange={(e) => setF({ ...f, minPrice: e.target.value })} />
+            <input className="input" inputMode="decimal" placeholder={t("Min")} value={f.minPrice ?? ""} onChange={(e) => setF({ ...f, minPrice: e.target.value })} />
             <span className="text-ink-muted">–</span>
-            <input className="input" inputMode="decimal" placeholder="Max" value={f.maxPrice ?? ""} onChange={(e) => setF({ ...f, maxPrice: e.target.value })} />
+            <input className="input" inputMode="decimal" placeholder={t("Max")} value={f.maxPrice ?? ""} onChange={(e) => setF({ ...f, maxPrice: e.target.value })} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Cuisine</label>
+            <label className="label">{t("Cuisine")}</label>
             <select className="input" value={f.cuisine ?? ""} onChange={(e) => setF({ ...f, cuisine: e.target.value })}>
-              <option value="">Any</option>
+              <option value="">{t("Any")}</option>
               {facets.cuisines.map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="label">Area</label>
+            <label className="label">{t("Area")}</label>
             <select className="input" value={f.area ?? ""} onChange={(e) => setF({ ...f, area: e.target.value })}>
-              <option value="">Anywhere</option>
+              <option value="">{t("Anywhere")}</option>
               {facets.areas.map((a) => (
                 <option key={a}>{a}</option>
               ))}
@@ -220,35 +225,35 @@ function FilterSheet({ open, onClose, facets, current, apply }: { open: boolean;
             ["available", "Available now"],
           ].map(([k, label]) => (
             <button key={k} type="button" onClick={() => toggle(k)} className={cn("chip", f[k] === "1" && "chip-active")}>
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Restaurant rating</label>
+            <label className="label">{t("Restaurant rating")}</label>
             <select className="input" value={f.minRating ?? ""} onChange={(e) => setF({ ...f, minRating: e.target.value })}>
-              <option value="">Any</option>
-              <option value="3">3★ & up</option>
-              <option value="4">4★ & up</option>
-              <option value="4.5">4.5★ & up</option>
+              <option value="">{t("Any")}</option>
+              <option value="3">{t("3★ & up")}</option>
+              <option value="4">{t("4★ & up")}</option>
+              <option value="4.5">{t("4.5★ & up")}</option>
             </select>
           </div>
           <div>
-            <label className="label">Dish rating</label>
+            <label className="label">{t("Dish rating")}</label>
             <select className="input" value={f.minItemRating ?? ""} onChange={(e) => setF({ ...f, minItemRating: e.target.value })}>
-              <option value="">Any</option>
-              <option value="3">3★ & up</option>
-              <option value="4">4★ & up</option>
-              <option value="4.5">4.5★ & up</option>
+              <option value="">{t("Any")}</option>
+              <option value="3">{t("3★ & up")}</option>
+              <option value="4">{t("4★ & up")}</option>
+              <option value="4.5">{t("4.5★ & up")}</option>
             </select>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 pt-2">
           <Button variant="outline" onClick={() => apply(Object.fromEntries(keys.map((k) => [k, null])))}>
-            Reset
+            {t("Reset")}
           </Button>
-          <Button onClick={() => apply(Object.fromEntries(keys.map((k) => [k, f[k] || null])))}>Show results</Button>
+          <Button onClick={() => apply(Object.fromEntries(keys.map((k) => [k, f[k] || null])))}>{t("Show results")}</Button>
         </div>
       </div>
     </Sheet>

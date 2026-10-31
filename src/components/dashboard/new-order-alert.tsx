@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { BellOff, BellRing, Volume2 } from "lucide-react";
 import { playOrderSound, unlockOrderSound } from "./order-sound";
+import { useT } from "@/i18n/client";
 
 /**
  * Watches for new orders every 10 s while the dashboard is open: rings (loud, repeating until
@@ -11,6 +12,7 @@ import { playOrderSound, unlockOrderSound } from "./order-sound";
  * refreshes the orders list.
  */
 export function NewOrderAlert({ initialCount }: { initialCount: number }) {
+  const t = useT();
   const router = useRouter();
   const pathname = usePathname();
   const known = useRef<Set<string> | null>(null);
@@ -87,12 +89,12 @@ export function NewOrderAlert({ initialCount }: { initialCount: number }) {
     <div className="flex items-center gap-2">
       {count > 0 && (
         <a href="/dashboard/orders" className="inline-flex animate-pulse items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1.5 text-xs font-bold text-white">
-          <BellRing className="h-4 w-4" /> {count} new order{count === 1 ? "" : "s"}
+          <BellRing className="h-4 w-4" /> {t(count === 1 ? "{n} new order" : "{n} new orders", { n: count })}
         </a>
       )}
       {ringing && soundOn && count > 0 && (
         <button onClick={() => setRinging(false)} className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-xs font-bold text-white">
-          <BellOff className="h-4 w-4" /> Stop ringing
+          <BellOff className="h-4 w-4" /> {t("Stop ringing")}
         </button>
       )}
       <button
@@ -111,7 +113,7 @@ export function NewOrderAlert({ initialCount }: { initialCount: number }) {
         className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ${soundOn && !needsTap ? "bg-emerald-50 text-emerald-700" : soundOn ? "bg-amber-50 text-amber-800" : "bg-black/5 text-ink-muted"}`}
         aria-pressed={soundOn}
       >
-        <Volume2 className="h-4 w-4" /> {soundOn ? (needsTap ? "Tap to enable sound" : "Sound on") : "Turn on sound"}
+        <Volume2 className="h-4 w-4" /> {t(soundOn ? (needsTap ? "Tap to enable sound" : "Sound on") : "Turn on sound")}
       </button>
     </div>
   );

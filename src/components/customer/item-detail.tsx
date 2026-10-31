@@ -13,6 +13,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { useCart } from "./cart";
 import { track } from "./track";
+import { useLocale, useT } from "@/i18n/client";
 
 function defaultSelections(item: PublicItem): Selections {
   const s: Selections = {};
@@ -25,6 +26,7 @@ function defaultSelections(item: PublicItem): Selections {
 }
 
 export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item: PublicItem; reelId?: string | null; onAdded?: () => void; compact?: boolean; navOffset?: boolean }) {
+  const t = useT();
   const cart = useCart();
   const toast = useToast();
   const [selections, setSelections] = useState<Selections>(() => defaultSelections(item));
@@ -79,7 +81,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
     if (res === "conflict") return setConflict(true);
     setConflict(false);
     track("add_to_cart", { menuItemId: item.id, reelId: reelId ?? undefined, restaurantId: item.restaurant.id });
-    toast(`Added ${qty} × ${item.name}`, "success", { label: "View cart", href: "/cart" });
+    toast(t("Added {qty} × {name}", { qty, name: item.name }), "success", { label: "View cart", href: "/cart" });
     onAdded?.();
   }
 
@@ -103,7 +105,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
               ))}
             </div>
             {item.images.length > 1 && (
-              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+              <div className="absolute bottom-3 start-0 end-0 flex justify-center gap-1.5">
                 {item.images.map((_, i) => (
                   <button key={i} onClick={() => showImage(i)} className={cn("h-1.5 rounded-full bg-white/90 transition-all", i === imgIdx ? "w-5" : "w-1.5 opacity-60")} aria-label={`Photo ${i + 1}`} />
                 ))}
@@ -132,7 +134,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
           <RatingPill avg={item.ratingAvg} count={item.ratingCount} />
           {item.prepTimeMinutes ? (
             <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
-              <Clock className="h-3.5 w-3.5" /> ~{item.prepTimeMinutes} min
+              <Clock className="h-3.5 w-3.5" /> ~{t("{n} min", { n: item.prepTimeMinutes })}
             </span>
           ) : null}
           {item.dietaryLabels.map((d) => (
@@ -140,26 +142,26 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
               {d}
             </Badge>
           ))}
-          {!item.available && <Badge tone="red">Currently unavailable</Badge>}
+          {!item.available && <Badge tone="red">{t("Currently unavailable")}</Badge>}
         </div>
         {item.description && <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">{item.description}</p>}
         {item.ingredients && (
           <div className="mt-4">
-            <h3 className="text-sm font-bold">Ingredients</h3>
+            <h3 className="text-sm font-bold">{t("Ingredients")}</h3>
             <p className="mt-1 text-sm text-ink-soft">{item.ingredients}</p>
           </div>
         )}
         {item.allergens && (
           <div className="mt-3 rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
-            <span className="font-bold">Allergens: </span>
+            <span className="font-bold">{t("Allergens:")} </span>
             {item.allergens}
-            <div className="mt-0.5 text-xs text-amber-800/80">Provided by the restaurant. Confirm with them if you have a severe allergy.</div>
+            <div className="mt-0.5 text-xs text-amber-800/80">{t("Provided by the restaurant. Confirm with them if you have a severe allergy.")}</div>
           </div>
         )}
 
         {item.reels.length > 0 && !compact && (
           <div className="mt-5">
-            <h3 className="mb-2 text-sm font-bold">Reels</h3>
+            <h3 className="mb-2 text-sm font-bold">{t("Reels")}</h3>
             <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible px-5">
               {item.reels.map((r) => (
                 <Link key={r.id} href={`/reel/${r.id}`} className="relative aspect-[9/16] w-24 shrink-0 overflow-hidden rounded-xl bg-black">
@@ -167,7 +169,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={r.posterUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
                   )}
-                  <span className="absolute bottom-1 left-1.5 inline-flex items-center gap-0.5 text-[11px] font-bold text-white text-shadow">
+                  <span className="absolute bottom-1 start-1.5 inline-flex items-center gap-0.5 text-[11px] font-bold text-white text-shadow">
                     <Play className="h-3 w-3 fill-white" />
                     {compactNumber(r.viewCount)}
                   </span>
@@ -188,10 +190,10 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
                 <div key={g.id} id={`grp-${g.id}`}>
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="font-bold">{g.name}</h3>
-                    <span className={cn("text-xs font-semibold", g.required ? "text-brand-600" : "text-ink-muted")}>{g.required ? "Required" : "Optional"}</span>
+                    <span className={cn("text-xs font-semibold", g.required ? "text-brand-600" : "text-ink-muted")}>{g.required ? t("Required") : t("Optional")}</span>
                   </div>
-                  <textarea className="input" maxLength={300} placeholder="Type here…" value={(selections[g.id] as string) ?? ""} onChange={(e) => setSelections((p) => ({ ...p, [g.id]: e.target.value }))} />
-                  {err && <p className="mt-1 text-xs font-medium text-red-600">{err}</p>}
+                  <textarea className="input" maxLength={300} placeholder={t("Type here…")} value={(selections[g.id] as string) ?? ""} onChange={(e) => setSelections((p) => ({ ...p, [g.id]: e.target.value }))} />
+                  {err && <p className="mt-1 text-xs font-medium text-red-600">{t(err)}</p>}
                 </div>
               );
             }
@@ -200,10 +202,10 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
                 <div className="mb-2 flex items-center justify-between">
                   <div>
                     <h3 className="font-bold">{g.name}</h3>
-                    <p className="text-xs text-ink-muted">{g.type === "SINGLE" ? "Choose 1" : min > 0 ? `Choose ${min}${max > min ? `–${max}` : ""}` : `Choose up to ${max}`}</p>
+                    <p className="text-xs text-ink-muted">{g.type === "SINGLE" ? t("Choose 1") : min > 0 ? (max > min ? t("Choose {min}–{max}", { min, max }) : t("Choose {n}", { n: min })) : t("Choose up to {n}", { n: max })}</p>
                   </div>
                   <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", min > 0 ? (v.errors[g.id] ? "bg-brand-500 text-white" : "bg-emerald-50 text-emerald-700") : "bg-black/5 text-ink-muted")}>
-                    {min > 0 ? (v.errors[g.id] ? "Required" : "Done") : "Optional"}
+                    {t(min > 0 ? (v.errors[g.id] ? "Required" : "Done") : "Optional")}
                   </span>
                 </div>
                 <div className="divide-y divide-black/5 rounded-2xl border border-black/10 bg-white">
@@ -211,13 +213,13 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
                     const checked = cur.includes(o.id);
                     const disabled = !o.available || (!checked && g.type === "MULTIPLE" && cur.length >= max);
                     return (
-                      <button key={o.id} type="button" disabled={disabled} onClick={() => toggle(g.id, o.id, g.type === "SINGLE", max)} className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2 text-left disabled:opacity-40">
+                      <button key={o.id} type="button" disabled={disabled} onClick={() => toggle(g.id, o.id, g.type === "SINGLE", max)} className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2 text-start disabled:opacity-40">
                         <span className={cn("grid h-6 w-6 shrink-0 place-items-center border-2 transition", g.type === "SINGLE" ? "rounded-full" : "rounded-md", checked ? "border-brand-500 bg-brand-500 text-white" : "border-black/20")}>
                           {checked && <Check className="h-4 w-4 stroke-[3]" />}
                         </span>
                         <span className="flex-1 text-[15px] font-medium">
                           {o.name}
-                          {!o.available && <span className="ml-2 text-xs text-ink-muted">Unavailable</span>}
+                          {!o.available && <span className="ms-2 text-xs text-ink-muted">{t("Unavailable")}</span>}
                         </span>
                         {o.priceDeltaCents !== 0 && (
                           <span className="tabular text-sm font-semibold text-ink-soft">
@@ -229,15 +231,15 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
                     );
                   })}
                 </div>
-                {err && <p className="mt-1.5 text-xs font-medium text-red-600">{err}</p>}
+                {err && <p className="mt-1.5 text-xs font-medium text-red-600">{t(err)}</p>}
               </div>
             );
           })}
           {/* General note, unless the restaurant already added its own free-text option. */}
           {canOrder && !item.groups.some((g) => g.type === "TEXT") && (
             <div>
-              <h3 className="mb-2 font-bold">Special instructions</h3>
-              <textarea className="input" maxLength={300} placeholder="E.g. no onions, extra crispy" value={note} onChange={(e) => setNote(e.target.value)} />
+              <h3 className="mb-2 font-bold">{t("Special instructions")}</h3>
+              <textarea className="input" maxLength={300} placeholder={t("E.g. no onions, extra crispy")} value={note} onChange={(e) => setNote(e.target.value)} />
             </div>
           )}
         </div>
@@ -246,47 +248,47 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
         {!compact && <ItemReviews item={item} />}
         {compact && (
           <Link href={`/item/${item.id}`} className="mt-6 block text-center text-sm font-semibold text-brand-600">
-            See full details & reviews
+            {t("See full details & reviews")}
           </Link>
         )}
       </div>
 
       {/* Add bar: sticks to the bottom of the sheet when shown in one, else to the bottom of the screen. */}
       <div
-        className={cn("z-40 border-t border-black/5 bg-white/95 px-4 pt-3 backdrop-blur", compact ? "sticky bottom-0 mt-4" : "fixed inset-x-0 mx-auto max-w-screen-sm lg:left-64")}
+        className={cn("z-40 border-t border-black/5 bg-white/95 px-4 pt-3 backdrop-blur", compact ? "sticky bottom-0 mt-4" : "fixed inset-x-0 mx-auto max-w-screen-sm lg:start-64")}
         style={compact ? { paddingBottom: 12 } : navOffset ? { bottom: "calc(var(--nav-h) + var(--safe-bottom))", paddingBottom: 12 } : { bottom: 0, paddingBottom: "calc(var(--safe-bottom) + 12px)" }}
       >
         {canOrder ? (
           <div className="flex items-center gap-3">
             <div className="flex h-14 items-center rounded-2xl bg-black/5">
-              <button className="grid h-14 w-12 place-items-center" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Decrease quantity">
+              <button className="grid h-14 w-12 place-items-center" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label={t("Decrease quantity")}>
                 <Minus className="h-5 w-5" />
               </button>
               <span className="tabular w-6 text-center text-lg font-bold">{qty}</span>
-              <button className="grid h-14 w-12 place-items-center" onClick={() => setQty((q) => Math.min(50, q + 1))} aria-label="Increase quantity">
+              <button className="grid h-14 w-12 place-items-center" onClick={() => setQty((q) => Math.min(50, q + 1))} aria-label={t("Increase quantity")}>
                 <Plus className="h-5 w-5" />
               </button>
             </div>
             <Button size="lg" className="flex-1" onClick={() => doAdd(false)} aria-disabled={!v.ok}>
-              <span>Add to cart</span>
+              <span>{t("Add to cart")}</span>
               <span className="tabular opacity-90">· {formatMoney(total, item.currency)}</span>
             </Button>
           </div>
         ) : (
-          <div className="py-3 text-center text-sm font-semibold text-ink-muted">{!item.available ? "This item is currently unavailable" : "This restaurant isn't taking online orders right now"}</div>
+          <div className="py-3 text-center text-sm font-semibold text-ink-muted">{!item.available ? t("This item is currently unavailable") : t("This restaurant isn't taking online orders right now")}</div>
         )}
       </div>
 
       <Sheet open={conflict} onClose={() => setConflict(false)} title="Start a new cart?">
         <div className="space-y-4 p-5">
           <p className="text-sm text-ink-soft">
-            Your cart has items from <b>{cart.cart?.restaurantName}</b>. Each order goes to one restaurant. Replace your cart with this item from <b>{item.restaurant.name}</b>?
+            {t("Your cart has items from")} <b>{cart.cart?.restaurantName}</b>{t(". Each order goes to one restaurant. Replace your cart with this item from")} <b>{item.restaurant.name}</b>?
           </p>
           <div className="grid grid-cols-2 gap-3">
             <Button variant="outline" onClick={() => setConflict(false)}>
-              Keep cart
+              {t("Keep cart")}
             </Button>
-            <Button onClick={() => doAdd(true)}>Replace cart</Button>
+            <Button onClick={() => doAdd(true)}>{t("Replace cart")}</Button>
           </div>
         </div>
       </Sheet>
@@ -295,13 +297,15 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
 }
 
 function ItemReviews({ item }: { item: PublicItem }) {
+  const t = useT();
+  const lang = useLocale();
   const max = Math.max(1, ...item.distribution.map((d) => d.count));
   return (
     <section className="mt-8">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-extrabold">Reviews</h3>
+        <h3 className="text-lg font-extrabold">{t("Reviews")}</h3>
         <Link href={`/item/${item.id}/review`} className="text-sm font-semibold text-brand-600">
-          Write a review
+          {t("Write a review")}
         </Link>
       </div>
       {item.ratingCount > 0 ? (
@@ -318,29 +322,29 @@ function ItemReviews({ item }: { item: PublicItem }) {
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-black/5">
                   <div className="h-full rounded-full bg-amber-400" style={{ width: `${(d.count / max) * 100}%` }} />
                 </div>
-                <span className="w-6 text-right text-ink-muted">{d.count}</span>
+                <span className="w-6 text-end text-ink-muted">{d.count}</span>
               </div>
             ))}
           </div>
         </div>
       ) : (
-        <p className="mt-2 text-sm text-ink-muted">No reviews yet. Be the first to review this dish.</p>
+        <p className="mt-2 text-sm text-ink-muted">{t("No reviews yet. Be the first to review this dish.")}</p>
       )}
       <ul className="mt-3 space-y-3">
         {item.reviews.map((r) => (
           <li key={r.id} className="rounded-2xl bg-white p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm font-bold">{r.userName}</div>
-              <div className="text-xs text-ink-muted">{formatDate(r.createdAt)}</div>
+              <div className="text-xs text-ink-muted">{formatDate(r.createdAt, undefined, lang)}</div>
             </div>
             <div className="mt-0.5 flex items-center gap-2">
               <Stars value={r.rating} size={13} />
-              {r.evidence !== "UNVERIFIED" && <Badge tone="green">{r.evidence === "COMPLETED_ORDER" ? "Verified order" : "Ordered on numnum"}</Badge>}
+              {r.evidence !== "UNVERIFIED" && <Badge tone="green">{r.evidence === "COMPLETED_ORDER" ? t("Verified order") : t("Ordered on numnum")}</Badge>}
             </div>
             {r.body && <p className="mt-2 text-sm text-ink-soft">{r.body}</p>}
             {r.photoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={r.photoUrl} alt="Review photo" className="mt-2 h-28 w-28 rounded-xl object-cover" loading="lazy" />
+              <img src={r.photoUrl} alt={t("Review photo")} className="mt-2 h-28 w-28 rounded-xl object-cover" loading="lazy" />
             )}
             {r.reply && (
               <div className="mt-3 rounded-xl bg-cream px-3 py-2 text-sm">

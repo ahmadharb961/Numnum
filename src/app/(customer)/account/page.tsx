@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield } from "lucide-react";
 import { requireUser } from "@/server/auth";
@@ -11,10 +12,16 @@ import { Badge } from "@/components/ui/misc";
 import { formatPhone } from "@/lib/phone";
 import { formatMoney } from "@/lib/money";
 import { STATUS_META, ACTIVE_STATUSES } from "@/lib/order-status";
+import { getT } from "@/i18n/server";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
-export const metadata = { title: "Account", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Account"), robots: { index: false } };
+}
 
 export default async function AccountPage() {
+  const t = await getT();
   const user = await requireUser("/account");
   const [active, orderCount, addressCount, staffCount] = await Promise.all([
     prisma.order.findMany({ where: { userId: user.id, status: { in: ACTIVE_STATUSES } }, orderBy: { createdAt: "desc" }, take: 3 }),
@@ -28,24 +35,31 @@ export default async function AccountPage() {
   ];
   return (
     <main className="pb-nav">
-      <PageHeader title={`Hi, ${user.name.split(" ")[0]}`} back={false} />
+      <PageHeader title={t("Hi, {name}", { name: user.name.split(" ")[0] })} back={false} />
       <div className="container-app space-y-5 pt-4">
         {active.map((o) => (
           <Link key={o.id} href={`/order/${o.reference}`} className="card flex items-center gap-3 p-4">
             <span className="relative flex h-3 w-3"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" /><span className="relative inline-flex h-3 w-3 rounded-full bg-brand-500" /></span>
             <div className="min-w-0 flex-1">
               <div className="truncate font-bold">{o.restaurantName}</div>
-              <div className="text-xs text-ink-muted">{STATUS_META[o.status].customer}</div>
+              <div className="text-xs text-ink-muted">{t(STATUS_META[o.status].customer)}</div>
             </div>
             <span className="tabular text-sm font-semibold">{formatMoney(o.totalCents, o.currency)}</span>
           </Link>
         ))}
         <NotifyPrompt />
+        <section className="card flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <h2 className="font-extrabold">{t("Language")}</h2>
+            <p className="text-xs text-ink-muted">{t("The app, emails and notifications")}</p>
+          </div>
+          <LanguageSwitcher />
+        </section>
         <nav className="card divide-y divide-black/5">
           {[
             ...workLinks,
-            { href: "/account/orders", icon: Receipt, label: "My orders", sub: `${orderCount} order${orderCount === 1 ? "" : "s"}` },
-            { href: "/account/addresses", icon: MapPin, label: "Saved addresses", sub: `${addressCount} saved` },
+            { href: "/account/orders", icon: Receipt, label: "My orders", sub: t(orderCount === 1 ? "{n} order" : "{n} orders", { n: orderCount }) },
+            { href: "/account/addresses", icon: MapPin, label: "Saved addresses", sub: t("{n} saved", { n: addressCount }) },
             { href: "/saved", icon: Bookmark, label: "Saved dishes & restaurants", sub: "Reels, dishes, restaurants" },
           ].map((l) => (
             <Link key={l.href} href={l.href} className="flex items-center gap-3 p-4">
@@ -53,24 +67,24 @@ export default async function AccountPage() {
                 <l.icon className="h-5 w-5" />
               </span>
               <span className="flex-1">
-                <span className="block font-semibold">{l.label}</span>
-                <span className="block text-xs text-ink-muted">{l.sub}</span>
+                <span className="block font-semibold">{t(l.label)}</span>
+                <span className="block text-xs text-ink-muted">{t(l.sub)}</span>
               </span>
-              <ChevronRight className="h-5 w-5 text-ink-muted" />
+              <ChevronRight className="rtl:-scale-x-100 h-5 w-5 text-ink-muted" />
             </Link>
           ))}
         </nav>
         <section>
-          <h2 className="mb-2 font-extrabold">Profile</h2>
+          <h2 className="mb-2 font-extrabold">{t("Profile")}</h2>
           <AccountForm name={user.name} phone={user.phone ? formatPhone(user.phone) : ""} email={user.email} />
         </section>
         <form action={logoutAction}>
           <Button variant="outline" block type="submit">
-            Log out
+            {t("Log out")}
           </Button>
         </form>
         <p className="pb-2 text-center text-xs text-ink-muted">
-          <Badge>Cash on delivery</Badge> is the only payment method — no card details are ever stored.
+          <Badge>{t("Cash on delivery")}</Badge> {t("is the only payment method — no card details are ever stored.")}
         </p>
       </div>
     </main>

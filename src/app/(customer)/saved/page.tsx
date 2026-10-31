@@ -12,11 +12,16 @@ import { deviceId } from "@/server/request";
 import { formatMoney } from "@/lib/money";
 import { STATUS_META } from "@/lib/order-status";
 import { MapPin, Receipt, UserRound } from "lucide-react";
+import { getT } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Saved", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Saved"), robots: { index: false } };
+}
 export const dynamic = "force-dynamic";
 
 export default async function SavedPage() {
+  const t = await getT();
   const [key, user] = await Promise.all([ownerKey(), getCurrentUser()]);
   const saved = key ? await prisma.savedItem.findMany({ where: { ownerKey: key }, orderBy: { createdAt: "desc" } }) : [];
   const ids = (t: string) => saved.filter((s) => s.type === t).map((s) => s.refId);
@@ -36,12 +41,12 @@ export default async function SavedPage() {
   return (
     <main className="pb-nav">
       <header className="container-wide pb-2" style={{ paddingTop: "calc(var(--safe-top) + 14px)" }}>
-        <h1 className="text-2xl font-black tracking-tight">Saved</h1>
+        <h1 className="text-2xl font-black tracking-tight">{t("Saved")}</h1>
         {!user && (
           <p className="mt-1 text-sm text-ink-muted">
             Saved on this device.{" "}
             <Link href="/account/register?next=/saved" className="font-semibold text-brand-600">
-              Create an account
+              {t("Create an account")}
             </Link>{" "}
             to keep saves, addresses and order history across devices.
           </p>
@@ -50,7 +55,7 @@ export default async function SavedPage() {
           <p className="mt-1 text-sm text-ink-muted">
             Signed in as {user.name} ·{" "}
             <Link href="/account" className="font-semibold text-brand-600">
-              Account
+              {t("Account")}
             </Link>
           </p>
         )}
@@ -65,14 +70,14 @@ export default async function SavedPage() {
             ].map((l) => (
               <Link key={l.href} href={l.href} className="card flex flex-col items-center gap-1 py-3 text-xs font-semibold">
                 <l.icon className="h-5 w-5 text-brand-600" />
-                {l.label}
+                {t(l.label)}
               </Link>
             ))}
           </div>
         )}
         {recentOrders.length > 0 && (
           <section>
-            <h2 className="mb-2 font-extrabold">{user ? "Recent orders" : "Your orders on this device"}</h2>
+            <h2 className="mb-2 font-extrabold">{user ? t("Recent orders") : t("Your orders on this device")}</h2>
             <div className="space-y-2">
               {recentOrders.map((o) => (
                 <Link key={o.id} href={`/order/${o.reference}`} className="card flex items-center justify-between gap-3 p-3.5 text-sm">
@@ -86,10 +91,10 @@ export default async function SavedPage() {
             </div>
           </section>
         )}
-        {empty && <EmptyState icon={<Bookmark />} title="Nothing saved yet" body="Tap the bookmark on reels or save restaurants to find them here." action={<Link href="/" className="chip chip-active">Watch reels</Link>} />}
+        {empty && <EmptyState icon={<Bookmark />} title={t("Nothing saved yet")} body={t("Tap the bookmark on reels or save restaurants to find them here.")} action={<Link href="/" className="chip chip-active">{t("Watch reels")}</Link>} />}
         {reels.length > 0 && (
           <section>
-            <h2 className="mb-2 font-extrabold">Reels</h2>
+            <h2 className="mb-2 font-extrabold">{t("Reels")}</h2>
             <div className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-2xl lg:grid-cols-5 lg:gap-2">
               {reels.map((r) => (
                 <ReelThumb key={r.id} href={`/reel/${r.id}`} posterUrl={r.posterUrl} views={r.viewCount} />
@@ -99,7 +104,7 @@ export default async function SavedPage() {
         )}
         {items.length > 0 && (
           <section>
-            <h2 className="mb-2 font-extrabold">Dishes</h2>
+            <h2 className="mb-2 font-extrabold">{t("Dishes")}</h2>
             <div className="grid gap-2.5 lg:grid-cols-2">
               {items.map((i) => (
                 <DishCard key={i.id} item={{ ...i, image: images.get(i.id) ?? null }} />
@@ -109,7 +114,7 @@ export default async function SavedPage() {
         )}
         {restaurants.length > 0 && (
           <section>
-            <h2 className="mb-2 font-extrabold">Restaurants</h2>
+            <h2 className="mb-2 font-extrabold">{t("Restaurants")}</h2>
             <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
               {restaurants.map((r) => (
                 <RestaurantCard key={r.id} r={r} />

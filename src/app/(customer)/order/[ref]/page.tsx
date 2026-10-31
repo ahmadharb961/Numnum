@@ -4,11 +4,16 @@ import { loadCustomerOrder } from "@/server/order-view";
 import { getCurrentUser } from "@/server/auth";
 import { OrderTracker } from "@/components/customer/order-tracker";
 import { PageHeader } from "@/components/customer/page-header";
+import { getT } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Your order", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Your order"), robots: { index: false } };
+}
 export const dynamic = "force-dynamic";
 
 export default async function OrderPage({ params, searchParams }: { params: Promise<{ ref: string }>; searchParams: Promise<{ t?: string; placed?: string }> }) {
+  const t = await getT();
   const ref = (await params).ref;
   const sp = await searchParams;
   const r = await loadCustomerOrder(ref, sp.t);
@@ -19,9 +24,9 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
         <div className="container-app py-16 text-center">
           <div className="text-5xl">🔒</div>
           <h1 className="mt-3 text-lg font-bold">We couldn&apos;t open this order</h1>
-          <p className="mt-1 text-sm text-ink-muted">Orders are visible on the device that placed them, with the order link, or in your account.</p>
+          <p className="mt-1 text-sm text-ink-muted">{t("Orders are visible on the device that placed them, with the order link, or in your account.")}</p>
           <Link href="/login?next=/account/orders" className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-500 px-5 font-semibold text-white">
-            Log in to see your orders
+            {t("Log in to see your orders")}
           </Link>
         </div>
       </main>

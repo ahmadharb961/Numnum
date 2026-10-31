@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { requireRestaurant } from "@/server/auth";
@@ -5,8 +6,12 @@ import { prisma } from "@/server/db";
 import { DashPage } from "@/components/dashboard/page";
 import { OrdersTable } from "@/components/dashboard/orders-table";
 import { cn } from "@/lib/utils";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "Orders" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Orders") };
+}
 
 const TABS = {
   new: { label: "New", where: { status: "PLACED" } },
@@ -17,6 +22,7 @@ const TABS = {
 } satisfies Record<string, { label: string; where: Prisma.OrderWhereInput }>;
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ tab?: string; ref?: string; page?: string }> }) {
+  const t = await getT();
   const ctx = await requireRestaurant("STAFF");
   const sp = await searchParams;
   const counts = await prisma.order.groupBy({ by: ["status"], where: { restaurantId: ctx.restaurant.id }, _count: true });
@@ -36,14 +42,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   ]);
 
   return (
-    <DashPage title="Orders" description="Accept new orders quickly — customers see every update live. Payment is cash on delivery, collected by you.">
+    <DashPage title={t("Orders")} description={t("Accept new orders quickly — customers see every update live. Payment is cash on delivery, collected by you.")}>
       <form className="mb-3 flex gap-2">
-        <input name="ref" defaultValue={sp.ref} className="input h-10 max-w-xs font-mono text-sm uppercase" placeholder="Find by reference" />
+        <input name="ref" defaultValue={sp.ref} className="input h-10 max-w-xs font-mono text-sm uppercase placeholder:font-sans placeholder:normal-case" placeholder={t("Find by reference")} />
       </form>
       <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4">
         {(Object.keys(TABS) as (keyof typeof TABS)[]).map((k) => (
           <Link key={k} href={`/dashboard/orders?tab=${k}`} className={cn("chip h-9 text-xs", tab === k && "chip-active", k === "new" && countFor("new") > 0 && tab !== k && "border-brand-500 text-brand-600")}>
-            {TABS[k].label} <span className="opacity-60">{countFor(k)}</span>
+            {t(TABS[k].label)} <span className="opacity-60">{countFor(k)}</span>
           </Link>
         ))}
       </div>
@@ -78,7 +84,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       {total > page * 30 && (
         <div className="mt-4 text-center">
           <Link className="chip" href={`/dashboard/orders?tab=${tab}&page=${page + 1}`}>
-            Load more
+            {t("Load more")}
           </Link>
         </div>
       )}

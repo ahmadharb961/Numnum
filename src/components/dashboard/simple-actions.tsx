@@ -6,6 +6,7 @@ import { acceptAgreementAction, publishProfileAction, markNotificationsReadActio
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
+import { useT } from "@/i18n/client";
 
 function useRun() {
   const [pending, start] = useTransition();
@@ -21,43 +22,47 @@ function useRun() {
 }
 
 export function AcceptAgreement() {
+  const t = useT();
   const [checked, setChecked] = useState(false);
   const { pending, msg, run } = useRun();
   return (
     <div className="space-y-3">
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
       <label className="flex items-start gap-3 text-sm font-semibold">
-        <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} className="mt-0.5 h-5 w-5 accent-brand-500" />I have read and accept the commission agreement on behalf of my restaurant.
+        <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} className="mt-0.5 h-5 w-5 accent-brand-500" />{t("I have read and accept the commission agreement on behalf of my restaurant.")}
       </label>
       <Button size="lg" disabled={!checked} loading={pending} onClick={() => run(acceptAgreementAction)}>
-        Accept and enable online ordering
+        {t("Accept and enable online ordering")}
       </Button>
     </div>
   );
 }
 
 export function PublishButton({ disabled }: { disabled?: boolean }) {
+  const t = useT();
   const { pending, msg, run } = useRun();
   return (
     <div className="space-y-3">
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
       <Button size="lg" disabled={disabled} loading={pending} onClick={() => run(publishProfileAction)}>
-        Publish my restaurant
+        {t("Publish my restaurant")}
       </Button>
     </div>
   );
 }
 
 export function MarkAllRead() {
+  const t = useT();
   const { pending, run } = useRun();
   return (
     <Button size="sm" variant="outline" loading={pending} onClick={() => run(markNotificationsReadAction)}>
-      Mark all as read
+      {t("Mark all as read")}
     </Button>
   );
 }
 
 export function RemoveStaff({ id }: { id: string }) {
+  const t = useT();
   const toast = useToast();
   const { pending, run } = useRun();
   return (
@@ -65,7 +70,7 @@ export function RemoveStaff({ id }: { id: string }) {
       disabled={pending}
       className="text-xs font-semibold text-red-600"
       onClick={() =>
-        confirm("Remove this person's access?") &&
+        confirm(t("Remove this person's access?")) &&
         run(async () => {
           const r = await removeStaffAction(id);
           if (!r.ok) toast(r.error, "error");
@@ -73,7 +78,7 @@ export function RemoveStaff({ id }: { id: string }) {
         })
       }
     >
-      Remove
+      {t("Remove")}
     </button>
   );
 }

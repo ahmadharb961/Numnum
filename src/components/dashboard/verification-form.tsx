@@ -7,8 +7,10 @@ import { requestVerificationAction } from "@/actions/restaurant";
 import { uploadFile } from "./upload";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
+import { useT } from "@/i18n/client";
 
 export function VerificationForm() {
+  const t = useT();
   const [f, setF] = useState({ legalName: "", registration: "", contactName: "", contactRole: "", notes: "" });
   const [docs, setDocs] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
@@ -40,26 +42,26 @@ export function VerificationForm() {
           <input className="input" value={f.contactName} onChange={(e) => setF({ ...f, contactName: e.target.value })} required />
         </Field>
         <Field label="Role">
-          <input className="input" value={f.contactRole} onChange={(e) => setF({ ...f, contactRole: e.target.value })} placeholder="Owner, manager…" />
+          <input className="input" value={f.contactRole} onChange={(e) => setF({ ...f, contactRole: e.target.value })} placeholder={t("Owner, manager…")} />
         </Field>
       </div>
       <Field label="Anything else? (optional)">
         <textarea className="input" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
       </Field>
       <div>
-        <div className="label">Supporting documents</div>
-        <p className="mb-2 text-xs text-ink-muted">Commercial registration, municipality license, or a utility bill for the premises. PDF or photo, stored privately.</p>
+        <div className="label">{t("Supporting documents")}</div>
+        <p className="mb-2 text-xs text-ink-muted">{t("Commercial registration, municipality license, or a utility bill for the premises. PDF or photo, stored privately.")}</p>
         <div className="flex flex-wrap gap-2">
           {docs.map((d) => (
             <span key={d.id} className="chip h-9 text-xs">
               {d.name}
-              <button type="button" onClick={() => setDocs(docs.filter((x) => x.id !== d.id))} aria-label="Remove">
+              <button type="button" onClick={() => setDocs(docs.filter((x) => x.id !== d.id))} aria-label={t("Remove")}>
                 <X className="h-3.5 w-3.5" />
               </button>
             </span>
           ))}
           <Button type="button" variant="outline" size="sm" loading={uploading} onClick={() => ref.current?.click()}>
-            <Upload className="h-4 w-4" /> Add document
+            <Upload className="h-4 w-4" /> {t("Add document")}
           </Button>
         </div>
         <input
@@ -84,7 +86,7 @@ export function VerificationForm() {
         />
       </div>
       <Button type="submit" loading={busy}>
-        Request verification
+        {t("Request verification")}
       </Button>
     </form>
   );

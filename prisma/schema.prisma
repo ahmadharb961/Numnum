@@ -33,6 +33,7 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   lastLoginAt  DateTime?
+  locale       String?   // "en" | "ar": language of the app, emails and notifications
 
   roles         UserRole[]
   orders        Order[]

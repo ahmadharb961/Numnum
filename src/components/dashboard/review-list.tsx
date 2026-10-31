@@ -7,6 +7,7 @@ import { Stars, Badge, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/utils";
+import { useLocale, useT } from "@/i18n/client";
 
 type Review = { id: string; rating: number; body: string | null; reply: string | null; createdAt: string; user: string; subject: string; evidence: string; hidden: boolean };
 
@@ -22,6 +23,8 @@ export function ReviewList({ reviews, kind, canReply }: { reviews: Review[]; kin
 }
 
 function ReviewCard({ r, kind, canReply }: { r: Review; kind: "item" | "restaurant"; canReply: boolean }) {
+  const t = useT();
+  const lang = useLocale();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(r.reply ?? "");
   const [pending, start] = useTransition();
@@ -40,28 +43,28 @@ function ReviewCard({ r, kind, canReply }: { r: Review; kind: "item" | "restaura
         <div className="flex items-center gap-2">
           <Stars value={r.rating} />
           <span className="text-sm font-semibold">{r.user.split(" ")[0]}</span>
-          {r.evidence !== "UNVERIFIED" && <Badge tone="green">{r.evidence === "COMPLETED_ORDER" ? "Verified order" : "Ordered on numnum"}</Badge>}
-          {r.hidden && <Badge tone="red">Hidden by moderators</Badge>}
+          {r.evidence !== "UNVERIFIED" && <Badge tone="green">{r.evidence === "COMPLETED_ORDER" ? t("Verified order") : t("Ordered on numnum")}</Badge>}
+          {r.hidden && <Badge tone="red">{t("Hidden by moderators")}</Badge>}
         </div>
-        <span className="text-xs text-ink-muted">{formatDate(r.createdAt)}</span>
+        <span className="text-xs text-ink-muted">{formatDate(r.createdAt, undefined, lang)}</span>
       </div>
       {r.subject && <div className="mt-1 text-xs font-semibold text-ink-muted">{r.subject}</div>}
       {r.body && <p className="mt-2 text-sm">{r.body}</p>}
       {r.reply && !editing && (
         <div className="mt-3 rounded-xl bg-cream px-3 py-2 text-sm">
-          <div className="text-xs font-bold text-ink-muted">Your reply</div>
+          <div className="text-xs font-bold text-ink-muted">{t("Your reply")}</div>
           {r.reply}
         </div>
       )}
       {editing && (
         <div className="mt-3 space-y-2">
-          <textarea className="input" maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Thank the customer or address their feedback. Replies are public." />
+          <textarea className="input" maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Thank the customer or address their feedback. Replies are public.")} />
           <div className="flex gap-2">
             <Button size="sm" loading={pending} onClick={() => run(() => replyReviewAction(kind, r.id, text))}>
-              Post reply
+              {t("Post reply")}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-              Cancel
+              {t("Cancel")}
             </Button>
           </div>
         </div>
@@ -69,21 +72,21 @@ function ReviewCard({ r, kind, canReply }: { r: Review; kind: "item" | "restaura
       {canReply && !editing && (
         <div className="mt-3 flex gap-4 text-xs font-semibold">
           <button className="text-brand-600" onClick={() => setEditing(true)}>
-            {r.reply ? "Edit reply" : "Reply"}
+            {r.reply ? t("Edit reply") : t("Reply")}
           </button>
           {r.reply && (
             <button className="text-ink-muted" onClick={() => run(() => replyReviewAction(kind, r.id, ""))}>
-              Delete reply
+              {t("Delete reply")}
             </button>
           )}
           <button
             className="text-ink-muted"
             onClick={() => {
-              const reason = prompt("Why should moderators review this? (e.g. fake review, offensive)");
+              const reason = prompt(t("Why should moderators review this? (e.g. fake review, offensive)"));
               if (reason) run(() => reportReviewAction(kind, r.id, reason.slice(0, 200)));
             }}
           >
-            Report
+            {t("Report")}
           </button>
         </div>
       )}

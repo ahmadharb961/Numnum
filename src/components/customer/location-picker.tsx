@@ -7,6 +7,7 @@ import { MapPicker, type Pin } from "@/components/map-picker";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 const COOKIE = "nn_loc";
 type Loc = Pin & { label: string; place?: string | null; name?: string | null };
@@ -39,12 +40,13 @@ export function writeLocation(l: Loc) {
 
 /** "Deliver to …" chip: GPS, a saved address, or a pin on the map. Drives distance checks everywhere. */
 export function LocationChip({ label, dark, className }: { label: string | null; dark?: boolean; className?: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} className={cn("inline-flex max-w-[62vw] items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold", dark ? "bg-black/40 text-white backdrop-blur" : "bg-white text-ink shadow-sm", className)} aria-label="Change delivery location">
+      <button onClick={() => setOpen(true)} className={cn("inline-flex max-w-[62vw] items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold", dark ? "bg-black/40 text-white backdrop-blur" : "bg-white text-ink shadow-sm", className)} aria-label={t("Change delivery location")}>
         <MapPin className={cn("h-4 w-4 shrink-0", dark ? "text-brand-300" : "text-brand-500")} />
-        <span className="truncate">{label ?? "Set your delivery location"}</span>
+        <span className="truncate">{label ?? t("Set your delivery location")}</span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
       </button>
       <LocationSheet open={open} onClose={() => setOpen(false)} />
@@ -53,6 +55,7 @@ export function LocationChip({ label, dark, className }: { label: string | null;
 }
 
 export function LocationSheet({ open, onClose, onPicked }: { open: boolean; onClose: () => void; onPicked?: (l: Loc) => void }) {
+  const t = useT();
   const router = useRouter();
   const [pin, setPin] = useState<Pin | null>(null);
   const [label, setLabel] = useState("");
@@ -107,7 +110,7 @@ export function LocationSheet({ open, onClose, onPicked }: { open: boolean; onCl
                   const p = { lat: a.latitude!, lng: a.longitude! };
                   const name = await placeName(p);
                   pick({ ...p, label: name ?? a.label, place: name });
-                }} className="flex w-full items-center gap-3 rounded-2xl bg-cream p-3 text-left text-sm">
+                }} className="flex w-full items-center gap-3 rounded-2xl bg-cream p-3 text-start text-sm">
                 <HomeIcon className="h-5 w-5 text-brand-500" />
                 <span className="min-w-0">
                   <span className="block font-bold">{a.label}</span>
@@ -121,14 +124,14 @@ export function LocationSheet({ open, onClose, onPicked }: { open: boolean; onCl
         {pin && (
           <p className="flex items-center gap-2 text-sm font-semibold">
             <MapPin className="h-4 w-4 shrink-0 text-brand-500" />
-            <span className="truncate">{placing && !place ? "Finding the area…" : place ?? "Pinned location"}</span>
+            <span className="truncate">{placing && !place ? t("Finding the area…") : place ?? t("Pinned location")}</span>
           </p>
         )}
-        <input className="input" placeholder="Label (optional, e.g. Home, Work)" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={40} />
+        <input className="input" placeholder={t("Label (optional, e.g. Home, Work)")} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={40} />
         <Button block size="lg" disabled={!pin} onClick={() => pin && pick({ ...pin, label: place ?? (label.trim() || "Pinned location"), place, name: label.trim() || null })}>
-          Use this location
+          {t("Use this location")}
         </Button>
-        <p className="text-center text-xs text-ink-muted">We use it to show restaurants that deliver to you and calculate delivery fees.</p>
+        <p className="text-center text-xs text-ink-muted">{t("We use it to show restaurants that deliver to you and calculate delivery fees.")}</p>
       </div>
     </Sheet>
   );

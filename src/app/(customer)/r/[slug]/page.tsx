@@ -17,12 +17,13 @@ import { formatKm, normalizeZones, quoteDelivery } from "@/lib/geo";
 import { formatMoney } from "@/lib/money";
 import { LocationChip } from "@/components/customer/location-picker";
 import { RestaurantViewTracker } from "@/components/customer/item-view-tracker";
+import { getLocale, getT } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const data = await getPublicRestaurant((await params).slug);
-  if (!data) return { title: "Restaurant not found" };
+  if (!data) return { title: (await getT())("Restaurant not found") };
   const r = data.restaurant;
   const description = r.description?.slice(0, 160) || `Watch reels and order from ${r.displayName} with cash on delivery.`;
   return {
@@ -34,6 +35,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function RestaurantPage({ params }: { params: Promise<{ slug: string }> }) {
+  const t = await getT();
+  const lang = await getLocale();
   const data = await getPublicRestaurant((await params).slug);
   if (!data) notFound();
   const { restaurant: r, sections, reels, reviews, subRatings } = data;
@@ -68,8 +71,8 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           <img src={r.coverUrl} alt="" className="h-full w-full object-cover" />
         )}
         <div className="absolute inset-x-0 top-0 flex justify-between px-3" style={{ paddingTop: "calc(var(--safe-top) + 10px)" }}>
-          <Link href="/restaurants" className="grid h-10 w-10 place-items-center rounded-full bg-black/40 text-white backdrop-blur" aria-label="Back">
-            <ChevronLeft className="h-6 w-6" />
+          <Link href="/restaurants" className="grid h-10 w-10 place-items-center rounded-full bg-black/40 text-white backdrop-blur" aria-label={t("Back")}>
+            <ChevronLeft className="rtl:-scale-x-100 h-6 w-6" />
           </Link>
           <ShareButton title={r.displayName} path={`/r/${r.slug}`} className="grid h-10 w-10 place-items-center rounded-full bg-black/40 text-white backdrop-blur">
             <Share2 className="h-5 w-5" />
@@ -102,16 +105,16 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
               {[r.area, r.city].filter(Boolean).join(", ")}
             </span>
           )}
-          {open !== null && <Badge tone={open ? "green" : "gray"}>{open ? "Open now" : "Closed now"}</Badge>}
+          {open !== null && <Badge tone={open ? "green" : "gray"}>{open ? t("Open now") : t("Closed now")}</Badge>}
         </div>
         {r.description && <p className="mt-2.5 text-[15px] leading-relaxed text-ink-soft">{r.description}</p>}
 
         <div className="mt-4 grid grid-cols-4 gap-2 text-center">
           {[
-            [r.ratingCount ? r.ratingAvg.toFixed(1) : "–", `${r.ratingCount} review${r.ratingCount === 1 ? "" : "s"}`],
-            [compactNumber(r.totalReelViews), "reel views"],
-            [String(r._count.menuItems), "menu items"],
-            [String(r._count.reels), "reels"],
+            [r.ratingCount ? r.ratingAvg.toFixed(1) : "–", t(r.ratingCount === 1 ? "{n} review" : "{n} reviews", { n: r.ratingCount })],
+            [compactNumber(r.totalReelViews), t("reel views")],
+            [String(r._count.menuItems), t("menu items")],
+            [String(r._count.reels), t("reels")],
           ].map(([v, l]) => (
             <div key={l} className="rounded-2xl bg-white py-2.5">
               <div className="tabular text-lg font-extrabold">{v}</div>
@@ -124,27 +127,27 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           <div className={`mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-3 text-sm ${dq?.deliverable ? "bg-emerald-50 text-emerald-900" : dq ? "bg-amber-50 text-amber-900" : "bg-white"}`}>
             <span className="inline-flex items-center gap-2 font-semibold">
               <Bike className="h-4 w-4" />
-              {!dq && "Set your location to check delivery"}
-              {dq?.deliverable && `Delivers to ${loc!.label} · ${formatKm(dq.km)} · ${dq.feeCents ? formatMoney(dq.feeCents, r.currency) : "free delivery"}`}
-              {dq && !dq.deliverable && (dq.reason === "out_of_range" ? `${formatKm(dq.km!)} away — delivers up to ${formatKm(dq.maxKm)}${r.pickupEnabled ? " · pickup available" : ""}` : "Delivery not set up yet")}
+              {!dq && t("Set your location to check delivery")}
+              {dq?.deliverable && `${t("Delivers to {place}", { place: loc!.label })} · ${formatKm(dq.km)} · ${dq.feeCents ? formatMoney(dq.feeCents, r.currency) : t("free delivery")}`}
+              {dq && !dq.deliverable && (dq.reason === "out_of_range" ? t("{km} away — delivers up to {max}", { km: formatKm(dq.km!), max: formatKm(dq.maxKm) }) + (r.pickupEnabled ? ` · ${t("pickup available")}` : "") : t("Delivery not set up yet"))}
             </span>
             <LocationChip label={loc?.label ?? null} className="bg-white/80" />
           </div>
         )}
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge tone={r.deliveryEnabled ? "brand" : "gray"}>
-            <Bike className="h-3.5 w-3.5" /> {r.deliveryEnabled ? "Delivery" : "No delivery"}
+            <Bike className="h-3.5 w-3.5" /> {r.deliveryEnabled ? t("Delivery") : t("No delivery")}
           </Badge>
           <Badge tone={r.pickupEnabled ? "brand" : "gray"}>
-            <ShoppingBag className="h-3.5 w-3.5" /> {r.pickupEnabled ? "Pickup" : "No pickup"}
+            <ShoppingBag className="h-3.5 w-3.5" /> {r.pickupEnabled ? t("Pickup") : t("No pickup")}
           </Badge>
-          {!r.orderingEnabled && <Badge tone="amber">Not taking online orders right now</Badge>}
+          {!r.orderingEnabled && <Badge tone="amber">{t("Not taking online orders right now")}</Badge>}
         </div>
 
         <details className="mt-3 rounded-2xl bg-white px-4 py-3 text-sm">
           <summary className="flex cursor-pointer list-none items-center justify-between font-semibold">
             <span className="inline-flex items-center gap-2">
-              <Clock className="h-4 w-4" /> Hours, location & contact
+              <Clock className="h-4 w-4" /> {t("Hours, location & contact")}
             </span>
             <span className="text-ink-muted">›</span>
           </summary>
@@ -154,8 +157,8 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
                 <tbody>
                   {DAYS.map((d) => (
                     <tr key={d}>
-                      <td className="py-0.5 text-ink-muted">{DAY_LABELS[d]}</td>
-                      <td className="py-0.5 text-right">{hours[d]?.length ? hours[d]!.map((s) => `${s.open}–${s.close}`).join(", ") : "Closed"}</td>
+                      <td className="py-0.5 text-ink-muted">{t(DAY_LABELS[d])}</td>
+                      <td className="py-0.5 text-end">{hours[d]?.length ? hours[d]!.map((s) => `${s.open}–${s.close}`).join(", ") : t("Closed")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -164,7 +167,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
             {r.address && <p>{r.address}</p>}
             {r.deliveryEnabled && normalizeZones(r.deliveryZones).length > 0 && (
               <p className="text-ink-muted">
-                Delivery: {normalizeZones(r.deliveryZones).map((z) => `up to ${formatKm(z.maxKm)} ${z.feeCents ? formatMoney(z.feeCents, r.currency) : "free"}`).join(" · ")}
+                {t("Delivery")}: {normalizeZones(r.deliveryZones).map((z) => `${t("up to {km}", { km: formatKm(z.maxKm) })} ${z.feeCents ? formatMoney(z.feeCents, r.currency) : t("free")}`).join(" · ")}
               </p>
             )}
             <div className="flex flex-wrap gap-2">
@@ -180,12 +183,12 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
               )}
               {social.instagram && (
                 <a href={social.instagram} target="_blank" rel="noopener noreferrer nofollow" className="chip">
-                  <Instagram className="h-4 w-4" /> Instagram
+                  <Instagram className="h-4 w-4" /> {t("Instagram")}
                 </a>
               )}
               {social.website && (
                 <a href={social.website} target="_blank" rel="noopener noreferrer nofollow" className="chip">
-                  <Globe className="h-4 w-4" /> Website
+                  <Globe className="h-4 w-4" /> {t("Website")}
                 </a>
               )}
             </div>
@@ -199,9 +202,9 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
 
       <section className="container-app mt-6" id="reviews">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-extrabold">Restaurant reviews</h2>
+          <h2 className="text-lg font-extrabold">{t("Restaurant reviews")}</h2>
           <Link href={`/r/${r.slug}/review`} className="text-sm font-semibold text-brand-600">
-            Write a review
+            {t("Write a review")}
           </Link>
         </div>
         {r.ratingCount > 0 && (
@@ -210,7 +213,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
               <span className="text-4xl font-extrabold">{r.ratingAvg.toFixed(1)}</span>
               <div>
                 <Stars value={r.ratingAvg} />
-                <div className="text-xs text-ink-muted">{r.ratingCount} reviews</div>
+                <div className="text-xs text-ink-muted">{t("{n} reviews", { n: r.ratingCount })}</div>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
@@ -225,7 +228,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
                 .filter(([, v]) => v)
                 .map(([l, v]) => (
                   <div key={l} className="flex justify-between">
-                    <span className="text-ink-muted">{l}</span>
+                    <span className="text-ink-muted">{t(l)}</span>
                     <span className="font-semibold">{v!.toFixed(1)}</span>
                   </div>
                 ))}
@@ -237,7 +240,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
             <li key={rv.id} className="rounded-2xl bg-white p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold">{rv.userName}</span>
-                <span className="text-xs text-ink-muted">{formatDate(rv.createdAt)}</span>
+                <span className="text-xs text-ink-muted">{formatDate(rv.createdAt, undefined, lang)}</span>
               </div>
               <div className="mt-0.5 flex items-center gap-2">
                 <Stars value={rv.rating} size={13} />
@@ -250,19 +253,19 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
                   <p className="mt-0.5 text-ink-soft">{rv.reply}</p>
                 </div>
               )}
-              <div className="mt-2 text-right">
+              <div className="mt-2 text-end">
                 <ReportButton targetType="RESTAURANT_REVIEW" targetId={rv.id} />
               </div>
             </li>
           ))}
-          {!reviews.length && <p className="text-sm text-ink-muted">No reviews yet.</p>}
+          {!reviews.length && <p className="text-sm text-ink-muted">{t("No reviews yet.")}</p>}
         </ul>
         <div className="mt-8 flex flex-col items-center gap-2 border-t border-black/5 pb-4 pt-5 text-center text-xs text-ink-muted">
           <p className="max-w-xs text-balance">
-            <BadgeCheck className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
-            The verified badge confirms business identity, not food quality.
+            <BadgeCheck className="me-1 inline h-3.5 w-3.5 align-[-2px]" />
+            {t("The verified badge confirms business identity, not food quality.")}
           </p>
-          <ReportButton targetType="RESTAURANT" targetId={r.id} label="Report this restaurant" />
+          <ReportButton targetType="RESTAURANT" targetId={r.id} label={t("Report this restaurant")} />
         </div>
       </section>
     </main>

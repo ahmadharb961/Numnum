@@ -1,10 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource-variable/cairo";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { CartProvider } from "@/components/customer/cart";
 import { ServiceWorker } from "@/components/sw-register";
 import { NavHistory } from "@/components/back-button";
 import { InstallPromptListener } from "@/components/install-guide";
+import { I18nProvider } from "@/i18n/client";
+import { dirOf } from "@/i18n/core";
+import { dictFor, getLocale } from "@/i18n/server";
 
 const appUrl = process.env.APP_URL || "http://localhost:3000";
 
@@ -28,10 +32,12 @@ export const viewport: Viewport = {
   themeColor: "#fbf8f5",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
   return (
-    <html lang="en" dir="ltr">
+    <html lang={locale} dir={dirOf(locale)}>
       <body>
+        <I18nProvider locale={locale} dict={dictFor(locale)}>
         <ToastProvider>
           <CartProvider>
             {/* In the installed app this is the scroll container (see globals.css); elsewhere a plain wrapper. */}
@@ -41,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ServiceWorker />
         <NavHistory />
         <InstallPromptListener />
+        </I18nProvider>
       </body>
     </html>
   );
