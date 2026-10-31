@@ -16,7 +16,7 @@ type Step = "loading" | "install" | "notify" | "blocked" | "ok";
  * (iPhone only delivers web notifications to home-screen apps), so new orders arrive instantly.
  * Desktop browsers aren't gated; they get a reminder banner.
  */
-export function InstallGate({ children }: { children: React.ReactNode }) {
+export function InstallGate({ children, bypass }: { children: React.ReactNode; bypass?: boolean }) {
   const t = useT();
   const [step, setStep] = useState<Step>("loading");
   const [mobile, setMobile] = useState(false);
@@ -28,7 +28,7 @@ export function InstallGate({ children }: { children: React.ReactNode }) {
     setMobile(m);
     // Automated test browsers aren't restaurants; `?gate=preview` shows the gate anyway.
     const automated = navigator.webdriver && !location.search.includes("gate=preview");
-    if (automated) return setStep("ok");
+    if (automated || bypass) return setStep("ok");
     const p = await pushState().catch(() => "unsupported" as PushState);
     setPush(p);
     if (p === "on") void resyncDevice();

@@ -88,7 +88,12 @@ export type RestaurantContext = {
   restaurant: Awaited<ReturnType<typeof loadRestaurant>>;
   staffRole: StaffRole;
   memberships: { id: string; displayName: string }[];
+  /** A platform admin managing this restaurant from the admin panel ("Manage as admin"). */
+  asAdmin?: boolean;
 };
+
+/** Set by "Manage as admin": the restaurant an admin is currently working in. */
+export const ADMIN_AS_COOKIE = "nn_admin_as";
 
 async function loadRestaurant(id: string) {
   const r = await prisma.restaurant.findUnique({ where: { id } });
@@ -100,6 +105,12 @@ async function loadRestaurant(id: string) {
 export const getRestaurantContext = cache(async (): Promise<RestaurantContext | null> => {
   const user = await getCurrentUser();
   if (!user) return null;
+  const jar0 = await cookies();
+  const asId = jar0.get(ADMIN_AS_COOKIE)?.value;
+  if (asId && hasRole(user, "ADMIN")) {
+    const r = await prisma.restaurant.findUnique({ where: { id: asId } });
+    if (r) return { user, restaurant: r, staffRole: "OWNER", memberships: [{ id: r.id, displayName: r.displayName }], asAdmin: true };
+  }
   const memberships = await prisma.restaurantStaff.findMany({
     where: { userId: user.id },
     include: { restaurant: { select: { id: true, displayName: true } } },

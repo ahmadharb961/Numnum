@@ -25,7 +25,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ]);
   return (
     <div className="min-h-dvh bg-cream">
-      <InstallGate>
+      {ctx.asAdmin && (
+        <form action="/admin/exit-restaurant" method="post" className="fixed inset-x-0 z-[70] mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-full bg-ink py-2 pe-2 ps-4 text-sm text-white shadow-lg" style={{ bottom: "calc(var(--safe-bottom) + 16px)" }}>
+          <span className="truncate">
+            Admin: managing <b>{r.displayName}</b>
+          </span>
+          <button type="submit" className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold hover:bg-white/25">
+            Back to admin
+          </button>
+        </form>
+      )}
+      <InstallGate bypass={ctx.asAdmin}>
       <DashboardNav restaurantName={r.displayName} slug={r.slug} role={ctx.staffRole} memberships={ctx.memberships} currentId={r.id} unread={unread} pendingOrders={pendingOrders} />
       <div className="lg:ps-64">
         <div className="flex justify-end px-4 pt-3 lg:px-8">

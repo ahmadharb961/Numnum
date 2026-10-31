@@ -15,6 +15,7 @@ import { recomputeItemRating, recomputeRestaurantRating } from "@/server/reviews
 import { parseAmount } from "@/lib/money";
 import { slugify } from "@/lib/slug";
 import type { ActionResult } from "./menu";
+import { createCustomerByAdmin, createRestaurantByAdmin, setCommissionForRestaurants, type AdminCustomerInput, type AdminFormResult, type AdminRestaurantInput } from "@/server/admin-accounts";
 
 async function admin() {
   const u = await requireAdmin();
@@ -356,4 +357,31 @@ export async function sendBroadcastAction(input: BroadcastInput): Promise<Broadc
   const r = await sendBroadcast(input, admin.id);
   if (r.ok) revalidatePath("/admin/push");
   return r;
+}
+
+// ───── Accounts created by an admin ─────
+
+export async function createRestaurantAdminAction(input: AdminRestaurantInput): Promise<AdminFormResult> {
+  const { user } = await admin();
+  const r = await createRestaurantByAdmin(user.id, input);
+  if (r.ok) revalidatePath("/admin/restaurants");
+  return r;
+}
+
+export async function createCustomerAdminAction(input: AdminCustomerInput): Promise<AdminFormResult> {
+  const { user } = await admin();
+  const r = await createCustomerByAdmin(user.id, input);
+  if (r.ok) revalidatePath("/admin/customers");
+  return r;
+}
+
+/** One commission rate for the selected restaurants; empty = back to the platform default. */
+export async function bulkCommissionAction(ids: string[], rate: string | null) {
+  const { user } = await admin();
+  return wrap(async () => {
+    const { changed } = await setCommissionForRestaurants(user.id, ids, rate);
+    for (const id of changed) await notifyRestaurant(id, { type: "COMMISSION_RATE", title: "Your commission rate was updated", body: "The new rate applies to future order requests only.", link: "/dashboard/billing" });
+    revalidatePath("/admin/restaurants");
+    return { changed: changed.length };
+  }, "Commission updated");
 }

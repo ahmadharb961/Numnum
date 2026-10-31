@@ -46,6 +46,11 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
       }
       actions={
         <>
+          <form action={`/admin/restaurants/${r.id}/manage`} method="post">
+            <button type="submit" className="chip chip-active h-9 text-xs">
+              Manage as admin (menu, photos, reels, settings)
+            </button>
+          </form>
           <Link href={`/r/${r.slug}`} target="_blank" className="chip h-9 text-xs">
             Public profile
           </Link>
