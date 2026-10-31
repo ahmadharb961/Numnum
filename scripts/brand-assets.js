@@ -55,6 +55,12 @@ const out = (p, data) => {
   for (const [name, fill] of [["orange", ORANGE], ["white", "#fff"], ["black", INK]]) {
     await png(stackSvg(fill), 2000, Math.round((2000 * STACK_H) / STACK_W), `brand/numnum-logo-${name}.png`);
   }
+  // Link preview (WhatsApp, Instagram, iMessage, Facebook…): 1200×630.
+  {
+    const page = await b.newPage({ viewport: { width: 1200, height: 630 } });
+    await page.setContent(`<style>*{margin:0}body{width:1200px;height:630px;background:${ORANGE};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:44px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff}svg{width:360px;height:auto;display:block}p{font-size:46px;font-weight:800;letter-spacing:-0.5px}small{font-size:28px;font-weight:600;opacity:.9;margin-top:-28px}</style>${stackSvg("#fff")}<p>Watch it. Crave it. Order it.</p><small>Lebanon's food in short videos · cash on delivery</small>`);
+    out(path.join(root, "public/og.png"), await page.screenshot({ type: "png" }));
+  }
   await b.close();
   console.log("brand assets written");
 })();

@@ -23,7 +23,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
         <PageHeader title="Order" />
         <div className="container-app py-16 text-center">
           <div className="text-5xl">🔒</div>
-          <h1 className="mt-3 text-lg font-bold">We couldn&apos;t open this order</h1>
+          <h1 className="mt-3 text-lg font-bold">{t("We couldn't open this order")}</h1>
           <p className="mt-1 text-sm text-ink-muted">{t("Orders are visible on the device that placed them, with the order link, or in your account.")}</p>
           <Link href="/login?next=/account/orders" className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-500 px-5 font-semibold text-white">
             {t("Log in to see your orders")}

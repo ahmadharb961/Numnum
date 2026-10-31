@@ -140,4 +140,6 @@ export const AR5: Record<string, string> = {
   "This restaurant hasn't set up delivery or pickup yet.": "هذا المطعم لم يُفعّل التوصيل أو الاستلام بعد.",
   "Collect {amount} in cash": "حصّل {amount} نقداً",
   "pays with {bill}, bring {change} change": "يدفع بـ {bill}، أحضر {change} فكّة",
+  "The page you're looking for doesn't exist or was removed.": "الصفحة التي تبحث عنها غير موجودة أو تمت إزالتها.",
+  "We couldn't open this order": "لم نتمكن من فتح هذا الطلب",
 };

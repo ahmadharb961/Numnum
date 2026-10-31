@@ -20,8 +20,8 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "numnum", statusBarStyle: "black-translucent" },
   icons: { icon: "/icons/v2/icon.svg", apple: "/icons/v2/apple-touch-icon.png" },
-  openGraph: { type: "website", siteName: "numnum", locale: "en_LB" },
-  twitter: { card: "summary_large_image" },
+  openGraph: { type: "website", siteName: "numnum", locale: "en_LB", images: [{ url: "/og.png", width: 1200, height: 630, alt: "numnum — Watch it. Crave it. Order it." }] },
+  twitter: { card: "summary_large_image", images: ["/og.png"] },
   formatDetection: { telephone: false },
 };
 

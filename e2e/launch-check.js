@@ -81,6 +81,7 @@ async function visit(ctx, label, path, opts = {}) {
   page.on("response", (r) => {
     const u = new URL(r.url());
     if (u.origin !== new URL(BASE).origin) return;
+    if (r.request().isNavigationRequest() && r.frame() === page.mainFrame()) return; // the page itself: checked below
     if (r.status() >= 500) errs.push(`${r.status()} ${u.pathname}`);
     else if (r.status() >= 400 && !(opts.allow4xx || []).some((p) => u.pathname.startsWith(p))) errs.push(`${r.status()} ${u.pathname}`);
   });
@@ -100,7 +101,12 @@ async function visit(ctx, label, path, opts = {}) {
     if (!opts.expectRedirect.test(final)) flag(where, `expected redirect to ${opts.expectRedirect}, ended at ${final}`);
   } else {
     if (res && res.status() >= 400 && !opts.expectStatus) flag(where, `HTTP ${res.status()}`);
-    if (opts.expectStatus && res && res.status() !== opts.expectStatus) flag(where, `expected HTTP ${opts.expectStatus}, got ${res.status()}`);
+    if (opts.expectStatus === 404 && res && res.status() !== 404) {
+      // Pages that stream (with a loading screen) can't change the status code once sending has
+      // started: Next.js then shows the not-found screen with a noindex tag instead.
+      const ok = await page.evaluate(() => /noindex/.test(document.querySelector('meta[name=robots]')?.content || "") && /This plate is empty|هذا الصحن فارغ|couldn't open this order|لم نتمكن من فتح/.test(document.body.innerText));
+      if (!ok) flag(where, `expected a not-found page, got HTTP ${res.status()}`);
+    } else if (opts.expectStatus && res && res.status() !== opts.expectStatus) flag(where, `expected HTTP ${opts.expectStatus}, got ${res.status()}`);
     if (!opts.expectStatus && final.startsWith("/login") && !path.startsWith("/login")) flag(where, "unexpectedly sent to login");
   }
   for (const e of [...new Set(errs)]) flag(where, e);
@@ -163,13 +169,14 @@ async function visit(ctx, label, path, opts = {}) {
   const shotName = (role, lang, dev, p) => `${role}-${lang}-${dev}${p.replace(/[^a-z0-9]+/gi, "_")}`.slice(0, 90);
 
   // ── 1. Every screen, every role, both languages ──
+  const ONLY = (process.env.ONLY || "screens,errors,access,seo").split(",");
   const runs = [
     { role: "guest", paths: PUBLIC, devs: ["phone", "desktop"], langs: ["en", "ar"] },
     { role: "customer", login: ["customer@numnum.demo", "demo1234"], paths: CUSTOMER, devs: ["phone", "desktop"], langs: ["en", "ar"] },
     { role: "owner", login: ["owner@burgerhouse.demo", "demo1234"], paths: OWNER, devs: ["phone", "desktop"], langs: ["en", "ar"] },
     { role: "admin", login: [process.env.ADMIN_EMAIL || "admin@numnum.app", process.env.ADMIN_PASSWORD || "admin1234"], paths: ADMIN, devs: ["desktop", "phone"], langs: ["en"] },
   ];
-  for (const run of runs) {
+  for (const run of ONLY.includes("screens") ? runs : []) {
     for (const dev of run.devs) {
       const ctx = await (dev === "phone" ? phone() : desktop());
       if (run.login) await login(ctx, ...run.login);
@@ -184,7 +191,7 @@ async function visit(ctx, label, path, opts = {}) {
 
   // ── 2. Error pages ──
   console.log("checking error pages");
-  {
+  if (ONLY.includes("errors")) {
     const ctx = await phone();
     await visit(ctx, "guest", "/this-page-does-not-exist", { expectStatus: 404, mobile: true, shot: "404-en" });
     await visit(ctx, "guest", "/r/no-such-restaurant", { expectStatus: 404, mobile: true });
@@ -197,16 +204,25 @@ async function visit(ctx, label, path, opts = {}) {
   // ── 3. Access control ──
   console.log("checking access control");
   const deny = async (ctx, label, path, redirectRe) => visit(ctx, label, path, { expectRedirect: redirectRe, allow4xx: ["/"] });
-  {
+  if (ONLY.includes("access")) {
     const g = await desktop();
     for (const p of ["/account", "/account/orders", "/dashboard", "/dashboard/orders", "/admin", "/admin/restaurants"]) await deny(g, "guest must not see", p, /^\/login/);
     // tracking link without its token must not reveal the order
-    await visit(g, "guest must not see", `/order/${custOrder.reference}`, { expectStatus: 404, allow4xx: ["/"] });
+    {
+      const pg = await g.newPage();
+      await pg.goto(`/order/${custOrder.reference}`, { waitUntil: "networkidle" });
+      const body = await pg.locator("body").innerText();
+      if (!/couldn't open this order/.test(body) || body.includes(custOrder.customerName)) flag(`[guest must not see] /order/${custOrder.reference}`, "order details visible without its link");
+      await pg.close();
+    }
     const api = await g.newPage();
-    for (const [method, url] of [["GET", `/api/orders/${custOrder.reference}/status`], ["GET", "/api/account/checkout-profile"], ["GET", "/api/dashboard/new-orders"], ["GET", "/api/admin/export?type=orders"], ["POST", `/api/orders/${custOrder.reference}/cancel`]]) {
+    await api.goto("/terms");
+    for (const [method, url] of [["GET", `/api/orders/${custOrder.reference}/status`], ["GET", "/api/dashboard/new-orders"], ["GET", "/api/admin/export?type=orders"], ["POST", `/api/orders/${custOrder.reference}/cancel`]]) {
       const s = await api.evaluate(async ([m, u]) => (await fetch(u, { method: m, headers: { "content-type": "application/json" }, body: m === "POST" ? "{}" : undefined, redirect: "manual" })).status, [method, url]);
       if (s < 400 && s !== 0) flag(`[guest API] ${method} ${url}`, `allowed (HTTP ${s}) — should be refused`);
     }
+    const prof = await api.evaluate(async () => (await fetch("/api/account/checkout-profile")).json().catch(() => null));
+    if (prof && (prof.user || (prof.addresses || []).length)) flag("[guest API] /api/account/checkout-profile", "returns account data to a guest");
     await g.close();
 
     const c = await desktop();
@@ -226,8 +242,9 @@ async function visit(ctx, label, path, opts = {}) {
       await pg.goto("/");
       const s = await pg.evaluate(async (ref) => (await fetch(`/api/orders/${ref}/status`)).status, otherOrder.reference);
       if (s < 400) flag("[customer API] someone else's order status", `allowed (HTTP ${s})`);
-      const res = await pg.goto(`/order/${otherOrder.reference}`);
-      if (res.status() !== 404) flag("[customer] someone else's order page", `HTTP ${res.status()} (expected 404)`);
+      await pg.goto(`/order/${otherOrder.reference}`, { waitUntil: "networkidle" });
+      const body = await pg.locator("body").innerText();
+      if (!/couldn't open this order/.test(body) || body.includes(otherOrder.customerName)) flag("[customer] someone else's order page", "details visible");
       await pg.close();
     }
     await c.close();
@@ -252,7 +269,7 @@ async function visit(ctx, label, path, opts = {}) {
 
   // ── 4. SEO & install basics ──
   console.log("checking robots, sitemap, manifest, headers");
-  {
+  if (ONLY.includes("seo")) {
     const ctx = await desktop();
     const pg = await ctx.newPage();
     for (const p of ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/sw.js", "/offline.html", "/icons/v2/icon-192.png", "/apple-touch-icon.png"]) {
@@ -281,6 +298,8 @@ async function visit(ctx, label, path, opts = {}) {
   console.log("No problems found.");
 })().catch(async (e) => {
   console.error("SWEEP CRASHED", e);
+  fs.writeFileSync(`${SHOTS}/launch-problems.txt`, problems.join("\n"));
+  console.log(problems.map((p) => "  ✗ " + p).join("\n"));
   await db.$disconnect();
   process.exit(2);
 });
