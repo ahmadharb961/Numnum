@@ -17,6 +17,7 @@ import { LocationChip } from "./location-picker";
 import { formatKm } from "@/lib/geo";
 import { Logo } from "@/components/logo";
 import { useLocale, useT } from "@/i18n/client";
+import { useLoginGate } from "./login-gate";
 
 export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean };
 
@@ -34,6 +35,7 @@ type Props = {
 
 export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref, locationLabel = null }: Props) {
   const t = useT();
+  const { requireLogin, askLogin } = useLoginGate();
   const router = useRouter();
   const [reels, setReels] = useState<FeedReel[]>(initial);
   const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
@@ -161,23 +163,27 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   const patch = (id: string, p: Partial<FeedReel>) => setReels((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)));
 
   async function like(r: FeedReel) {
+    if (!requireLogin("like", `/reel/${r.id}`)) return;
     patch(r.id, { liked: !r.liked, likeCount: r.likeCount + (r.liked ? -1 : 1) });
     try {
       const res = await api<{ liked: boolean; likeCount: number }>(`/api/reels/${r.id}/like`);
       patch(r.id, { liked: res.liked, likeCount: res.likeCount });
-    } catch {
+    } catch (e) {
       patch(r.id, { liked: r.liked, likeCount: r.likeCount });
+      if ((e as { status?: number }).status === 401) askLogin("like", `/reel/${r.id}`); // session expired
     }
   }
 
   async function save(r: FeedReel) {
+    if (!requireLogin("save", `/reel/${r.id}`)) return;
     patch(r.id, { saved: !r.saved });
     try {
       const res = await api<{ saved: boolean }>("/api/save", { type: "REEL", refId: r.id });
       patch(r.id, { saved: res.saved });
-      toast(res.saved ? "Saved" : "Removed from saved");
-    } catch {
+      toast(res.saved ? t("Saved") : t("Removed from saved"));
+    } catch (e) {
       patch(r.id, { saved: r.saved });
+      if ((e as { status?: number }).status === 401) askLogin("save", `/reel/${r.id}`);
     }
   }
 
@@ -312,6 +318,7 @@ function ReelSlide({
   onOpen: () => void;
 }) {
   const t = useT();
+  const { loggedIn } = useLoginGate();
   const locale = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   // Pooled <video> elements exist only in the browser: attach after mount (poster shows meanwhile).
@@ -379,10 +386,12 @@ function ReelSlide({
     if (justUnlocked()) return;
     const now = Date.now();
     if (now - lastTap.current < 280) {
-      // double tap = like
+      // double tap = like (guests get the log-in sheet instead, without the heart burst)
       if (!reel.liked) onLike();
-      setLikeAnim(true);
-      setTimeout(() => setLikeAnim(false), 600);
+      if (loggedIn) {
+        setLikeAnim(true);
+        setTimeout(() => setLikeAnim(false), 600);
+      }
       lastTap.current = 0;
       return;
     }

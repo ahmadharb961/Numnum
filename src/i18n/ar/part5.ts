@@ -209,4 +209,9 @@ export const AR5: Record<string, string> = {
   "{km} away · no delivery to you": "يبعد {km} · لا توصيل إليك",
   "No delivery to you": "لا توصيل إليك",
   "{name} hasn't set up delivery yet": "{name} لم يُفعّل التوصيل بعد",
+  "Log in to like reels": "سجّل الدخول لتسجيل الإعجاب بالفيديوهات",
+  "Log in to save": "سجّل الدخول للحفظ",
+  "Create a free account to like reels, save dishes and restaurants, and order with cash on delivery.": "أنشئ حساباً مجانياً لتسجيل الإعجاب بالفيديوهات وحفظ الأطباق والمطاعم والطلب مع الدفع نقداً عند التوصيل.",
+  "Log in to see your saved food": "سجّل الدخول لرؤية أطباقك المحفوظة",
+  "Save the dishes, reels and restaurants you love and find them here on any device.": "احفظ الأطباق والفيديوهات والمطاعم التي تحبها وستجدها هنا على أي جهاز.",
 };

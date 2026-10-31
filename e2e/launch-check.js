@@ -206,6 +206,12 @@ async function visit(ctx, label, path, opts = {}) {
       await pg.screenshot({ path: `${SHOTS}/journey-ar-${step}.png` }).catch(() => {});
     };
     await pg.goto(`/r/${bh.slug}`, { waitUntil: "networkidle" });
+    // A delivered order may bring up the rating popup first ("how was your order?"): close it.
+    const rating = pg.getByRole("dialog", { name: "كيف كان طلبك؟" });
+    if (await rating.waitFor({ timeout: 2500 }).then(() => true, () => false)) {
+      await rating.getByRole("button", { name: /إغلاق|Close|ليس الآن/ }).first().click();
+      await pg.waitForTimeout(500);
+    }
     await pg.getByLabel(/^أضف /).first().click();
     await pg.waitForTimeout(800);
     await scan("1-dish");
@@ -270,6 +276,36 @@ async function visit(ctx, label, path, opts = {}) {
       const s = await api.evaluate(async ([m, u]) => (await fetch(u, { method: m, headers: { "content-type": "application/json" }, body: m === "POST" ? "{}" : undefined, redirect: "manual" })).status, [method, url]);
       if (s < 400 && s !== 0) flag(`[guest API] ${method} ${url}`, `allowed (HTTP ${s}) — should be refused`);
     }
+    // Likes and saves need an account: the API refuses guests, and the buttons open the log-in sheet.
+    const reelForGate = reel ?? (await db.reel.findFirst({ where: { status: "READY", visibility: "PUBLISHED" } }));
+    if (reelForGate) {
+      const likesBefore = (await db.reel.findUnique({ where: { id: reelForGate.id } })).likeCount;
+      const savesBefore = await db.savedItem.count();
+      for (const [label, url, body] of [["like", `/api/reels/${reelForGate.id}/like`, "{}"], ["save", "/api/save", JSON.stringify({ type: "REEL", refId: reelForGate.id })]]) {
+        const st = await api.evaluate(async ([u, b]) => (await fetch(u, { method: "POST", headers: { "content-type": "application/json" }, body: b })).status, [url, body]);
+        if (st !== 401) flag(`[guest API] ${label}`, `HTTP ${st} — a guest must be asked to log in (401)`);
+      }
+      const gp = await (await phone()).newPage();
+      await gp.goto(`/reel/${reelForGate.id}`, { waitUntil: "networkidle" });
+      for (const [label, name] of [["like", /^(Like|Unlike)$/], ["save", /^(Save|Unsave)$/]]) {
+        await gp.getByRole("button", { name }).first().click();
+        const sheet = await gp.getByTestId("login-gate").waitFor({ timeout: 5000 }).then(() => true, () => false);
+        if (!sheet) flag(`[guest] ${label} button on a reel`, "did not ask to log in");
+        else {
+          const href = await gp.getByRole("link", { name: "I already have an account" }).getAttribute("href");
+          if (!href || !decodeURIComponent(href).includes(`/reel/${reelForGate.id}`)) flag(`[guest] ${label} login link`, `does not return to the reel: ${href}`);
+          await gp.keyboard.press("Escape");
+          await gp.locator("[role=dialog] button[aria-label]").first().click().catch(() => {});
+          await gp.waitForTimeout(400);
+        }
+      }
+      if ((await db.reel.findUnique({ where: { id: reelForGate.id } })).likeCount !== likesBefore) flag("[guest] like", "like count changed for a guest");
+      if ((await db.savedItem.count()) !== savesBefore) flag("[guest] save", "a guest save was stored");
+      await gp.goto("/saved", { waitUntil: "networkidle" });
+      if (!(await gp.getByText("Log in to see your saved food").count())) flag("[guest] /saved", "does not ask to log in");
+      await gp.context().close();
+    }
+
     const prof = await api.evaluate(async () => (await fetch("/api/account/checkout-profile")).json().catch(() => null));
     if (prof && (prof.user || (prof.addresses || []).length)) flag("[guest API] /api/account/checkout-profile", "returns account data to a guest");
     await g.close();
@@ -285,6 +321,17 @@ async function visit(ctx, label, path, opts = {}) {
         if (!/not found|404|no access|register your restaurant|create.*restaurant|log in/i.test(body)) flag(`[customer] ${p}`, `customer can open it: "${body.slice(0, 80)}"`);
         await pg.close();
       }
+    }
+    if (reel) {
+      const pg = await c.newPage();
+      await pg.goto("/terms");
+      const r1 = await pg.evaluate(async (id) => (await fetch(`/api/reels/${id}/like`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).json(), reel.id);
+      const r2 = await pg.evaluate(async (id) => (await fetch(`/api/reels/${id}/like`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).json(), reel.id);
+      if (typeof r1.liked !== "boolean" || r1.liked === r2.liked) flag("[customer] like", `like/unlike not working: ${JSON.stringify([r1, r2])}`);
+      const s1 = await pg.evaluate(async (id) => (await fetch("/api/save", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "REEL", refId: id }) })).json(), reel.id);
+      const s2 = await pg.evaluate(async (id) => (await fetch("/api/save", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "REEL", refId: id }) })).json(), reel.id);
+      if (typeof s1.saved !== "boolean" || s1.saved === s2.saved) flag("[customer] save", `save/unsave not working: ${JSON.stringify([s1, s2])}`);
+      await pg.close();
     }
     if (otherOrder) {
       const pg = await c.newPage();

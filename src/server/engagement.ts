@@ -13,6 +13,18 @@ export async function ownerKey(): Promise<string | null> {
   return d ? `d:${d}` : null;
 }
 
+/** Likes and saves belong to an account: guests are asked to log in (HTTP 401). */
+async function accountKey(message: string): Promise<string> {
+  const u = await getCurrentUser();
+  if (!u) {
+    const e = new Error(message) as Error & { status: number; code: string };
+    e.status = 401;
+    e.code = "LOGIN_REQUIRED";
+    throw e;
+  }
+  return `u:${u.id}`;
+}
+
 /**
  * Qualified view: the client reports only after the reel was ≥ 60% visible and
  * actually playing for the configured minimum. The server re-checks watch time
@@ -39,8 +51,7 @@ export async function recordView(reelId: string, watchMs: number) {
 }
 
 export async function toggleLike(reelId: string) {
-  const key = await ownerKey();
-  if (!key) throw new Error("Enable cookies to like reels");
+  const key = await accountKey("Log in to like reels");
   return prisma.$transaction(async (tx) => {
     const existing = await tx.reelLike.findUnique({ where: { reelId_ownerKey: { reelId, ownerKey: key } } });
     if (existing) {
@@ -56,8 +67,7 @@ export async function toggleLike(reelId: string) {
 }
 
 export async function toggleSave(type: SavedType, refId: string) {
-  const key = await ownerKey();
-  if (!key) throw new Error("Enable cookies to save");
+  const key = await accountKey("Log in to save");
   const existing = await prisma.savedItem.findUnique({ where: { ownerKey_type_refId: { ownerKey: key, type, refId } } });
   if (existing) {
     await prisma.savedItem.delete({ where: { id: existing.id } });

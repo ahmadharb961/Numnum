@@ -8,6 +8,7 @@ import { getMainImages } from "@/server/menu";
 import { publicReelWhere } from "@/server/feed";
 import { DishCard, ReelThumb, RestaurantCard } from "@/components/customer/cards";
 import { Badge, EmptyState } from "@/components/ui/misc";
+import { buttonClass } from "@/components/ui/button";
 import { deviceId } from "@/server/request";
 import { formatMoney } from "@/lib/money";
 import { STATUS_META } from "@/lib/order-status";
@@ -23,6 +24,27 @@ export const dynamic = "force-dynamic";
 export default async function SavedPage() {
   const t = await getT();
   const [key, user] = await Promise.all([ownerKey(), getCurrentUser()]);
+  // Saves belong to an account.
+  if (!user)
+    return (
+      <main className="pb-nav">
+        <div className="container-app pt-16 text-center" style={{ paddingTop: "calc(var(--safe-top) + 64px)" }}>
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-brand-50 text-brand-500">
+            <Bookmark className="h-8 w-8 fill-brand-500" />
+          </div>
+          <h1 className="mt-4 text-2xl font-black tracking-tight">{t("Log in to see your saved food")}</h1>
+          <p className="mx-auto mt-2 max-w-sm text-ink-muted">{t("Save the dishes, reels and restaurants you love and find them here on any device.")}</p>
+          <div className="mx-auto mt-6 grid max-w-xs gap-3">
+            <Link href="/account/register?next=/saved" className={buttonClass("primary", "lg")}>
+              {t("Create an account")}
+            </Link>
+            <Link href="/login?next=/saved" className={buttonClass("outline", "lg")}>
+              {t("I already have an account")}
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
   const saved = key ? await prisma.savedItem.findMany({ where: { ownerKey: key }, orderBy: { createdAt: "desc" } }) : [];
   const ids = (t: string) => saved.filter((s) => s.type === t).map((s) => s.refId);
   const [reels, items, restaurants] = await Promise.all([
@@ -42,15 +64,6 @@ export default async function SavedPage() {
     <main className="pb-nav">
       <header className="container-wide pb-2" style={{ paddingTop: "calc(var(--safe-top) + 14px)" }}>
         <h1 className="text-2xl font-black tracking-tight">{t("Saved")}</h1>
-        {!user && (
-          <p className="mt-1 text-sm text-ink-muted">
-            {t("Saved on this device.")}{" "}
-            <Link href="/account/register?next=/saved" className="font-semibold text-brand-600">
-              {t("Create an account")}
-            </Link>{" "}
-            {t("to keep saves, addresses and order history across devices.")}
-          </p>
-        )}
         {user && (
           <p className="mt-1 text-sm text-ink-muted">
             {t("Signed in as {name}", { name: user.name })} ·{" "}

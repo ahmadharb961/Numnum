@@ -8,6 +8,7 @@ import { RatingPill, EmptyState } from "@/components/ui/misc";
 import { ReelThumb } from "./cards";
 import { ItemSheet } from "./item-sheet";
 import { useT } from "@/i18n/client";
+import { useLoginGate } from "./login-gate";
 
 type Item = { id: string; name: string; description: string | null; priceCents: number; currency: string; ratingAvg: number; ratingCount: number; available: boolean; dietaryLabels: string[]; image: { url: string; thumbUrl: string | null } | null };
 type Section = { id: string; name: string; items: Item[] };
@@ -174,6 +175,7 @@ export function ShareButton({ title, path, className, children }: { title: strin
 
 export function SaveToggle({ type, refId, initial, className, heart }: { type: "RESTAURANT" | "ITEM"; refId: string; initial: boolean; className?: string; heart?: boolean }) {
   const t = useT();
+  const { requireLogin, askLogin } = useLoginGate();
   const [saved, setSaved] = useState(initial);
   return (
     <button
@@ -181,10 +183,14 @@ export function SaveToggle({ type, refId, initial, className, heart }: { type: "
       aria-label={saved ? t("Saved") : t("Save")}
       aria-pressed={saved}
       onClick={async () => {
+        if (!requireLogin("save")) return;
         setSaved(!saved);
         const res = await fetch("/api/save", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type, refId }) });
         if (res.ok) setSaved((await res.json()).saved);
-        else setSaved(saved);
+        else {
+          setSaved(saved);
+          if (res.status === 401) askLogin("save");
+        }
       }}
     >
       {heart ? <Heart className={cn("h-5 w-5 transition", saved ? "fill-brand-500 text-brand-500" : "text-ink")} /> : saved ? t("Saved") : t("Save")}
