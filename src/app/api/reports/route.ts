@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/server/db";
 import { errorResponse, json, limit, readJson } from "@/server/http";
-import { ownerKey } from "@/server/engagement";
 import { notifyAdmins } from "@/server/notifications";
-import { getRestaurantContext } from "@/server/auth";
+import { getCurrentUser, getRestaurantContext } from "@/server/auth";
 
 const schema = z.object({
   targetType: z.enum(["REEL", "ITEM_REVIEW", "RESTAURANT_REVIEW", "RESTAURANT", "MENU_ITEM"]),
@@ -16,8 +15,10 @@ export async function POST(req: Request) {
   try {
     await limit("report", 10, 60 * 60_000);
     const data = schema.parse(await readJson(req));
-    const key = await ownerKey();
-    if (!key) return json({ error: "Enable cookies to report content" }, 400);
+    // Reports come from accounts (so moderators can follow up, and to keep out anonymous spam).
+    const user = await getCurrentUser();
+    if (!user) return json({ error: "Log in to report content", code: "LOGIN_REQUIRED" }, 401);
+    const key = `u:${user.id}`;
     const ctx = await getRestaurantContext();
     try {
       await prisma.report.create({ data: { ...data, reporterKey: key, reporterRestaurantId: ctx?.restaurant.id } });

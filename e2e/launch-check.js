@@ -281,13 +281,14 @@ async function visit(ctx, label, path, opts = {}) {
     if (reelForGate) {
       const likesBefore = (await db.reel.findUnique({ where: { id: reelForGate.id } })).likeCount;
       const savesBefore = await db.savedItem.count();
-      for (const [label, url, body] of [["like", `/api/reels/${reelForGate.id}/like`, "{}"], ["save", "/api/save", JSON.stringify({ type: "REEL", refId: reelForGate.id })]]) {
+      const reportsBefore = await db.report.count();
+      for (const [label, url, body] of [["like", `/api/reels/${reelForGate.id}/like`, "{}"], ["save", "/api/save", JSON.stringify({ type: "REEL", refId: reelForGate.id })], ["report", "/api/reports", JSON.stringify({ targetType: "REEL", targetId: reelForGate.id, reason: "Spam" })]]) {
         const st = await api.evaluate(async ([u, b]) => (await fetch(u, { method: "POST", headers: { "content-type": "application/json" }, body: b })).status, [url, body]);
         if (st !== 401) flag(`[guest API] ${label}`, `HTTP ${st} — a guest must be asked to log in (401)`);
       }
       const gp = await (await phone()).newPage();
       await gp.goto(`/reel/${reelForGate.id}`, { waitUntil: "networkidle" });
-      for (const [label, name] of [["like", /^(Like|Unlike)$/], ["save", /^(Save|Unsave)$/]]) {
+      for (const [label, name] of [["like", /^(Like|Unlike)$/], ["save", /^(Save|Unsave)$/], ["report", /^Report this reel$/]]) {
         await gp.getByRole("button", { name }).first().click();
         const sheet = await gp.getByTestId("login-gate").waitFor({ timeout: 5000 }).then(() => true, () => false);
         if (!sheet) flag(`[guest] ${label} button on a reel`, "did not ask to log in");
@@ -301,6 +302,15 @@ async function visit(ctx, label, path, opts = {}) {
       }
       if ((await db.reel.findUnique({ where: { id: reelForGate.id } })).likeCount !== likesBefore) flag("[guest] like", "like count changed for a guest");
       if ((await db.savedItem.count()) !== savesBefore) flag("[guest] save", "a guest save was stored");
+      if ((await db.report.count()) !== reportsBefore) flag("[guest] report", "a guest report was stored");
+      // review report link on a restaurant page
+      await gp.goto(`/r/${bh.slug}#reviews`, { waitUntil: "networkidle" });
+      const rep = gp.getByRole("button", { name: /^Report$/ }).first();
+      if (await rep.count()) {
+        await rep.click();
+        if (!(await gp.getByTestId("login-gate").waitFor({ timeout: 5000 }).then(() => true, () => false))) flag("[guest] report a review", "did not ask to log in");
+        await gp.keyboard.press("Escape");
+      }
       await gp.goto("/saved", { waitUntil: "networkidle" });
       if (!(await gp.getByText("Log in to see your saved food").count())) flag("[guest] /saved", "does not ask to log in");
       await gp.context().close();
@@ -331,6 +341,18 @@ async function visit(ctx, label, path, opts = {}) {
       const s1 = await pg.evaluate(async (id) => (await fetch("/api/save", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "REEL", refId: id }) })).json(), reel.id);
       const s2 = await pg.evaluate(async (id) => (await fetch("/api/save", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "REEL", refId: id }) })).json(), reel.id);
       if (typeof s1.saved !== "boolean" || s1.saved === s2.saved) flag("[customer] save", `save/unsave not working: ${JSON.stringify([s1, s2])}`);
+      const rp = await pg.evaluate(async (id) => (await fetch("/api/reports", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ targetType: "REEL", targetId: id, reason: "Other", details: "launch-check" }) })).status, reel.id);
+      if (rp !== 201 && rp !== 200) flag("[customer] report", `HTTP ${rp}`);
+      // through the screen: Report on a reel → reason → submit → thank-you toast
+      await pg.goto(`/reel/${reel.id}`, { waitUntil: "networkidle" });
+      await pg.getByRole("button", { name: "Report this reel" }).first().click();
+      const opened = await pg.getByRole("dialog", { name: "Report content" }).waitFor({ timeout: 5000 }).then(() => true, () => false);
+      if (!opened) flag("[customer] report a reel", "report form did not open");
+      else {
+        await pg.getByRole("button", { name: "Misleading information" }).click();
+        await pg.getByRole("button", { name: "Submit report" }).click();
+        if (!(await pg.getByText("Thanks — our team will review it").waitFor({ timeout: 5000 }).then(() => true, () => false))) flag("[customer] report a reel", "no confirmation after submitting");
+      }
       await pg.close();
     }
     if (otherOrder) {

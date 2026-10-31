@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { api } from "./track";
 import { useT } from "@/i18n/client";
+import { useLoginGate } from "./login-gate";
 
 const REASONS = ["Spam", "Offensive or inappropriate", "Misleading information", "Fake review", "Copyright", "Food safety concern", "Other"] as const;
 
-export function ReportButton({ targetType, targetId, label, dark }: { targetType: "REEL" | "ITEM_REVIEW" | "RESTAURANT_REVIEW" | "RESTAURANT" | "MENU_ITEM"; targetId: string; label?: string; dark?: boolean }) {
+export function ReportButton({ targetType, targetId, label, dark, rail, next }: { targetType: "REEL" | "ITEM_REVIEW" | "RESTAURANT_REVIEW" | "RESTAURANT" | "MENU_ITEM"; targetId: string; label?: string; dark?: boolean; rail?: boolean; next?: string }) {
   const t = useT();
+  const { requireLogin, askLogin } = useLoginGate();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<string>("");
   const [details, setDetails] = useState("");
@@ -19,9 +21,17 @@ export function ReportButton({ targetType, targetId, label, dark }: { targetType
   const toast = useToast();
   return (
     <>
-      <button onClick={() => setOpen(true)} className={`inline-flex items-center gap-1 text-xs ${dark ? "text-white/70" : "text-ink-muted"}`}>
-        <Flag className="h-3 w-3" /> {t(label ?? "Report")}
-      </button>
+      {rail ? (
+        // Reel action rail style (white icon over the video)
+        <button onClick={() => requireLogin("report", next) && setOpen(true)} className="flex flex-col items-center gap-0.5 text-[11px] font-semibold text-white text-shadow" aria-label={t(label ?? "Report")}>
+          <Flag className="h-6 w-6 drop-shadow" />
+          {t("Report")}
+        </button>
+      ) : (
+        <button onClick={() => requireLogin("report", next) && setOpen(true)} className={`inline-flex items-center gap-1 text-xs ${dark ? "text-white/70" : "text-ink-muted"}`}>
+          <Flag className="h-3 w-3" /> {t(label ?? "Report")}
+        </button>
+      )}
       <Sheet open={open} onClose={() => setOpen(false)} title="Report content">
         <div className="space-y-3 p-5">
           <div className="flex flex-wrap gap-2">
@@ -40,10 +50,13 @@ export function ReportButton({ targetType, targetId, label, dark }: { targetType
               setBusy(true);
               try {
                 await api("/api/reports", { targetType, targetId, reason, details: details || undefined });
-                toast("Thanks — our team will review it", "success");
+                toast(t("Thanks — our team will review it"), "success");
                 setOpen(false);
               } catch (e) {
-                toast((e as Error).message, "error");
+                if ((e as { status?: number }).status === 401) {
+                  setOpen(false);
+                  askLogin("report", next);
+                } else toast((e as Error).message, "error");
               } finally {
                 setBusy(false);
               }

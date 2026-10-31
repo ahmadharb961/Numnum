@@ -18,6 +18,7 @@ import { formatKm } from "@/lib/geo";
 import { Logo } from "@/components/logo";
 import { useLocale, useT } from "@/i18n/client";
 import { useLoginGate } from "./login-gate";
+import { ReportButton } from "./report-button";
 
 export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean };
 
@@ -494,6 +495,7 @@ function ReelSlide({
           <Eye className="h-6 w-6 drop-shadow" />
           {compactNumber(reel.viewCount)}
         </div>
+        <ReportButton rail targetType="REEL" targetId={reel.id} label="Report this reel" next={`/reel/${reel.id}`} />
       </div>
 
       {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}

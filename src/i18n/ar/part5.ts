@@ -214,4 +214,7 @@ export const AR5: Record<string, string> = {
   "Create a free account to like reels, save dishes and restaurants, and order with cash on delivery.": "أنشئ حساباً مجانياً لتسجيل الإعجاب بالفيديوهات وحفظ الأطباق والمطاعم والطلب مع الدفع نقداً عند التوصيل.",
   "Log in to see your saved food": "سجّل الدخول لرؤية أطباقك المحفوظة",
   "Save the dishes, reels and restaurants you love and find them here on any device.": "احفظ الأطباق والفيديوهات والمطاعم التي تحبها وستجدها هنا على أي جهاز.",
+  "Log in to report content": "سجّل الدخول للإبلاغ عن محتوى",
+  "Reports come from accounts so our team can follow up and keep numnum free of spam.": "تصدر البلاغات من حسابات حتى يتمكن فريقنا من المتابعة وإبقاء numnum خالياً من الرسائل المزعجة.",
+  "Report this reel": "الإبلاغ عن هذا الفيديو",
 };
