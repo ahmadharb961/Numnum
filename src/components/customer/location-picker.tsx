@@ -54,6 +54,27 @@ export function LocationChip({ label, dark, className }: { label: string | null;
   );
 }
 
+/** Two-line "Delivering to / Hamra, Beirut ⌄" picker (restaurant profile). */
+export function DeliverToButton({ label }: { label: string | null }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="flex min-w-0 flex-1 items-center gap-3 text-start" aria-label={t("Change delivery location")}>
+        <MapPin className="h-7 w-7 shrink-0 text-brand-500" />
+        <span className="min-w-0">
+          <span className="block text-xs font-medium text-ink-muted">{label ? t("Delivering to") : t("Where should we deliver?")}</span>
+          <span className="flex items-center gap-1 font-bold">
+            <span className="truncate">{label ?? t("Set your delivery location")}</span>
+            <ChevronDown className="h-4 w-4 shrink-0" />
+          </span>
+        </span>
+      </button>
+      <LocationSheet open={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
 export function LocationSheet({ open, onClose, onPicked }: { open: boolean; onClose: () => void; onPicked?: (l: Loc) => void }) {
   const t = useT();
   const router = useRouter();
