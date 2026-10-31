@@ -31,6 +31,7 @@ const profileSchema = z.object({
   facebook: z.string().trim().url().optional().or(z.literal("")),
   tiktok: z.string().trim().url().optional().or(z.literal("")),
   website: z.string().trim().url().optional().or(z.literal("")),
+  whatsapp: z.string().trim().max(30).optional(),
   logoUrl: z.string().optional(),
   coverUrl: z.string().optional(),
 });
@@ -45,6 +46,12 @@ export async function saveProfileAction(_: FormState, form: FormData): Promise<F
     const p = normalizePhone(d.phone);
     if (!p.ok) return { fieldErrors: { phone: p.error } };
     phone = p.e164;
+  }
+  let whatsapp: string | undefined;
+  if (d.whatsapp) {
+    const p = normalizePhone(d.whatsapp);
+    if (!p.ok) return { fieldErrors: { whatsapp: p.error } };
+    whatsapp = p.e164;
   }
   // only accept media URLs that belong to this restaurant
   const media = async (url?: string) => (url ? ((await prisma.mediaAsset.findFirst({ where: { restaurantId: ctx.restaurant.id, url } })) ? url : undefined) : undefined);
@@ -63,7 +70,7 @@ export async function saveProfileAction(_: FormState, form: FormData): Promise<F
       area: d.area || null,
       city: d.city || null,
       mapsUrl: d.mapsUrl || null,
-      socialLinks: { instagram: d.instagram || undefined, facebook: d.facebook || undefined, tiktok: d.tiktok || undefined, website: d.website || undefined },
+      socialLinks: { instagram: d.instagram || undefined, facebook: d.facebook || undefined, tiktok: d.tiktok || undefined, website: d.website || undefined, whatsapp },
       logoUrl: (await media(d.logoUrl)) ?? undefined,
       coverUrl: (await media(d.coverUrl)) ?? undefined,
     },

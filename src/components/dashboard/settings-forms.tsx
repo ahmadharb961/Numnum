@@ -118,9 +118,12 @@ export function ProfileForm({ r }: { r: Record<string, string> }) {
         <input name="mapsUrl" className="input" defaultValue={r.mapsUrl} placeholder={t("https://maps.app.goo.gl/…")} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        {(["instagram", "facebook", "tiktok", "website"] as const).map((k) => (
-          <Field key={k} label={k[0].toUpperCase() + k.slice(1)} error={fe[k]}>
-            <input name={k} className="input" defaultValue={r[k] ?? ""} placeholder={t("https://")} />
+        <Field label="WhatsApp number" hint="Shown as a WhatsApp button on your profile. Empty = your restaurant phone if it's a mobile." error={fe.whatsapp}>
+          <input name="whatsapp" type="tel" inputMode="tel" className="input" defaultValue={r.whatsapp ?? ""} placeholder="70 123 456" />
+        </Field>
+        {(["instagram", "tiktok", "facebook", "website"] as const).map((k) => (
+          <Field key={k} label={{ instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook", website: "Website" }[k]} error={fe[k]}>
+            <input name={k} type="url" className="input" defaultValue={r[k] ?? ""} placeholder={k === "website" ? "https://" : `https://${k}.com/…`} />
           </Field>
         ))}
       </div>

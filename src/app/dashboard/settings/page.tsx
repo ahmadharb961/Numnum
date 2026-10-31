@@ -28,7 +28,7 @@ export default async function SettingsPage() {
     <DashPage title={t("Restaurant settings")}>
       <Section title={t("Business details")} description={t("Shown on your public profile.")}>
         <ProfileForm
-          r={{ displayName: r.displayName, businessName: r.businessName, description: r.description ?? "", cuisine: r.cuisine ?? "", phone: r.phone ? formatPhone(r.phone) : "", email: r.email ?? "", address: r.address ?? "", area: r.area ?? "", city: r.city ?? "", mapsUrl: r.mapsUrl ?? "", latitude: r.latitude?.toString() ?? "", longitude: r.longitude?.toString() ?? "", logoUrl: r.logoUrl ?? "", coverUrl: r.coverUrl ?? "", ...social }}
+          r={{ displayName: r.displayName, businessName: r.businessName, description: r.description ?? "", cuisine: r.cuisine ?? "", phone: r.phone ? formatPhone(r.phone) : "", email: r.email ?? "", address: r.address ?? "", area: r.area ?? "", city: r.city ?? "", mapsUrl: r.mapsUrl ?? "", latitude: r.latitude?.toString() ?? "", longitude: r.longitude?.toString() ?? "", logoUrl: r.logoUrl ?? "", coverUrl: r.coverUrl ?? "", ...social, whatsapp: social.whatsapp ? formatPhone(social.whatsapp) : "" }}
         />
       </Section>
       <Section id="ordering" title={t("Online ordering, delivery & pickup")}>

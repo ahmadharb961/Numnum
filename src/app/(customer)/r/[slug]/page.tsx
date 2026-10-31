@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { BadgeCheck, Bike, ChevronLeft, ChevronRight, Clapperboard, Clock, ConciergeBell, Globe, Instagram, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, UtensilsCrossed } from "lucide-react";
+import { BadgeCheck, Bike, ChevronLeft, ChevronRight, Clapperboard, Clock, ConciergeBell, Globe, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, UtensilsCrossed } from "lucide-react";
 import { getPublicRestaurant } from "@/server/restaurant-public";
 import { ownerKey } from "@/server/engagement";
 import { prisma } from "@/server/db";
 import { ProfileTabs, SaveToggle, ShareButton } from "@/components/customer/restaurant-profile";
 import { VerifiedBadge, Stars, Badge, EmptyState } from "@/components/ui/misc";
 import { DAYS, DAY_LABELS, isOpenAt, type OpeningHours } from "@/lib/hours";
-import { formatPhone } from "@/lib/phone";
+import { formatPhone, isLebaneseMobile } from "@/lib/phone";
+import { FacebookIcon, InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/brand-icons";
 import { compactNumber, formatDate } from "@/lib/utils";
 import { evidenceLabel } from "@/server/reviews";
 import { ReportButton } from "@/components/customer/report-button";
@@ -71,6 +72,18 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
         ? { ok: true, text: `${formatKm(dq.km)} · ${dq.feeCents ? t("Delivery fee") + " " + formatMoney(dq.feeCents, r.currency) : t("free delivery")}` }
         : { ok: false, text: dq.reason === "out_of_range" ? t("{km} away — delivers up to {max}", { km: formatKm(dq.km!), max: formatKm(dq.maxKm) }) + (r.pickupEnabled ? ` · ${t("pickup available")}` : "") : t("Delivery not set up yet") };
 
+  // WhatsApp: the number set in settings, else the restaurant phone when it's a mobile.
+  const wa = social.whatsapp || (r.phone && isLebaneseMobile(r.phone) ? r.phone : null);
+  const contacts: { label: string; sub?: string; href: string; icon: React.ReactNode; bg: string; external?: boolean }[] = [
+    ...(r.phone ? [{ label: t("Call"), sub: formatPhone(r.phone).replace(/^\+961\s*/, ""), href: `tel:+${r.phone}`, icon: <Phone className="h-[18px] w-[18px]" />, bg: "bg-ink" }] : []),
+    ...(wa ? [{ label: "WhatsApp", sub: formatPhone(wa).replace(/^\+961\s*/, ""), href: `https://wa.me/${wa}`, icon: <WhatsAppIcon className="h-5 w-5" />, bg: "bg-[#25D366]", external: true }] : []),
+    ...(mapsHref ? [{ label: "Google Maps", sub: t("Directions"), href: mapsHref, icon: <MapPin className="h-[18px] w-[18px]" />, bg: "bg-[#1A73E8]", external: true }] : []),
+    ...(social.instagram ? [{ label: "Instagram", href: social.instagram, icon: <InstagramIcon className="h-5 w-5" />, bg: "bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF]", external: true }] : []),
+    ...(social.tiktok ? [{ label: "TikTok", href: social.tiktok, icon: <TikTokIcon className="h-5 w-5" />, bg: "bg-black", external: true }] : []),
+    ...(social.facebook ? [{ label: "Facebook", href: social.facebook, icon: <FacebookIcon className="h-5 w-5" />, bg: "bg-[#1877F2]", external: true }] : []),
+    ...(social.website ? [{ label: t("Website"), href: social.website, icon: <Globe className="h-[18px] w-[18px]" />, bg: "bg-brand-500", external: true }] : []),
+  ];
+
   const about = (
     <div className="space-y-4 pb-4">
       {r.description && <p className={`${card} p-4 text-[15px] leading-relaxed text-ink-soft`}>{r.description}</p>}
@@ -101,29 +114,25 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
             {t("Delivery")}: {normalizeZones(r.deliveryZones).map((z) => `${t("up to {km}", { km: formatKm(z.maxKm) })} ${z.feeCents ? formatMoney(z.feeCents, r.currency) : t("free")}`).join(" · ")}
           </p>
         )}
-        <div className="flex flex-wrap gap-2">
-          {mapsHref && (
-            <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="chip">
-              <MapPin className="h-4 w-4" /> Google Maps
-            </a>
-          )}
-          {r.phone && (
-            <a href={`tel:+${r.phone}`} className="chip">
-              <Phone className="h-4 w-4" /> <span className="tabular">{formatPhone(r.phone)}</span>
-            </a>
-          )}
-          {social.instagram && (
-            <a href={social.instagram} target="_blank" rel="noopener noreferrer nofollow" className="chip">
-              <Instagram className="h-4 w-4" /> Instagram
-            </a>
-          )}
-          {social.website && (
-            <a href={social.website} target="_blank" rel="noopener noreferrer nofollow" className="chip">
-              <Globe className="h-4 w-4" /> {t("Website")}
-            </a>
-          )}
-        </div>
       </div>
+      {contacts.length > 0 && (
+        <div className={`${card} p-4`}>
+          <h3 className="mb-3 flex items-center gap-2 font-extrabold">
+            <Phone className="h-4 w-4 text-brand-500" /> {t("Contact")}
+          </h3>
+          <div className="grid grid-cols-2 gap-2.5">
+            {contacts.map((c) => (
+              <a key={c.label} href={c.href} target={c.external ? "_blank" : undefined} rel={c.external ? "noopener noreferrer nofollow" : undefined} className="flex h-14 items-center gap-2.5 rounded-xl border border-black/[0.07] bg-white px-2.5 transition active:scale-[0.98] hover:bg-black/[0.02]">
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white ${c.bg}`}>{c.icon}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold">{c.label}</span>
+                  {c.sub && <span className="block truncate text-[11px] text-ink-muted tabular">{c.sub}</span>}
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="flex flex-col items-center gap-2 pt-2 text-center text-xs text-ink-muted">
         <p className="max-w-xs text-balance">
           <BadgeCheck className="me-1 inline h-3.5 w-3.5 align-[-2px]" />

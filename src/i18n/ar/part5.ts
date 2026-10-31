@@ -122,4 +122,11 @@ export const AR5: Record<string, string> = {
   "Reply from {name}": "ردّ من {name}",
   "Open 24 hours": "مفتوح ٢٤ ساعة",
   "Pick up": "استلام",
+  "Call": "اتصال",
+  "Directions": "الاتجاهات",
+  "WhatsApp number": "رقم واتساب",
+  "Shown as a WhatsApp button on your profile. Empty = your restaurant phone if it's a mobile.": "يظهر كزر واتساب في صفحتك. إذا تُرك فارغاً = هاتف المطعم إذا كان خلوياً.",
+  "Instagram": "Instagram",
+  "TikTok": "TikTok",
+  "Facebook": "Facebook",
 };
