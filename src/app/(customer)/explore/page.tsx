@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { SearchControls } from "@/components/customer/search-controls";
 import { ExploreResults } from "@/components/customer/explore-results";
 import { facets, parseSearchParams, restaurantsDeliveringTo } from "@/server/search";
@@ -22,13 +21,11 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const [f, initial] = await Promise.all([facets(), exploreSearch({ ...p, page: 1 }, loc ? { lat: loc.lat, lng: loc.lng } : null)]);
   return (
     <main className="pb-nav">
-      <Suspense>
-        <SearchControls facets={f} locationLabel={loc?.label ?? null} />
-      </Suspense>
+      {/* No Suspense around these: the page is always rendered per request, and streaming them
+          as separate boundaries let them hydrate out of step with the search state (rare #418). */}
+      <SearchControls facets={f} locationLabel={loc?.label ?? null} />
       <div className="container-wide pt-2">
-        <Suspense>
-          <ExploreResults initial={initial} categories={f.categories} />
-        </Suspense>
+        <ExploreResults initial={initial} categories={f.categories} />
       </div>
     </main>
   );

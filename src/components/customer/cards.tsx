@@ -7,7 +7,7 @@ import { compactNumber, cn } from "@/lib/utils";
 import { RatingPill, VerifiedBadge, Badge } from "@/components/ui/misc";
 import { isOpenAt, type OpeningHours } from "@/lib/hours";
 import { formatKm } from "@/lib/geo";
-import { useT } from "@/i18n/client";
+import { useLocale, useT } from "@/i18n/client";
 
 export function DishCard({ item }: { item: { id: string; name: string; description: string | null; priceCents: number; currency: string; ratingAvg: number; ratingCount: number; available: boolean; image: { url: string; thumbUrl: string | null } | null; restaurant?: { slug: string; displayName: string; verificationStatus: string } } }) {
   const t = useT();
@@ -42,6 +42,7 @@ export function DishCard({ item }: { item: { id: string; name: string; descripti
 
 export function RestaurantCard({ r, delivery }: { delivery?: { km: number | null; deliverable: boolean; feeCents: number | null } | null; r: { slug: string; displayName: string; logoUrl: string | null; coverUrl: string | null; cuisine: string | null; area: string | null; city: string | null; verificationStatus: string; ratingAvg: number; ratingCount: number; deliveryEnabled: boolean; pickupEnabled: boolean; openingHours: unknown; avgPrepMinutes?: number | null; _count?: { menuItems: number } } }) {
   const t = useT();
+  const locale = useLocale();
   const open = isOpenAt(r.openingHours as OpeningHours);
   const prep = r.avgPrepMinutes ?? null;
   return (
@@ -85,9 +86,9 @@ export function RestaurantCard({ r, delivery }: { delivery?: { km: number | null
         <div className="mt-2 flex flex-wrap gap-1.5">
           {delivery ? (
             delivery.deliverable ? (
-              <Badge tone="green">{t("Delivers to you")}{delivery.km != null ? ` · ${formatKm(delivery.km)}` : ""}</Badge>
+              <Badge tone="green">{t("Delivers to you")}{delivery.km != null ? ` · ${formatKm(delivery.km, locale)}` : ""}</Badge>
             ) : (
-              <Badge tone="gray">{delivery.km != null ? `${formatKm(delivery.km)} away · ` : ""}no delivery to you</Badge>
+              <Badge tone="gray">{delivery.km != null ? t("{km} away · no delivery to you", { km: formatKm(delivery.km, locale) }) : t("No delivery to you")}</Badge>
             )
           ) : (
             r.deliveryEnabled && <Badge tone="brand">{t("Delivery")}</Badge>

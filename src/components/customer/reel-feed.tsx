@@ -16,7 +16,7 @@ import { pooledVideo, unlockPooledVideos } from "./video-pool";
 import { LocationChip } from "./location-picker";
 import { formatKm } from "@/lib/geo";
 import { Logo } from "@/components/logo";
-import { useT } from "@/i18n/client";
+import { useLocale, useT } from "@/i18n/client";
 
 export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean };
 
@@ -312,6 +312,7 @@ function ReelSlide({
   onOpen: () => void;
 }) {
   const t = useT();
+  const locale = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   // Pooled <video> elements exist only in the browser: attach after mount (poster shows meanwhile).
   const [mounted, setMounted] = useState(false);
@@ -497,7 +498,7 @@ function ReelSlide({
           <div className="mt-0.5 flex items-center gap-1 text-xs text-white/80 text-shadow">
             <MapPin className="h-3.5 w-3.5" />
             {reel.restaurant.location}
-            {reel.restaurant.distanceKm != null && <span>· {formatKm(reel.restaurant.distanceKm)}</span>}
+            {reel.restaurant.distanceKm != null && <span>· {formatKm(reel.restaurant.distanceKm, locale)}</span>}
             {reel.restaurant.deliversToYou === false && <span className="rounded bg-white/20 px-1.5 text-[10px] font-bold uppercase">{t("Pickup only")}</span>}
           </div>
         )}
@@ -589,6 +590,7 @@ type PanelMenu = { description: string | null; openNow: boolean | null; reelCoun
 /** Desktop right-hand panel (like the left sidebar): the current reel's restaurant and its menu. */
 function RestaurantPanel({ reel, onClose, onItem }: { reel: FeedReel; onClose: () => void; onItem: (itemId: string) => void }) {
   const t = useT();
+  const locale = useLocale();
   const r = reel.restaurant;
   const [menu, setMenu] = useState<PanelMenu | null>(null);
   useEffect(() => {
@@ -645,7 +647,7 @@ function RestaurantPanel({ reel, onClose, onItem }: { reel: FeedReel; onClose: (
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 text-sm">
             {menu?.openNow != null && <span className={cn("font-semibold", menu.openNow ? "text-emerald-700" : "text-ink-muted")}>{menu.openNow ? t("Open now") : t("Closed")}</span>}
-            {r.deliversToYou === true && <span className="font-semibold text-emerald-700">{t("Delivers to you")}{r.distanceKm != null ? ` · ${formatKm(r.distanceKm)}` : ""}</span>}
+            {r.deliversToYou === true && <span className="font-semibold text-emerald-700">{t("Delivers to you")}{r.distanceKm != null ? ` · ${formatKm(r.distanceKm, locale)}` : ""}</span>}
             {r.deliversToYou === false && <span className="text-ink-muted">{t("Pickup only for your location")}</span>}
             {r.avgPrepMinutes > 0 && <span className="text-ink-muted">{t("{a}–{b} mins", { a: r.avgPrepMinutes, b: r.avgPrepMinutes + 15 })}</span>}
           </div>

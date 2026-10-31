@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { priceCart, orderInputSchema } from "@/server/orders";
+import { getLocale, tFor } from "@/i18n/server";
 import { errorResponse, json, limit, readJson } from "@/server/http";
 import { prisma } from "@/server/db";
 import { getCurrentUser } from "@/server/auth";
@@ -18,6 +19,8 @@ const schema = z.object({
 export async function POST(req: Request) {
   try {
     await limit("quote", 60, 60_000);
+    const lang = await getLocale();
+    const t = tFor(lang);
     const body = schema.parse(await readJson(req));
     const r = await prisma.restaurant.findFirst({ where: { id: body.restaurantId, status: "ACTIVE" } });
     if (!r) return json({ error: "This restaurant is not available" }, 404);
@@ -39,7 +42,12 @@ export async function POST(req: Request) {
       } else {
         deliveryFeeCents = null;
         distanceKm = q.km;
-        deliveryError = q.reason === "out_of_range" ? `This address is ${formatKm(q.km!)} away — ${r.displayName} delivers up to ${formatKm(q.maxKm)}.` : q.reason === "no_location" ? "Pin your delivery location on the map" : `${r.displayName} hasn't set up delivery yet`;
+        deliveryError =
+          q.reason === "out_of_range"
+            ? t("This address is {km} away — {name} delivers up to {max}.", { km: formatKm(q.km!, lang), name: r.displayName, max: formatKm(q.maxKm, lang) })
+            : q.reason === "no_location"
+              ? t("Pin your delivery location on the map")
+              : t("{name} hasn't set up delivery yet", { name: r.displayName });
       }
     }
     return json({

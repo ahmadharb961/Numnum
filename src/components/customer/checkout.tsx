@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, Field, Spinner } from "@/components/ui/misc";
 import { PageHeader } from "./page-header";
 import { api, track } from "./track";
-import { useT } from "@/i18n/client";
+import { useLocale, useT } from "@/i18n/client";
 
 type Info = {
   id: string;
@@ -51,6 +51,7 @@ function newKey() {
 
 export function Checkout() {
   const t = useT();
+  const locale = useLocale();
   const { cart, ready, clear } = useCart();
   const router = useRouter();
   const [info, setInfo] = useState<Info | null>(null);
@@ -150,7 +151,7 @@ export function Checkout() {
       if (!point) e.location = "Pin your delivery location on the map";
       else {
         const est = estimate(point);
-        if (est && est.feeCents == null) e.location = t("This address is {km} away — {name} delivers up to {max}.", { km: formatKm(est.km), name: info?.displayName, max: formatKm(est.maxKm) }) + ` Choose pickup or another address.`;
+        if (est && est.feeCents == null) e.location = t("This address is {km} away — {name} delivers up to {max}.", { km: formatKm(est.km, locale), name: info?.displayName, max: formatKm(est.maxKm, locale) }) + ` Choose pickup or another address.`;
       }
     }
     setErrors(e);
@@ -255,7 +256,7 @@ export function Checkout() {
                 onClick={() => setMethod("DELIVERY")}
                 icon={<Bike className="h-6 w-6" />}
                 title={t("Delivery")}
-                body={t("Up to {km} · fee from {fee}", { km: formatKm(info.zones.at(-1)?.maxKm ?? 0), fee: info.zones[0]?.feeCents ? formatMoney(info.zones[0].feeCents, currency) : t("free") }) + ` · about ${info.avgPrepMinutes + 15} min`}
+                body={t("Up to {km} · fee from {fee}", { km: formatKm(info.zones.at(-1)?.maxKm ?? 0, locale), fee: info.zones[0]?.feeCents ? formatMoney(info.zones[0].feeCents, currency) : t("free") }) + " · " + t("about {n} min", { n: info.avgPrepMinutes + 15 })}
               />
             )}
             {info.pickupEnabled && <MethodCard active={method === "PICKUP"} onClick={() => setMethod("PICKUP")} icon={<ShoppingBag className="h-6 w-6" />} title={t("Pickup")} body={t("Ready in about {n} min", { n: info.avgPrepMinutes }) + (info.address ? ` · ${info.address}` : "")} />}
@@ -300,11 +301,11 @@ export function Checkout() {
                             <span className="font-bold">{a.label}</span>
                             <span className="block text-ink-soft">{[a.area, a.address, a.building].filter(Boolean).join(", ")}</span>
                             {!a.hasLocation && <span className="block text-xs font-semibold text-amber-700">{t("No map pin — edit it in Saved addresses")}</span>}
-                            {est && est.feeCents == null && <span className="block text-xs font-semibold text-red-600">{formatKm(est.km)} away · outside delivery range</span>}
+                            {est && est.feeCents == null && <span className="block text-xs font-semibold text-red-600">{t("{km} away · outside delivery range", { km: formatKm(est.km, locale) })}</span>}
                           </span>
                           {est && est.feeCents != null && (
                             <span className="text-end text-xs font-semibold text-ink-muted">
-                              {formatKm(est.km)}
+                              {formatKm(est.km, locale)}
                               <span className="block tabular">{est.feeCents ? `+${formatMoney(est.feeCents, currency)}` : t("Free")}</span>
                             </span>
                           )}
@@ -328,10 +329,10 @@ export function Checkout() {
                         const est = estimate(pin);
                         if (!est) return null;
                         return est.feeCents == null ? (
-                          <p className="mt-1 text-xs font-semibold text-red-600">{formatKm(est.km)} away — {info.displayName} delivers up to {formatKm(est.maxKm)}</p>
+                          <p className="mt-1 text-xs font-semibold text-red-600">{t("{km} away — {name} delivers up to {max}", { km: formatKm(est.km, locale), name: info.displayName, max: formatKm(est.maxKm, locale) })}</p>
                         ) : (
                           <p className="mt-1 text-xs font-semibold text-emerald-700">
-                            ✓ {formatKm(est.km)} away · delivery {est.feeCents ? formatMoney(est.feeCents, currency) : "free"}
+                            ✓ {t("{km} away · delivery {fee}", { km: formatKm(est.km, locale), fee: est.feeCents ? formatMoney(est.feeCents, currency) : t("free") })}
                           </p>
                         );
                       })()}
@@ -411,7 +412,7 @@ export function Checkout() {
                 {d.name} · {d.phone}
               </div>
               {method === "DELIVERY" && <div className="mt-1 text-ink-soft">{savedAddress ? `${savedAddress.label}: ${[savedAddress.area, savedAddress.address, savedAddress.building].filter(Boolean).join(", ")}` : [d.area, d.address, d.building].filter(Boolean).join(", ")}</div>}
-              {method === "DELIVERY" && quote?.distanceKm != null && <div className="mt-1 text-xs text-emerald-700">📍 {formatKm(quote.distanceKm)} from {info.displayName}</div>}
+              {method === "DELIVERY" && quote?.distanceKm != null && <div className="mt-1 text-xs text-emerald-700">📍 {t("{km} from {name}", { km: formatKm(quote.distanceKm, locale), name: info.displayName })}</div>}
               {d.notes && <div className="mt-1 text-xs text-ink-muted">Note: {d.notes}</div>}
               <button className="mt-2 text-xs font-semibold text-brand-600" onClick={() => setStep(1)}>
                 {t("Edit details")}
@@ -434,9 +435,9 @@ export function Checkout() {
                 <span className="label">{t("Paying with a bigger bill? (optional)")}</span>
                 <div className="relative">
                   <span className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-sm text-ink-muted">{unitLabel}</span>
-                  <input className={cn("input", currency === "LBP" ? "ps-12" : "ps-8")} inputMode={minorDigits(currency) ? "decimal" : "numeric"} placeholder={currency === "LBP" ? "e.g. 1,000,000" : "e.g. 50"} value={changeFor} onChange={(e) => setChangeFor(e.target.value)} />
+                  <input className={cn("input", currency === "LBP" ? "ps-12" : "ps-8")} inputMode={minorDigits(currency) ? "decimal" : "numeric"} placeholder={t("e.g. {n}", { n: currency === "LBP" ? "1,000,000" : "50" })} value={changeFor} onChange={(e) => setChangeFor(e.target.value)} />
                 </div>
-                <span className="mt-1 block text-xs text-ink-muted">So the {method === "DELIVERY" ? "driver" : "restaurant"} can bring change.</span>
+                <span className="mt-1 block text-xs text-ink-muted">{method === "DELIVERY" ? t("So the driver can bring change.") : t("So the restaurant can bring change.")}</span>
               </label>
             </div>
 
@@ -452,7 +453,7 @@ export function Checkout() {
               {total != null ? t("Place order · {total}", { total: formatMoney(total, currency) }) : t("Place order")}
             </Button>
             <p className="text-center text-xs text-ink-muted">
-              {t("By placing your order you agree to our")} <Link href="/terms" className="underline">{t("terms")}</Link>. Your name, phone and address are shared with {info.displayName} to deliver your order.
+              {t("By placing your order you agree to our")} <Link href="/terms" className="underline">{t("terms")}</Link>. {t("Your name, phone and address are shared with {name} to deliver your order.", { name: info.displayName })}
             </p>
             {quote && Object.keys(quote.errors).length > 0 && (
               <Button variant="outline" block onClick={() => router.push("/cart")}>

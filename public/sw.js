@@ -1,9 +1,9 @@
 // numnum service worker: installability + light offline support.
 // - static assets: cache-first
 // - images/posters: stale-while-revalidate (bounded)
-// - pages: network only, offline fallback page
+// - pages: handled by the browser; offline page when the device is offline
 // - API, uploads and videos: never cached (videos use HTTP range requests)
-const VERSION = "nn-v6";
+const VERSION = "nn-v7";
 const STATIC = `${VERSION}-static`;
 const IMAGES = `${VERSION}-images`;
 const OFFLINE_URL = "/offline.html";
@@ -44,9 +44,10 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   if (req.mode === "navigate") {
-    // Pages are streamed (React Suspense): pass the response straight through. Copying it into a
-    // cache while it streams changes how the chunks reach the page and made hydration fail at random.
-    e.respondWith(fetch(req).catch(async () => (await caches.match(OFFLINE_URL)) || Response.error()));
+    // Online, pages are left to the browser: they stream (React Suspense), and serving them
+    // through the worker, even untouched, changed the chunk timing enough to break hydration
+    // now and then. Offline, show the offline page.
+    if (self.navigator.onLine === false) e.respondWith(caches.match(OFFLINE_URL).then((r) => r || Response.error()));
   }
 });
 

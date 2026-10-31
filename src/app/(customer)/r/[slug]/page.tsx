@@ -69,8 +69,8 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
     : !dq
       ? null
       : dq.deliverable
-        ? { ok: true, text: `${formatKm(dq.km)} · ${dq.feeCents ? t("Delivery fee") + " " + formatMoney(dq.feeCents, r.currency) : t("free delivery")}` }
-        : { ok: false, text: dq.reason === "out_of_range" ? t("{km} away — delivers up to {max}", { km: formatKm(dq.km!), max: formatKm(dq.maxKm) }) + (r.pickupEnabled ? ` · ${t("pickup available")}` : "") : t("Delivery not set up yet") };
+        ? { ok: true, text: `${formatKm(dq.km, lang)} · ${dq.feeCents ? t("Delivery fee") + " " + formatMoney(dq.feeCents, r.currency) : t("free delivery")}` }
+        : { ok: false, text: dq.reason === "out_of_range" ? t("{km} away — delivers up to {max}", { km: formatKm(dq.km!, lang), max: formatKm(dq.maxKm, lang) }) + (r.pickupEnabled ? ` · ${t("pickup available")}` : "") : t("Delivery not set up yet") };
 
   // WhatsApp: the number set in settings, else the restaurant phone when it's a mobile.
   const wa = social.whatsapp || (r.phone && isLebaneseMobile(r.phone) ? r.phone : null);
@@ -111,7 +111,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
         {r.address && <p>{r.address}</p>}
         {r.deliveryEnabled && normalizeZones(r.deliveryZones).length > 0 && (
           <p className="text-ink-muted">
-            {t("Delivery")}: {normalizeZones(r.deliveryZones).map((z) => `${t("up to {km}", { km: formatKm(z.maxKm) })} ${z.feeCents ? formatMoney(z.feeCents, r.currency) : t("free")}`).join(" · ")}
+            {t("Delivery")}: {normalizeZones(r.deliveryZones).map((z) => `${t("up to {km}", { km: formatKm(z.maxKm, lang) })} ${z.feeCents ? formatMoney(z.feeCents, r.currency) : t("free")}`).join(" · ")}
           </p>
         )}
       </div>

@@ -42,9 +42,10 @@ export function quoteDelivery(restaurant: { latitude: number | null; longitude: 
   return zone ? { deliverable: true, km, feeCents: zone.feeCents, maxKm } : { deliverable: false, km, maxKm, reason: "out_of_range" };
 }
 
-export function formatKm(km: number) {
-  if (km < 1) return `${Math.round(km * 1000)} m`;
-  return `${km < 10 ? Number(km.toFixed(1)) : Math.round(km)} km`;
+export function formatKm(km: number, lang?: string | null) {
+  const ar = lang === "ar";
+  if (km < 1) return `${Math.round(km * 1000)} ${ar ? "م" : "m"}`;
+  return `${km < 10 ? Number(km.toFixed(1)) : Math.round(km)} ${ar ? "كم" : "km"}`;
 }
 
 export function isValidLatLng(lat: unknown, lng: unknown): boolean {

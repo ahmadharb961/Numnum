@@ -19,7 +19,8 @@ import { pushToRestaurantStaff, pushToUsers } from "./push";
 
 export class OrderError extends Error {
   status = 400;
-  constructor(message: string, public fieldErrors?: Record<string, string>) {
+  /** `texts`: translatable versions (key + values) of the message ("_") or of field errors, shown in the customer's language. */
+  constructor(message: string, public fieldErrors?: Record<string, string>, public texts?: Record<string, { k: string; v?: Record<string, string | number> }>) {
     super(message);
   }
 }
@@ -183,6 +184,7 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   }
 
   const fieldErrors: Record<string, string> = {};
+  const texts: NonNullable<OrderError["texts"]> = {};
   const phone = normalizePhone(c.phone);
   if (!phone.ok) fieldErrors["customer.phone"] = phone.error;
   const mapsUrl = normalizeMapsUrl(c.mapsUrl, c.latitude, c.longitude);
@@ -198,22 +200,30 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
       if (q.deliverable) {
         deliveryFeeCents = q.feeCents;
         distance = Math.round(q.km * 100) / 100;
-      } else if (q.reason === "out_of_range") fieldErrors["customer.location"] = `This address is ${formatKm(q.km!)} away — ${restaurant.displayName} delivers up to ${formatKm(q.maxKm)}. Choose pickup or another restaurant.`;
-      else fieldErrors["customer.location"] = `${restaurant.displayName} hasn't set up delivery yet — choose pickup`;
+      } else if (q.reason === "out_of_range") {
+        fieldErrors["customer.location"] = `This address is ${formatKm(q.km!)} away — ${restaurant.displayName} delivers up to ${formatKm(q.maxKm)}. Choose pickup or another restaurant.`;
+        texts["customer.location"] = { k: "This address is {km} away — {name} delivers up to {max}. Choose pickup or another restaurant.", v: { km: q.km!, name: restaurant.displayName, max: q.maxKm } };
+      } else {
+        fieldErrors["customer.location"] = `${restaurant.displayName} hasn't set up delivery yet — choose pickup`;
+        texts["customer.location"] = { k: "{name} hasn't set up delivery yet — choose pickup", v: { name: restaurant.displayName } };
+      }
     }
   }
 
   const priced = await priceCart(restaurant.id, input.items);
   Object.assign(fieldErrors, priced.fieldErrors);
-  if (Object.keys(fieldErrors).length) throw new OrderError("Please check your order details", fieldErrors);
-  if (restaurant.minOrderCents && priced.subtotalCents < restaurant.minOrderCents) throw new OrderError(`Minimum order is ${formatMoney(restaurant.minOrderCents, restaurant.currency)}`);
+  if (Object.keys(fieldErrors).length) throw new OrderError("Please check your order details", fieldErrors, texts);
+  if (restaurant.minOrderCents && priced.subtotalCents < restaurant.minOrderCents) {
+    const amount = formatMoney(restaurant.minOrderCents, restaurant.currency);
+    throw new OrderError(`Minimum order is ${amount}`, undefined, { _: { k: "Minimum order is {amount}.", v: { amount } } });
+  }
 
   const currency = restaurant.currency;
   const totalCents = priced.subtotalCents + deliveryFeeCents;
   let changeForCents: number | null = null;
   if (input.changeFor) {
     changeForCents = parseAmount(input.changeFor, currency);
-    if (changeForCents === null || changeForCents < totalCents) throw new OrderError("Please check your order details", { changeFor: `Enter a bill amount of at least ${formatMoney(totalCents, currency)}` });
+    if (changeForCents === null || changeForCents < totalCents) throw new OrderError("Please check your order details", { changeFor: `Enter a bill amount of at least ${formatMoney(totalCents, currency)}` }, { changeFor: { k: "Enter a bill amount of at least {amount}", v: { amount: formatMoney(totalCents, currency) } } });
   }
   const exchangeRate = currency === "USD" ? null : settings.lbpPerUsd;
   const commissionBaseCents = toUsdCents(priced.subtotalCents, currency, exchangeRate);

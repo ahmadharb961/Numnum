@@ -89,7 +89,7 @@ export function CartView() {
             ))}
           </ul>
           <Link href={`/r/${cart.restaurantSlug}`} className="mt-3 flex h-12 items-center justify-center rounded-2xl border border-dashed border-black/15 text-sm font-semibold text-ink-soft">
-            + Add more from {cart.restaurantName}
+            + {t("Add more from {name}", { name: cart.restaurantName })}
           </Link>
           <div className="card mt-4 space-y-1.5 p-4 text-sm">
             <div className="flex justify-between">

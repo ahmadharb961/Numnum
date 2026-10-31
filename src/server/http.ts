@@ -3,17 +3,31 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { rateLimit } from "./rate-limit";
 import { clientIp } from "./request";
+import { getLocale, tFor } from "@/i18n/server";
+import { formatKm } from "@/lib/geo";
+
+type Texts = Record<string, { k: string; v?: Record<string, string | number> }>;
 
 export function json(data: unknown, init?: number | ResponseInit) {
   return NextResponse.json(data, typeof init === "number" ? { status: init } : init);
 }
 
-export function errorResponse(e: unknown) {
-  if (e instanceof ZodError) return json({ error: "Invalid request", fieldErrors: Object.fromEntries(e.issues.map((i) => [i.path.join("."), i.message])) }, 400);
-  const err = e as Error & { status?: number; fieldErrors?: Record<string, string> };
-  if (err?.status && err.status < 500) return json({ error: err.message, fieldErrors: err.fieldErrors }, err.status);
+/** API error in the visitor's language: known messages from the dictionary, templated ones via `texts`. */
+export async function errorResponse(e: unknown) {
+  const locale = await getLocale().catch(() => "en" as const);
+  const t = tFor(locale);
+  // Distances travel as numbers (km) and are formatted in the visitor's units.
+  const fmt = (x: { k: string; v?: Record<string, string | number> }) =>
+    t(x.k, Object.fromEntries(Object.entries(x.v ?? {}).map(([k, v]) => [k, typeof v === "number" && (k === "km" || k === "max") ? formatKm(v, locale) : v])));
+  if (e instanceof ZodError) return json({ error: t("Invalid request"), fieldErrors: Object.fromEntries(e.issues.map((i) => [i.path.join("."), t(i.message)])) }, 400);
+  const err = e as Error & { status?: number; fieldErrors?: Record<string, string>; texts?: Texts };
+  if (err?.status && err.status < 500) {
+    const texts = err.texts ?? {};
+    const fieldErrors = err.fieldErrors && Object.fromEntries(Object.entries(err.fieldErrors).map(([k, v]) => [k, texts[k] ? fmt(texts[k]) : t(v)]));
+    return json({ error: texts._ ? fmt(texts._) : t(err.message), fieldErrors }, err.status);
+  }
   console.error(e);
-  return json({ error: "Something went wrong. Please try again." }, 500);
+  return json({ error: t("Something went wrong. Please try again.") }, 500);
 }
 
 export async function limit(bucket: string, max: number, windowMs: number) {
