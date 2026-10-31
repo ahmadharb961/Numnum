@@ -1,3 +1,4 @@
+import { showText } from "@/lib/notification-text";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRestaurant } from "@/server/auth";
@@ -27,8 +28,8 @@ export default async function NotificationsPage() {
               <div className={cn("flex gap-3 p-4", !n.readAt && "bg-brand-50/40")}>
                 <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.readAt ? "bg-transparent" : "bg-brand-500")} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold">{n.title}</div>
-                  {n.body && <div className="text-sm text-ink-muted">{n.body}</div>}
+                  <div className="text-sm font-semibold">{showText(t, n.title)}</div>
+                  {n.body && <div className="text-sm text-ink-muted">{showText(t, n.body)}</div>}
                   <div className="mt-0.5 text-xs text-ink-muted">{formatDateTime(n.createdAt, lang)}</div>
                 </div>
               </div>
@@ -38,7 +39,7 @@ export default async function NotificationsPage() {
         </ul>
       ) : (
         <div className="card">
-          <EmptyState title="You're all caught up" />
+          <EmptyState title={t("You're all caught up")} />
         </div>
       )}
     </DashPage>

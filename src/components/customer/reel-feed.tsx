@@ -394,7 +394,7 @@ function ReelSlide({
   const showVideo = mounted && near && reel.videoUrl && !failed;
 
   return (
-    <section data-index={index} data-active={active} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black lg:flex lg:items-center lg:justify-center lg:bg-[#0f0d0c]" aria-label={`${reel.item.name} by ${reel.restaurant.name}`}>
+    <section data-index={index} data-active={active} className="relative h-feed w-full snap-start snap-always overflow-hidden bg-black lg:flex lg:items-center lg:justify-center lg:bg-[#0f0d0c]" aria-label={t("{dish} by {restaurant}", { dish: reel.item.name, restaurant: reel.restaurant.name })}>
       {/* Desktop: the video plays in a centered 9:16 column. */}
       <div className="relative h-full w-full overflow-hidden lg:aspect-[9/16] lg:h-[calc(100%-2.5rem)] lg:w-auto lg:rounded-3xl">
       {/* poster always rendered underneath to avoid black frames */}

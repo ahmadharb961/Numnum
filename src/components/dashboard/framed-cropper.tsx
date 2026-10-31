@@ -137,7 +137,7 @@ export function FramedCropper({ file, title, aspect, outputWidth, guide, onCance
           )}
           {guide && guideH > 0 && guideH < frameH && (
             <div className="pointer-events-none absolute inset-x-0 border-y-2 border-dashed border-white/80" style={{ top: (frameH - guideH) / 2, height: guideH }}>
-              <span className="absolute start-2 top-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">{guide.label}</span>
+              <span className="absolute start-2 top-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">{t(guide.label)}</span>
             </div>
           )}
         </div>

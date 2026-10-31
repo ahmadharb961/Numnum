@@ -100,6 +100,17 @@ export async function updateSetting<K extends keyof Settings>(key: K, value: Set
   });
 }
 
+/**
+ * Notification text from a template. While the admin keeps the default wording it is sent as a
+ * translation key, so each restaurant reads it in its own language; edited wording is sent as is.
+ */
+export function templateText(name: keyof Settings["templates"], current: NotificationTemplate, vars: Record<string, string>) {
+  const def = DEFAULT_SETTINGS.templates[name];
+  const key = (s: string) => s.replace(/\{\{(\w+)\}\}/g, "{$1}");
+  if (current.title === def.title && current.body === def.body) return { title: { k: key(def.title), v: vars }, body: { k: key(def.body), v: vars } };
+  return renderTemplate(current, vars);
+}
+
 export function renderTemplate(t: NotificationTemplate, vars: Record<string, string>): NotificationTemplate {
   const r = (s: string) => s.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? "");
   return { title: r(t.title), body: r(t.body) };

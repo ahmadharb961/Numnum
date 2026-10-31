@@ -1,7 +1,7 @@
 import "server-only";
 import type { Invoice, InvoiceStatus } from "@prisma/client";
 import { prisma, type Tx } from "./db";
-import { getSettings, renderTemplate, type Settings } from "./settings";
+import { getSettings, templateText, renderTemplate, type Settings } from "./settings";
 import { nextCounter } from "./counters";
 import { notifyAdmins, notifyRestaurant } from "./notifications";
 import { audit } from "./audit";
@@ -152,7 +152,7 @@ export async function generateInvoice(restaurantId: string, period: string, acto
       });
     }
     await audit({ actorId, action: "invoice.generate", entityType: "invoice", entityId: invoice.id, data: { number, period, totalDueCents } }, tx);
-    const t = renderTemplate(settings.templates.invoiceIssued, templateVars(invoice));
+    const t = templateText("invoiceIssued", settings.templates.invoiceIssued, templateVars(invoice));
     await notifyRestaurant(restaurantId, { type: "INVOICE_ISSUED", ...t, link: `/dashboard/billing/${invoice.id}` }, tx);
     return { invoice, created: true };
   });
@@ -236,9 +236,10 @@ export async function reviewPayment(adminId: string, paymentId: string, review: 
     await refreshInvoiceStatus(tx, p.invoiceId);
     const inv = await tx.invoice.findUniqueOrThrow({ where: { id: p.invoiceId } });
     await audit({ actorId: adminId, action: `payment.${review.action.toLowerCase()}`, entityType: "payment", entityId: p.id, data: { invoice: inv.number, ...review } }, tx);
-    const tpl = review.action === "APPROVE" ? settings.templates.paymentApproved : review.action === "REJECT" ? settings.templates.paymentRejected : settings.templates.paymentMoreInfo;
+    const tplName = review.action === "APPROVE" ? "paymentApproved" : review.action === "REJECT" ? "paymentRejected" : "paymentMoreInfo";
+    const tpl = settings.templates[tplName];
     const amount = review.action === "APPROVE" ? formatMoney(review.verifiedAmountCents) : formatMoney(p.amountCents);
-    const t = renderTemplate(tpl, { ...templateVars(inv), amount, note: review.note ?? "" });
+    const t = templateText(tplName, tpl, { ...templateVars(inv), amount, note: review.note ?? "" });
     await notifyRestaurant(p.restaurantId, { type: `PAYMENT_${review.action}`, ...t, link: `/dashboard/billing/${inv.id}` }, tx, { email: true });
     return inv;
   });
@@ -255,7 +256,7 @@ export async function recordManualPayment(adminId: string, invoiceId: string, am
     await tx.invoice.update({ where: { id: invoiceId }, data: { paidCents: { increment: amountCents } } });
     await refreshInvoiceStatus(tx, invoiceId);
     await audit({ actorId: adminId, action: "payment.manual_record", entityType: "payment", entityId: p.id, data: { invoice: inv.number, amountCents, reference, note } }, tx);
-    await notifyRestaurant(inv.restaurantId, { type: "PAYMENT_APPROVE", title: `Payment recorded for ${inv.number}`, body: `${formatMoney(amountCents)} was reconciled against your invoice.`, link: `/dashboard/billing/${inv.id}` }, tx);
+    await notifyRestaurant(inv.restaurantId, { type: "PAYMENT_APPROVE", title: { k: "Payment recorded for {invoice}", v: { invoice: inv.number } }, body: { k: "{amount} was reconciled against your invoice.", v: { amount: formatMoney(amountCents) } }, link: `/dashboard/billing/${inv.id}` }, tx);
     return p;
   });
 }
@@ -310,7 +311,7 @@ export async function applyAdjustmentToInvoice(adminId: string, adjustmentId: st
     }
     await refreshInvoiceStatus(tx, invoiceId);
     await audit({ actorId: adminId, action: "invoice.apply_adjustment", entityType: "invoice", entityId: invoiceId, data: { adjustmentId, applied } }, tx);
-    await notifyRestaurant(inv.restaurantId, { type: "INVOICE_ADJUSTED", title: `Invoice ${inv.number} adjusted`, body: `${formatMoney(applied)} — ${adj.reason}`, link: `/dashboard/billing/${inv.id}` }, tx);
+    await notifyRestaurant(inv.restaurantId, { type: "INVOICE_ADJUSTED", title: { k: "Invoice {invoice} adjusted", v: { invoice: inv.number } }, body: `${formatMoney(applied)} — ${adj.reason}`, link: `/dashboard/billing/${inv.id}` }, tx);
   });
 }
 
@@ -371,7 +372,7 @@ export async function resolveDispute(adminId: string, disputeId: string, accept:
     }
     if (d.invoiceId) await refreshInvoiceStatus(tx, d.invoiceId);
     await audit({ actorId: adminId, action: accept ? "dispute.accept" : "dispute.reject", entityType: "commission_dispute", entityId: d.id, data: { resolution } }, tx);
-    await notifyRestaurant(d.restaurantId, { type: "DISPUTE_RESOLVED", title: `Dispute ${accept ? "accepted" : "rejected"}`, body: resolution, link: "/dashboard/billing" }, tx);
+    await notifyRestaurant(d.restaurantId, { type: "DISPUTE_RESOLVED", title: accept ? "Dispute accepted" : "Dispute rejected", body: resolution, link: "/dashboard/billing" }, tx);
   });
 }
 
@@ -425,7 +426,7 @@ export async function runBillingMaintenance(now = new Date()) {
       if (Object.keys(data).length) {
         await prisma.restaurant.update({ where: { id: r.id }, data });
         await audit({ actorId: null, action: "restaurant.overdue_restriction", entityType: "restaurant", entityId: r.id, data: { invoice: inv.number, ...data } });
-        await notifyRestaurant(r.id, { type: "ACCOUNT_WARNING", title: "Account restricted due to overdue invoice", body: `Settle ${inv.number} to lift restrictions.`, link: `/dashboard/billing/${inv.id}` }, undefined, { email: true });
+        await notifyRestaurant(r.id, { type: "ACCOUNT_WARNING", title: "Account restricted due to overdue invoice", body: { k: "Settle {invoice} to lift restrictions.", v: { invoice: inv.number } }, link: `/dashboard/billing/${inv.id}` }, undefined, { email: true });
         summary.restricted++;
       }
     }

@@ -32,7 +32,7 @@ async function setLang(ctx, lang) {
 // Text that legitimately stays in Latin letters on Arabic pages: data typed by restaurants and
 // customers (dish/restaurant names, descriptions, reviews, addresses), brand names, codes.
 let dataText = "";
-const ALLOW = /^(numnum|num num|whatsapp|instagram|tiktok|facebook|google maps|apple|android|iphone|safari|chrome|samsung internet|firefox|pdf|csv|usd|lbp|ios|ok|whish|omt)$/i;
+const ALLOW = /^(english|leaflet|© openstreetmap|openstreetmap|numnum|num num|whatsapp|instagram|tiktok|facebook|google maps|apple|android|iphone|safari|chrome|samsung internet|firefox|pdf|csv|usd|lbp|ios|ok|whish|omt)$/i;
 
 async function englishLeftovers(page) {
   const texts = await page.evaluate(() => {
@@ -156,6 +156,9 @@ async function visit(ctx, label, path, opts = {}) {
     ...(await db.itemReview.findMany({ select: { body: true } }).catch(() => [])).map((r) => r.body),
     ...(await db.user.findMany({ select: { name: true } })).map((u) => u.name),
     ...(await db.order.findMany({ select: { customerName: true, address: true, building: true, notes: true }, take: 2000 }).catch(() => [])).flatMap(Object.values),
+    // Notifications stored as plain text before they were stored as translation keys.
+    ...(await db.notification.findMany({ where: { NOT: { title: { startsWith: "§" } } }, select: { title: true, body: true } })).flatMap((n) => [n.title, n.body]),
+    ...(await db.orderItem.findMany({ select: { note: true }, take: 3000 }).catch(() => [])).map((i) => i.note),
     ...(await db.customerAddress.findMany({ select: { label: true, address: true, area: true, building: true } }).catch(() => [])).flatMap(Object.values),
   ].forEach((v) => v && (dataText += " " + String(v).toLowerCase()));
 
@@ -169,7 +172,7 @@ async function visit(ctx, label, path, opts = {}) {
   const shotName = (role, lang, dev, p) => `${role}-${lang}-${dev}${p.replace(/[^a-z0-9]+/gi, "_")}`.slice(0, 90);
 
   // ── 1. Every screen, every role, both languages ──
-  const ONLY = (process.env.ONLY || "screens,errors,access,seo").split(",");
+  const ONLY = (process.env.ONLY || "screens,journey,errors,access,seo").split(",");
   const runs = [
     { role: "guest", paths: PUBLIC, devs: ["phone", "desktop"], langs: ["en", "ar"] },
     { role: "customer", login: ["customer@numnum.demo", "demo1234"], paths: CUSTOMER, devs: ["phone", "desktop"], langs: ["en", "ar"] },
@@ -187,6 +190,52 @@ async function visit(ctx, label, path, opts = {}) {
       }
       await ctx.close();
     }
+  }
+
+  // ── 1b. Arabic order journey: every checkout step, scanned for English ──
+  if (ONLY.includes("journey")) {
+    console.log("arabic order journey");
+    const ctx = await phone({ geolocation: { latitude: 33.8975, longitude: 35.4815 }, permissions: ["geolocation"] });
+    await login(ctx, "customer@numnum.demo", "demo1234");
+    await setLang(ctx, "ar");
+    const pg = await ctx.newPage();
+    const errs = [];
+    pg.on("pageerror", (e) => errs.push(e.message.slice(0, 160)));
+    const scan = async (step) => {
+      for (const t of await englishLeftovers(pg)) flag(`[journey/ar] ${step}`, `English left in Arabic: "${t.slice(0, 90)}"`);
+      await pg.screenshot({ path: `${SHOTS}/journey-ar-${step}.png` }).catch(() => {});
+    };
+    await pg.goto(`/r/${bh.slug}`, { waitUntil: "networkidle" });
+    await pg.getByLabel(/^أضف /).first().click();
+    await pg.waitForTimeout(800);
+    await scan("1-dish");
+    await pg.getByRole("button", { name: /أضف إلى السلة/ }).click();
+    await pg.waitForTimeout(800);
+    await pg.goto("/cart", { waitUntil: "networkidle" });
+    await scan("2-cart");
+    await pg.goto("/checkout", { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+    await scan("3-method");
+    await pg.locator("main button").filter({ hasText: "توصيل" }).first().click().catch(() => {});
+    await pg.getByRole("button", { name: "متابعة" }).click();
+    await pg.waitForTimeout(1500);
+    await scan("4-details");
+    await pg.getByRole("button", { name: "راجع الطلب" }).click();
+    await pg.waitForTimeout(2000);
+    await scan("5-review");
+    const place = pg.getByRole("button", { name: /تأكيد الطلب/ });
+    if (await place.count()) {
+      await Promise.all([pg.waitForURL(/\/order\//, { timeout: 20000 }), place.click()]);
+      await pg.waitForTimeout(1000);
+      await scan("6-tracking");
+      await pg.getByRole("button", { name: "إلغاء الطلب" }).first().click().catch(() => {});
+      await pg.getByRole("dialog").getByRole("button", { name: "إلغاء الطلب" }).click().catch(() => {});
+      await pg.waitForTimeout(1500);
+      await pg.reload({ waitUntil: "networkidle" });
+      await scan("7-canceled");
+    } else flag("[journey/ar] review", "no Place order button (checkout did not reach the review step)");
+    for (const e of errs) flag("[journey/ar]", `crash: ${e}`);
+    await ctx.close();
   }
 
   // ── 2. Error pages ──

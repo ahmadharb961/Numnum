@@ -19,7 +19,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
         <CustomerRegisterForm next={next} />
       </div>
       <p className="mt-6 text-center text-sm">
-        Already have an account?{" "}
+        {t("Already have an account?")}{" "}
         <Link href="/login" className="font-semibold text-brand-600">
           {t("Log in")}
         </Link>

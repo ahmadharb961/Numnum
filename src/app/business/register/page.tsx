@@ -24,13 +24,13 @@ export default async function RegisterRestaurantPage() {
       </header>
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-4">
         <h1 className="text-3xl font-black tracking-tight">{t("Register your restaurant")}</h1>
-        <p className="mt-1 text-sm text-ink-muted">Takes about a minute. Next you&apos;ll import your menu and photos.</p>
+        <p className="mt-1 text-sm text-ink-muted">{t("Takes about a minute. Next you'll import your menu and photos.")}</p>
         <div className="card mt-6 p-5">
           <RestaurantRegisterForm loggedInEmail={user?.email} />
         </div>
         {!user && (
           <p className="mt-4 text-center text-sm">
-            Already registered?{" "}
+            {t("Already registered?")}{" "}
             <Link href="/login?next=/dashboard" className="font-semibold text-brand-600">
               {t("Log in")}
             </Link>

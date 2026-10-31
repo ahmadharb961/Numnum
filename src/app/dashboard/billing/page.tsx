@@ -48,7 +48,7 @@ export default async function BillingPage() {
         <div className="card mb-5 flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
             <div className="text-sm text-ink-muted">
-              Invoice {payable.number} · due {formatDate(payable.dueDate, undefined, lang)}
+              {t("Invoice {number} · due {date}", { number: payable.number, date: formatDate(payable.dueDate, undefined, lang) })}
             </div>
             <div className="tabular text-2xl font-black">{formatMoney(outstanding(payable))}</div>
             {payable.status === "PAYMENT_SUBMITTED" && <div className="text-sm text-sky-700">{t("Your payment is awaiting verification.")}</div>}
@@ -191,7 +191,7 @@ export default async function BillingPage() {
           ) : (
             <p className="text-sm text-ink-muted">{t("No disputes.")}</p>
           )}
-          <p className="mt-3 text-xs text-ink-muted">Disputes must be opened within {s.settings.disputeWindowDays} days of the entry or invoice date.</p>
+          <p className="mt-3 text-xs text-ink-muted">{t("Disputes must be opened within {n} days of the entry or invoice date.", { n: s.settings.disputeWindowDays })}</p>
         </Section>
       </div>
     </DashPage>

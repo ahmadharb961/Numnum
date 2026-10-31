@@ -34,7 +34,7 @@ export default async function EditItemPage({ params, searchParams }: { params: P
       title={item.name}
       description={
         <>
-          SKU <span className="font-mono">{item.sku}</span> · {compactNumber(item.viewCount)} detail views · {item.reels.length} reels
+          SKU <span className="font-mono">{item.sku}</span> · {t("{n} detail views", { n: compactNumber(item.viewCount) })} · {t("{n} reels", { n: item.reels.length })}
         </>
       }
       actions={

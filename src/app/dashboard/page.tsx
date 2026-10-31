@@ -57,7 +57,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                 <Link href={s.href} className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm hover:bg-black/[0.03]">
                   {s.done ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <Circle className="h-5 w-5 text-ink-muted/40" />}
                   <span className={s.done ? "text-ink-muted line-through" : "font-semibold"}>
-                    {i + 1}. {s.label}
+                    {i + 1}. {t(s.label)}
                   </span>
                 </Link>
               </li>

@@ -19,13 +19,17 @@ const TABS: Tab[] = ["dishes", "reels", "restaurants"];
 const FILTERS = ["category", "cuisine", "area", "minPrice", "maxPrice", "delivery", "pickup", "verified", "available", "minRating", "minItemRating"];
 
 // Answers already seen (per exact request) are reused for a minute: going back, switching tabs
-// or retyping a word is instant. Small and bounded.
+// or retyping a word is instant. Small and bounded. Browser only: on the server this module is
+// shared by every visitor, so a cache there would serve one request's results to the next.
 const cache = new Map<string, { at: number; v: ExploreResult }>();
+const isBrowser = typeof window !== "undefined";
 const cached = (k: string) => {
+  if (!isBrowser) return null;
   const h = cache.get(k);
   return h && Date.now() - h.at < 60_000 ? h.v : null;
 };
 const remember = (k: string, v: ExploreResult) => {
+  if (!isBrowser) return;
   if (cache.size > 120) cache.delete(cache.keys().next().value!);
   cache.set(k, { at: Date.now(), v });
 };
@@ -244,7 +248,7 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
       {last?.hasMore && (
         <div className="mt-4 flex justify-center">
           <button type="button" onClick={loadMore} disabled={loadingMore} className="chip">
-            {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Show more
+            {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {t("Show more")}
           </button>
         </div>
       )}

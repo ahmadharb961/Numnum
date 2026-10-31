@@ -53,7 +53,7 @@ export default async function SavedPage() {
         )}
         {user && (
           <p className="mt-1 text-sm text-ink-muted">
-            Signed in as {user.name} ·{" "}
+            {t("Signed in as {name}", { name: user.name })} ·{" "}
             <Link href="/account" className="font-semibold text-brand-600">
               {t("Account")}
             </Link>

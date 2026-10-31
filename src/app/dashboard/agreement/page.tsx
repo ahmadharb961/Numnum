@@ -24,7 +24,7 @@ export default async function AgreementPage() {
     <DashPage title={t("Commission agreement")}>
       {r.agreementAcceptedAt && !outdated && (
         <Alert tone="green" className="mb-4">
-          Accepted on {formatDateTime(r.agreementAcceptedAt, lang)} (version {r.agreementVersion}).
+          {t("Accepted on {date} (version {v}).", { date: formatDateTime(r.agreementAcceptedAt, lang), v: r.agreementVersion })}
         </Alert>
       )}
       {outdated && <Alert className="mb-4">The agreement has been updated since you accepted version {r.agreementVersion}. Please review and accept the new version.</Alert>}

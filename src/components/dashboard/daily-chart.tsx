@@ -42,7 +42,7 @@ export function DailyChart({ days, currency, metrics = DEFAULT_METRICS }: { days
           ))}
         </div>
         <button onClick={() => setTable((t) => !t)} className="text-xs font-semibold text-brand-600">
-          {table ? "View chart" : "View as table"}
+          {table ? t("View chart") : t("View as table")}
         </button>
       </div>
       <div className="mb-2 text-sm text-ink-muted">
@@ -75,7 +75,7 @@ export function DailyChart({ days, currency, metrics = DEFAULT_METRICS }: { days
         </div>
       ) : (
         <div className="relative" dir="ltr" onMouseLeave={() => setHover(null)}>
-          <div className="flex items-end border-b border-black/10" style={{ height: H, gap: 2 }} role="img" aria-label={`Daily ${metric.label.toLowerCase()}`}>
+          <div className="flex items-end border-b border-black/10" style={{ height: H, gap: 2 }} role="img" aria-label={t("Daily {metric}", { metric: t(metric.label).toLowerCase() })}>
             {days.map((d, i) => {
               const v = Number(d[key]) || 0;
               const h = v ? Math.max(3, (v / max) * (H - 8)) : 0;

@@ -35,7 +35,9 @@ export function MapPicker({ value, onChange, radiusKm, rings = [], height = 260,
       const L = (await import("leaflet")).default;
       if (cancelled || !el.current || map.current) return;
       const start = value ?? BEIRUT;
-      const m = L.map(el.current, { zoomControl: true, attributionControl: true }).setView([start.lat, start.lng], value ? 16 : 13);
+      const m = L.map(el.current, { zoomControl: false, attributionControl: true }).setView([start.lat, start.lng], value ? 16 : 13);
+      L.control.zoom({ zoomInTitle: t("Zoom in"), zoomOutTitle: t("Zoom out") }).addTo(m);
+      m.attributionControl.setPrefix(false); // keeps "© OpenStreetMap", drops the Leaflet ad link
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(m);
       const icon = L.divIcon({ className: "", html: '<div style="width:34px;height:34px;transform:translate(-50%,-100%);position:absolute;left:0;top:0"><svg viewBox="0 0 24 24" width="34" height="34"><path fill="#ff5412" stroke="#fff" stroke-width="1.5" d="M12 2C7.6 2 4 5.5 4 9.9 4 15.5 12 22 12 22s8-6.5 8-12.1C20 5.5 16.4 2 12 2z"/><circle cx="12" cy="10" r="3" fill="#fff"/></svg></div>', iconSize: [0, 0] });
       const mk = L.marker([start.lat, start.lng], { draggable: true, icon }).addTo(m);
@@ -106,7 +108,7 @@ export function MapPicker({ value, onChange, radiusKm, rings = [], height = 260,
       <div className="relative overflow-hidden rounded-2xl border border-black/10" style={{ height }}>
         <div ref={el} className="h-full w-full" aria-label={t("Map — drag the pin to the exact location")} />
         <Button type="button" size="sm" variant="outline" onClick={locate} className="absolute bottom-3 end-3 z-[500] shadow-md">
-          {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />} Use my location
+          {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />} {t("Use my location")}
         </Button>
       </div>
       <p className="mt-1 text-xs text-ink-muted">{t(error ?? "Drag the pin or tap the map to set the exact spot.")}</p>

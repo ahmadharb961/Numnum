@@ -47,7 +47,7 @@ export default async function BusinessPage() {
             {t("Register your restaurant")}
           </Link>
         </div>
-        <p className="mt-3 text-xs text-ink-muted">{formatRate(s.defaultCommissionRateBps)} commission on completed orders · billed monthly</p>
+        <p className="mt-3 text-xs text-ink-muted">{t("{rate} commission on completed orders · billed monthly", { rate: formatRate(s.defaultCommissionRateBps) })}</p>
       </section>
       <section className="container-app grid gap-3 pb-16 sm:grid-cols-2">
         {steps.map((st) => (

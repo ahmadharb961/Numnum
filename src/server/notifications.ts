@@ -1,11 +1,12 @@
 import { prisma, type Tx } from "./db";
 import { sendEmail } from "./email";
 import { tFor } from "@/i18n/server";
-import type { T, Vars } from "@/i18n/core";
+import type { T } from "@/i18n/core";
 
-// Texts are English (optionally a template with values) and are translated into the
-// recipient's language (their account setting) when stored and emailed.
-export type Text = string | { k: string; v?: Vars };
+// Texts are English (optionally a template with values). They are stored as a key and shown in
+// the reader's language; emails and pushes go out in the recipient's language (account setting).
+import { encodeText, type Text } from "@/lib/notification-text";
+export type { Text };
 type NotifyInput = { type: string; title: Text; body?: Text | null; link?: string };
 
 export const render = (t: T, x: Text | null | undefined) => (x == null ? undefined : typeof x === "string" ? t(x) : t(x.k, x.v));
@@ -26,7 +27,7 @@ export async function notifyRestaurant(restaurantId: string, n: NotifyInput, tx?
   const t = await restaurantT(restaurantId, client);
   const title = render(t, n.title)!;
   const body = render(t, n.body);
-  await client.notification.create({ data: { audience: "RESTAURANT", restaurantId, type: n.type, title, body, link: n.link } });
+  await client.notification.create({ data: { audience: "RESTAURANT", restaurantId, type: n.type, title: encodeText(n.title), body: n.body == null ? null : encodeText(n.body), link: n.link } });
   if (opts.email) {
     const r = await client.restaurant.findUnique({ where: { id: restaurantId }, select: { email: true } });
     if (r?.email) void sendEmail(r.email, title, `${body ?? ""}\n\n${process.env.APP_URL ?? ""}${n.link ?? ""}`);
@@ -40,6 +41,5 @@ export async function notifyAdmins(n: { type: string; title: string; body?: stri
 
 export async function notifyUser(userId: string, n: NotifyInput, tx?: Tx) {
   const client = tx ?? prisma;
-  const t = await userT(userId, client);
-  await client.notification.create({ data: { audience: "USER", userId, type: n.type, title: render(t, n.title)!, body: render(t, n.body), link: n.link } });
+  await client.notification.create({ data: { audience: "USER", userId, type: n.type, title: encodeText(n.title), body: n.body == null ? null : encodeText(n.body), link: n.link } });
 }

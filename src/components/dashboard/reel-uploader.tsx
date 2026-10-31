@@ -106,7 +106,7 @@ export function ReelUploader({ items, defaultItemId, canPublish, stream }: { ite
           <button onClick={() => vInput.current?.click()} className="mx-auto flex aspect-[9/16] w-full max-w-[320px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-black/15 bg-white text-center">
             <Film className="h-10 w-10 text-brand-500" />
             <span className="font-bold">{t("Choose or record a video")}</span>
-            <span className="px-6 text-xs text-ink-muted">MP4, MOV or WebM · vertical works best · up to {stream ? "500" : "200"} MB</span>
+            <span className="px-6 text-xs text-ink-muted">{t("MP4, MOV or WebM · vertical works best · up to {n} MB", { n: stream ? 500 : 200 })}</span>
           </button>
         )}
         <input ref={vInput} type="file" accept="video/mp4,video/quicktime,video/webm,video/*" className="hidden" onChange={(e) => e.target.files?.[0] && pickVideo(e.target.files[0])} />
@@ -121,7 +121,7 @@ export function ReelUploader({ items, defaultItemId, canPublish, stream }: { ite
         <div>
           <div className="label">{t("Linked menu item *")}</div>
           <ItemPicker items={items} value={itemId} onChange={setItemId} />
-          <p className="mt-1 text-xs text-ink-muted">The reel always shows this item&apos;s current name, price and rating, and opens its order screen.</p>
+          <p className="mt-1 text-xs text-ink-muted">{t("The reel always shows this item's current name, price and rating, and opens its order screen.")}</p>
         </div>
         <Field label="Caption (optional)">
           <textarea className="input" maxLength={300} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder={t("Smashed to order, every time 🔥")} />

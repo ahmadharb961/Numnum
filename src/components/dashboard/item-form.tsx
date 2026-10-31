@@ -85,7 +85,7 @@ export function ItemForm({ item, currency, categories, foodCategories, groups, c
           </div>
         ) : (
           <p className="text-sm text-ink-muted">
-            No customization groups yet.{" "}
+            {t("No customization groups yet.")}{" "}
             <Link href="/dashboard/customizations" className="font-semibold text-brand-600">
               {t("Create one")}
             </Link>

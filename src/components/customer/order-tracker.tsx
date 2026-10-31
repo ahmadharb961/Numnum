@@ -218,7 +218,7 @@ export function OrderTracker({ order: o, token, placed, loggedIn }: { order: Ord
           <div className="mt-3 border-t border-black/5 pt-3 text-xs text-ink-muted">
             {delivery ? t("Deliver to {name}: {address}", { name: o.customerName, address: o.address }) : t("Pickup by {name}", { name: o.customerName })}
             {o.notes && <> · Note: {o.notes}</>}
-            <div>Placed {formatDateTime(o.createdAt, lang)}</div>
+            <div>{t("Placed {date}", { date: formatDateTime(o.createdAt, lang) })}</div>
           </div>
         </div>
 

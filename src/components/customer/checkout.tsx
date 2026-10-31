@@ -445,11 +445,11 @@ export function Checkout() {
                 <AlertTriangle className="me-1 inline h-4 w-4" /> {t("Prices were updated by the restaurant. The totals above are the current prices.")}
               </Alert>
             )}
-            {below && <Alert tone="amber">Minimum order is {formatMoney(info.minOrderCents!, currency)}.</Alert>}
+            {below && <Alert tone="amber">{t("Minimum order is {amount}.", { amount: formatMoney(info.minOrderCents!, currency) })}</Alert>}
             {quote?.deliveryError && <Alert tone="red">{quote.deliveryError}</Alert>}
             {placeError && <Alert tone="red">{placeError}</Alert>}
             <Button size="lg" block onClick={placeOrder} loading={placing} disabled={!quote || Object.keys(quote.errors).length > 0 || !!below || total == null}>
-              Place order{total != null ? ` · ${formatMoney(total, currency)}` : ""}
+              {total != null ? t("Place order · {total}", { total: formatMoney(total, currency) }) : t("Place order")}
             </Button>
             <p className="text-center text-xs text-ink-muted">
               {t("By placing your order you agree to our")} <Link href="/terms" className="underline">{t("terms")}</Link>. Your name, phone and address are shared with {info.displayName} to deliver your order.

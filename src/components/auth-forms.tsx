@@ -6,7 +6,7 @@ import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { loginAction, registerCustomerAction, registerRestaurantAction, type FormState } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
-import { useT } from "@/i18n/client";
+import { rich, useT } from "@/i18n/client";
 
 /**
  * useActionState that remembers what was typed: React resets forms after every action, so
@@ -123,15 +123,18 @@ export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: stri
       <label className="flex items-start gap-3 text-sm">
         <input type="checkbox" name="terms" className="mt-0.5 h-5 w-5 accent-brand-500" />
         <span>
-          I agree to the{" "}
-          <Link href="/terms" className="font-semibold text-brand-600 underline" target="_blank">
-            {t("Terms of Service")}
-          </Link>{" "}
-          and{" "}
-          <Link href="/privacy" className="font-semibold text-brand-600 underline" target="_blank">
-            {t("Privacy Policy")}
-          </Link>
-          . I&apos;ll review the commission agreement before enabling online ordering.
+          {rich(t, "I agree to the {terms} and {privacy}. I'll review the commission agreement before enabling online ordering.", {
+            terms: (
+              <Link href="/terms" className="font-semibold text-brand-600 underline" target="_blank">
+                {t("Terms of Service")}
+              </Link>
+            ),
+            privacy: (
+              <Link href="/privacy" className="font-semibold text-brand-600 underline" target="_blank">
+                {t("Privacy Policy")}
+              </Link>
+            ),
+          })}
         </span>
       </label>
       {fe.terms && <p className="text-xs font-medium text-red-600">{fe.terms}</p>}

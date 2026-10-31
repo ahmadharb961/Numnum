@@ -31,7 +31,7 @@ export default async function PublishPage() {
             <li key={x.key}>
               <Link href={x.href} className="flex items-center gap-3 text-sm">
                 {x.done ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <Circle className="h-5 w-5 text-ink-muted/40" />}
-                <span className={x.done ? "" : "font-semibold"}>{x.label}</span>
+                <span className={x.done ? "" : "font-semibold"}>{t(x.label)}</span>
                 {["phone", "menu", "agreement"].includes(x.key) && !x.done && <span className="text-xs font-semibold text-brand-600">{t("required")}</span>}
               </Link>
             </li>

@@ -162,7 +162,7 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
       {state?.error && <Alert tone="red">{state.error}</Alert>}
       <label className="flex items-center gap-3 rounded-xl bg-cream p-3 text-sm font-semibold">
         <input type="checkbox" name="orderingEnabled" defaultChecked={r.orderingEnabled} disabled={!agreementAccepted} className="h-5 w-5 accent-brand-500" />
-        Accepting orders (turn off to pause ordering, e.g. when you&apos;re too busy)
+        {t("Accepting orders (turn off to pause ordering, e.g. when you're too busy)")}
       </label>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Average preparation time (minutes)" error={fe.avgPrepMinutes} hint="Suggested when you accept an order">
@@ -189,7 +189,7 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
       </div>
 
       <div>
-        <div className="label">Restaurant location {delivery && <span className="text-brand-600">{t("(required for delivery)")}</span>}</div>
+        <div className="label">{t("Restaurant location")} {delivery && <span className="text-brand-600">{t("(required for delivery)")}</span>}</div>
         <MapPicker value={pin} onChange={setPin} radiusKm={delivery && radius ? radius : undefined} rings={delivery ? innerRings : []} height={300} />
         {delivery && (
           <div className="mt-3 rounded-xl border border-black/10 bg-white p-3">
@@ -224,7 +224,7 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
             <input type="range" min={0.5} max={30} step={0.5} value={Math.min(radius || 0.5, 30)} onChange={(e) => setRadius(Number(e.target.value))} className="mt-2 w-full accent-brand-500" aria-label={t("Delivery radius in km")} />
             <div className="flex justify-between text-[11px] text-ink-muted">
               <span>{t("0.5 km")}</span>
-              <span>30 km (type up to {MAX_ZONE_KM})</span>
+              <span>{t("30 km (type up to {n})", { n: MAX_ZONE_KM })}</span>
             </div>
             <p className="mt-1 text-xs text-ink-muted">{t("Customers outside the circle can still order pickup. Set fees per distance in the delivery zones below.")}</p>
           </div>
@@ -237,7 +237,7 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
       {delivery && (
         <div>
           <div className="label">{t("Delivery zones")}</div>
-          <p className="mb-2 text-xs text-ink-muted">Distance is measured in a straight line from your pin. Customers farther than your last zone can&apos;t order delivery (they can still pick up).</p>
+          <p className="mb-2 text-xs text-ink-muted">{t("Distance is measured in a straight line from your pin. Customers farther than your last zone can't order delivery (they can still pick up).")}</p>
           <div className="space-y-2">
             {zones.map((z, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">
@@ -255,7 +255,7 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
           <button type="button" onClick={() => setZones([...zones, { maxKm: String((Number(zones.at(-1)?.maxKm) || 0) + 3), fee: "" }])} className="mt-2 text-sm font-semibold text-brand-600">
             {t("+ Add zone")}
           </button>
-          {radius > 0 && <p className="mt-1 text-xs text-ink-muted">You deliver up to {radius} km (shown as the circle on the map).</p>}
+          {radius > 0 && <p className="mt-1 text-xs text-ink-muted">{t("You deliver up to {n} km (shown as the circle on the map).", { n: radius })}</p>}
           {fe.zones && <p className="mt-1 text-xs font-medium text-red-600">{fe.zones}</p>}
           <input type="hidden" name="zones" value={JSON.stringify(zones)} />
         </div>
@@ -279,7 +279,7 @@ export function HoursEditor({ initial }: { initial: OpeningHours }) {
         const slots = hours[d] ?? [];
         return (
           <div key={d} className="flex flex-wrap items-center gap-2 border-b border-black/5 py-2">
-            <span className="w-28 text-sm font-semibold">{DAY_LABELS[d]}</span>
+            <span className="w-28 text-sm font-semibold">{t(DAY_LABELS[d])}</span>
             {slots.length === 0 && <span className="text-sm text-ink-muted">{t("Closed")}</span>}
             {slots.map((s, i) => (
               <span key={i} className="flex items-center gap-1">
