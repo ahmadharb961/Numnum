@@ -13,9 +13,9 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#ff5412",
     categories: ["food", "lifestyle", "shopping"],
     icons: [
-      { src: "/icons/v2/icon-192.png", sizes: "192x192", type: "image/png" },
-      { src: "/icons/v2/icon-512.png", sizes: "512x512", type: "image/png" },
-      { src: "/icons/v2/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icons/v2/icon-192.png?v=4", sizes: "192x192", type: "image/png" },
+      { src: "/icons/v2/icon-512.png?v=4", sizes: "512x512", type: "image/png" },
+      { src: "/icons/v2/maskable-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

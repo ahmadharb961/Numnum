@@ -362,6 +362,21 @@ function ReelSlide({
     if (!active) setPaused(false);
   }, [active]);
 
+  // Lock screen / notification "Now Playing": dish and restaurant with the full-orange numnum icon
+  // (without this, phones fall back to a site icon and the page title).
+  useEffect(() => {
+    if (!active || typeof navigator === "undefined" || !("mediaSession" in navigator) || typeof MediaMetadata === "undefined") return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: reel.item.name,
+      artist: reel.restaurant.name,
+      album: "numnum",
+      artwork: [
+        { src: "/icons/v2/icon-192.png?v=4", sizes: "192x192", type: "image/png" },
+        { src: "/icons/v2/icon-512.png?v=4", sizes: "512x512", type: "image/png" },
+      ],
+    });
+  }, [active, reel.item.name, reel.restaurant.name]);
+
   useEffect(() => {
     if (videoRef.current) videoRef.current.muted = muted;
   }, [muted]);

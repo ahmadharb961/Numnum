@@ -406,7 +406,7 @@ async function visit(ctx, label, path, opts = {}) {
   if (ONLY.includes("seo")) {
     const ctx = await desktop();
     const pg = await ctx.newPage();
-    for (const p of ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/sw.js", "/offline.html", "/icons/v2/icon-192.png", "/apple-touch-icon.png", "/favicon.ico", "/favicon.ico?v=3"]) {
+    for (const p of ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/sw.js", "/offline.html", "/icons/v2/icon-192.png", "/apple-touch-icon.png", "/favicon.ico", "/favicon.ico?v=4"]) {
       const r = await pg.goto(p).catch(() => null);
       if (!r || r.status() !== 200) flag(`[static] ${p}`, `HTTP ${r ? r.status() : "failed"}`);
     }

@@ -50,7 +50,9 @@ const out = (p, data) => {
   const files = {
     "public/logo/numnum-stack-orange.svg": stackSvg(ORANGE),
     "public/logo/numnum-stack-white.svg": stackSvg("#fff"),
-    "public/icons/v2/icon.svg": iconSvg({ rx: 112 }),
+    // Full-bleed orange squares, no transparent corners: phones and browsers round icons themselves,
+    // and iOS paints transparent corners white (e.g. on the lock-screen "Now Playing" card).
+    "public/icons/v2/icon.svg": iconSvg(),
     "brand/numnum-logo-orange.svg": stackSvg(ORANGE),
     "brand/numnum-instagram.svg": iconSvg({ w: 0.62 }),
   };
@@ -63,22 +65,22 @@ const out = (p, data) => {
     await page.setContent(`<style>*{margin:0}html,body{background:transparent}svg{display:block;width:${w}px;height:${h}px}</style>${svg}`);
     out(path.join(root, p), await page.screenshot({ omitBackground: transparent, type: "png" }));
   };
-  await png(iconSvg({ rx: 112 }), 192, 192, "public/icons/v2/icon-192.png");
-  await png(iconSvg({ rx: 112 }), 512, 512, "public/icons/v2/icon-512.png");
+  await png(iconSvg(), 192, 192, "public/icons/v2/icon-192.png", false);
+  await png(iconSvg(), 512, 512, "public/icons/v2/icon-512.png", false);
   await png(iconSvg({ w: 0.64 }), 180, 180, "public/icons/v2/apple-touch-icon.png", false);
   // iPhones also look for this at the site root.
   await png(iconSvg({ w: 0.64 }), 180, 180, "public/apple-touch-icon.png", false);
   await png(iconSvg({ w: 0.56 }), 512, 512, "public/icons/v2/maskable-512.png", false);
-  await png(iconSvg({ rx: 112, w: 0.8 }), 32, 32, "public/favicon.png");
+  await png(iconSvg({ w: 0.8 }), 32, 32, "public/favicon.png", false);
   // Browser tab icons: PNGs (Safari and some Android browsers don't show SVG favicons) and a
   // classic multi-size /favicon.ico, which browsers and search engines request on their own.
-  for (const s of [16, 32, 48, 96]) await png(iconSvg({ rx: 112, w: 0.8 }), s, s, `public/icons/v2/favicon-${s}.png`);
+  for (const s of [16, 32, 48, 96]) await png(iconSvg({ w: 0.8 }), s, s, `public/icons/v2/favicon-${s}.png`, false);
   out(path.join(root, "public/favicon.ico"), ico([16, 32, 48].map((s) => fs.readFileSync(path.join(root, `public/icons/v2/favicon-${s}.png`)))));
   // Emails can't show SVG: a PNG at 2× the size it's shown (96 px wide).
   await png(stackSvg(ORANGE), 192, Math.round((192 * STACK_H) / STACK_W), "public/logo/numnum-email.png");
   // Downloads for social media and print.
   await png(iconSvg({ w: 0.62 }), 2048, 2048, "brand/numnum-instagram-2048.png", false);
-  await png(iconSvg({ rx: 112 }), 1024, 1024, "brand/numnum-app-icon-1024.png");
+  await png(iconSvg(), 1024, 1024, "brand/numnum-app-icon-1024.png", false);
   for (const [name, fill] of [["orange", ORANGE], ["white", "#fff"], ["black", INK]]) {
     await png(stackSvg(fill), 2000, Math.round((2000 * STACK_H) / STACK_W), `brand/numnum-logo-${name}.png`);
   }

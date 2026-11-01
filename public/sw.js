@@ -3,7 +3,7 @@
 // - images/posters: stale-while-revalidate (bounded)
 // - pages: handled by the browser; offline page when the device is offline
 // - API, uploads and videos: never cached (videos use HTTP range requests)
-const VERSION = "nn-v8";
+const VERSION = "nn-v9";
 const STATIC = `${VERSION}-static`;
 const IMAGES = `${VERSION}-images`;
 const OFFLINE_URL = "/offline.html";
