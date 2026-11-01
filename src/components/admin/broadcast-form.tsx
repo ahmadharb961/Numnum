@@ -133,7 +133,7 @@ export function BroadcastForm({ stats, restaurants }: { stats: Record<"everyone"
           <p className="mt-1 text-xs text-ink-muted">Shown large on Android and computers. iPhones show the title and message only.</p>
         </div>
 
-        <Field label="Link when tapped (optional)" error={errors.link} hint="A page like /restaurants or /r/burger-house, or a full https:// link. Empty opens the home page." htmlFor="bc-link">
+        <Field label="Link when tapped (optional)" error={errors.link} hint="Tapping the notification opens the full message with its photo. Add a page like /r/burger-house or a full https:// link to show a button there." htmlFor="bc-link">
           <input id="bc-link" className="input" value={link} onChange={(e) => setLink(e.target.value)} placeholder="/r/burger-house" />
         </Field>
 

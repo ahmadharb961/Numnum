@@ -20,7 +20,7 @@ vi.mock("@/server/email", () => ({
 }));
 
 import { prisma } from "@/server/db";
-import { audienceDevices, audienceReach, sendBroadcast } from "@/server/broadcast";
+import { audienceDevices, audienceReach, canSeeBroadcast, sendBroadcast } from "@/server/broadcast";
 import { createOrder, restaurantOrderAction } from "@/server/orders";
 import { makeCustomer, makeRestaurant, orderPayload, resetDb } from "./helpers";
 
@@ -68,10 +68,34 @@ describe("admin push broadcasts", () => {
     const r = await sendBroadcast({ audience: "customers", title: "Weekend offer", body: "Free delivery", imageUrl: "/media/i/abc.webp", link: "/r/rest-1" }, admin.id);
     expect(r).toEqual({ ok: true, people: 2, devices: 3, delivered: 3 });
     expect(pushes.map((p) => p.endpoint).sort()).toEqual(["https://push.test/c1", "https://push.test/c2", "https://push.test/guest"]);
-    expect(pushes[0].payload).toMatchObject({ title: "Weekend offer", body: "Free delivery", url: "/r/rest-1", requireInteraction: true });
-    expect(String(pushes[0].payload.image)).toMatch(/\/media\/i\/abc\.webp$/);
     const row = await prisma.pushBroadcast.findFirstOrThrow();
-    expect(row).toMatchObject({ audience: "customers", recipients: 2, devices: 3, delivered: 3, createdById: admin.id });
+    // tapping it opens the message page (which shows the photo and the link as a button)
+    expect(pushes[0].payload).toMatchObject({ title: "Weekend offer", body: "Free delivery", url: `/m/${row.id}`, requireInteraction: true });
+    expect(String(pushes[0].payload.image)).toMatch(/\/media\/i\/abc\.webp$/);
+    expect(row).toMatchObject({ audience: "customers", recipients: 2, devices: 3, delivered: 3, createdById: admin.id, link: "/r/rest-1", imageUrl: "/media/i/abc.webp" });
+    expect(await prisma.notification.count({ where: { type: "BROADCAST" } })).toBe(0); // customers: no dashboard copy
+    expect(await canSeeBroadcast(row, row.id, null)).toBe(true);
+  });
+
+  it("restaurant broadcasts land in the dashboard notifications with the photo, visible only to them", async () => {
+    const r = await sendBroadcast({ audience: "restaurants", title: "New feature", body: "Upload reels in HD", imageUrl: "/media/i/promo.webp" }, admin.id);
+    expect(r).toMatchObject({ ok: true });
+    const row = await prisma.pushBroadcast.findFirstOrThrow();
+    expect(pushes.map((p) => p.payload.url)).toEqual([`/m/${row.id}`]);
+    const n = await prisma.notification.findFirstOrThrow({ where: { restaurantId: f.restaurant.id, type: "BROADCAST" } });
+    expect(n).toMatchObject({ audience: "RESTAURANT", title: "New feature", body: "Upload reels in HD", imageUrl: "/media/i/promo.webp", link: `/m/${row.id}`, readAt: null });
+    const owner = await prisma.user.findFirstOrThrow({ where: { staff: { some: { restaurantId: f.restaurant.id } } }, include: { roles: true } });
+    expect(await canSeeBroadcast(row, row.id, { id: owner.id, roles: owner.roles.map((x) => x.role) })).toBe(true);
+    expect(await canSeeBroadcast(row, row.id, { id: customer.id, roles: ["CUSTOMER"] })).toBe(false);
+    expect(await canSeeBroadcast(row, row.id, null)).toBe(false);
+    pushes.length = 0;
+    // one restaurant: only that restaurant gets it and can open it
+    const other = await makeRestaurant();
+    await sendBroadcast({ audience: "restaurant", restaurantId: f.restaurant.id, title: "Just for you" }, admin.id);
+    const one = await prisma.pushBroadcast.findFirstOrThrow({ where: { title: "Just for you" } });
+    expect(await prisma.notification.count({ where: { link: `/m/${one.id}` } })).toBe(1);
+    expect(await canSeeBroadcast(one, one.id, { id: other.user.id, roles: ["RESTAURANT"] })).toBe(false);
+    expect(await canSeeBroadcast(one, one.id, { id: owner.id, roles: ["RESTAURANT"] })).toBe(true);
   });
 
   it("targets one restaurant's staff or one person by email", async () => {
@@ -80,6 +104,10 @@ describe("admin push broadcasts", () => {
     pushes.length = 0;
     await sendBroadcast({ audience: "user", email: customer.email, title: "Hello" }, admin.id);
     expect(pushes.map((p) => p.endpoint).sort()).toEqual(["https://push.test/c1", "https://push.test/c2"]);
+    const hello = await prisma.pushBroadcast.findFirstOrThrow({ where: { title: "Hello" } });
+    expect(await canSeeBroadcast(hello, hello.id, { id: customer.id, roles: ["CUSTOMER"] })).toBe(true);
+    expect(await canSeeBroadcast(hello, hello.id, { id: admin.id, roles: ["ADMIN"] })).toBe(true);
+    expect(await canSeeBroadcast(hello, hello.id, null)).toBe(false);
   });
 });
 

@@ -76,6 +76,23 @@ export async function audienceStats() {
   return out;
 }
 
+export const messagePath = (broadcastId: string) => `/m/${broadcastId}`;
+
+/** Who may open a broadcast's message page: its audience (and admins). */
+export async function canSeeBroadcast(b: { audience: string; targetLabel: string | null }, broadcastId: string, user: { id: string; roles: string[] } | null) {
+  if (user?.roles.includes("ADMIN")) return true;
+  if (b.audience === "everyone" || b.audience === "customers") return true;
+  if (!user) return false;
+  if (b.audience === "restaurants") return (await prisma.restaurantStaff.count({ where: { userId: user.id } })) > 0;
+  // one restaurant / one person: they received it (stored notification, or the push went to their devices)
+  if (b.audience === "restaurant") {
+    const staff = await prisma.restaurantStaff.findMany({ where: { userId: user.id }, select: { restaurantId: true } });
+    return (await prisma.notification.count({ where: { link: messagePath(broadcastId), restaurantId: { in: staff.map((s) => s.restaurantId) } } })) > 0;
+  }
+  if (b.audience === "user") return (await prisma.auditLog.count({ where: { action: "push.broadcast", entityId: broadcastId, data: { path: ["targetUserId"], equals: user.id } } })) > 0;
+  return false;
+}
+
 export type BroadcastResult = { ok: true; people: number; devices: number; delivered: number } | { ok: false; error?: string; fieldErrors?: Record<string, string> };
 
 export async function sendBroadcast(raw: BroadcastInput, adminId: string): Promise<BroadcastResult> {
@@ -103,9 +120,18 @@ export async function sendBroadcast(raw: BroadcastInput, adminId: string): Promi
   const { people, devices } = await audienceReach(where);
   if (!devices) return { ok: false, error: d.audience === "user" || d.audience === "restaurant" ? "They haven't turned on notifications on any device yet." : "Nobody in this audience has turned on notifications yet." };
   const row = await prisma.pushBroadcast.create({ data: { audience: d.audience, targetLabel, title: d.title || null, body: d.body || null, imageUrl: d.imageUrl || null, link: d.link || null, recipients: people, devices, createdById: adminId } });
-  const delivered = await pushToDevices(where, { title: d.title || "numnum", body: d.body, url: d.link || "/", image: d.imageUrl ? absolute(d.imageUrl) : undefined, tag: `broadcast-${row.id}`, requireInteraction: true });
+  // Tapping the notification opens the message page (title, text, full photo, and the link as a button).
+  const page = messagePath(row.id);
+  // Restaurants also keep it in their dashboard notifications.
+  const restaurantIds =
+    d.audience === "restaurant" ? [d.restaurantId!] : d.audience === "restaurants" || d.audience === "everyone" ? (await prisma.restaurant.findMany({ where: { staff: { some: {} } }, select: { id: true } })).map((r) => r.id) : [];
+  if (restaurantIds.length)
+    await prisma.notification.createMany({
+      data: restaurantIds.map((restaurantId) => ({ audience: "RESTAURANT", restaurantId, type: "BROADCAST", title: d.title || "numnum", body: d.body || null, imageUrl: d.imageUrl || null, link: page })),
+    });
+  const delivered = await pushToDevices(where, { title: d.title || "numnum", body: d.body, url: page, image: d.imageUrl ? absolute(d.imageUrl) : undefined, tag: `broadcast-${row.id}`, requireInteraction: true });
   await prisma.pushBroadcast.update({ where: { id: row.id }, data: { delivered } });
-  await audit({ actorId: adminId, action: "push.broadcast", entityType: "push_broadcast", entityId: row.id, data: { audience: d.audience, targetLabel, people, devices, delivered } });
+  await audit({ actorId: adminId, action: "push.broadcast", entityType: "push_broadcast", entityId: row.id, data: { audience: d.audience, targetLabel, targetUserId: userId ?? null, people, devices, delivered } });
   return { ok: true, people, devices, delivered };
 }
 

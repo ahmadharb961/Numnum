@@ -28,10 +28,15 @@ export default async function NotificationsPage() {
               <div className={cn("flex gap-3 p-4", !n.readAt && "bg-brand-50/40")}>
                 <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.readAt ? "bg-transparent" : "bg-brand-500")} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold">{showText(t, n.title)}</div>
-                  {n.body && <div className="text-sm text-ink-muted">{showText(t, n.body)}</div>}
+                  {n.type === "BROADCAST" && <span className="mb-1 inline-block rounded-full bg-brand-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{t("Message from numnum")}</span>}
+                  <div className="text-sm font-semibold">{n.type === "BROADCAST" ? n.title : showText(t, n.title)}</div>
+                  {n.body && <div className={cn("text-sm text-ink-muted", n.type === "BROADCAST" && "line-clamp-2")}>{n.type === "BROADCAST" ? n.body : showText(t, n.body)}</div>}
                   <div className="mt-0.5 text-xs text-ink-muted">{formatDateTime(n.createdAt, lang)}</div>
                 </div>
+                {n.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={n.imageUrl} alt="" className="h-16 w-16 shrink-0 rounded-xl bg-black/5 object-cover" />
+                )}
               </div>
             );
             return <li key={n.id}>{n.link ? <Link href={n.link}>{body}</Link> : body}</li>;

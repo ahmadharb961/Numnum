@@ -218,4 +218,10 @@ export const AR5: Record<string, string> = {
   "Reports come from accounts so our team can follow up and keep numnum free of spam.": "تصدر البلاغات من حسابات حتى يتمكن فريقنا من المتابعة وإبقاء numnum خالياً من الرسائل المزعجة.",
   "Report this reel": "الإبلاغ عن هذا الفيديو",
   "The verified badge now shows on your profile.": "تظهر شارة التوثيق الآن على صفحتك.",
+  "This message isn't for this account": "هذه الرسالة ليست لهذا الحساب",
+  "Log in with the account that received it.": "سجّل الدخول بالحساب الذي استلمها.",
+  "Message from numnum": "رسالة من numnum",
+  "Open link": "فتح الرابط",
+  "All notifications": "كل الإشعارات",
+  "Back to numnum": "العودة إلى numnum",
 };

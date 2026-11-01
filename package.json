@@ -16,7 +16,7 @@
     "billing:run": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/run-billing.ts",
     "postinstall": "prisma generate",
     "worker": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/worker.ts",
-    "test:e2e": "node e2e/customer-strict.js && node e2e/admin-verify.js && node e2e/launch-check.js && node e2e/features.js && node e2e/business.js",
+    "test:e2e": "node e2e/customer-strict.js && node e2e/admin-verify.js && node e2e/broadcast.js && node e2e/launch-check.js && node e2e/features.js && node e2e/business.js",
     "build:local": "prisma generate && next build",
     "db:setup": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs prisma/seed.ts",
     "demo:media": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/demo-media.ts"

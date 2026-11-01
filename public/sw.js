@@ -3,7 +3,7 @@
 // - images/posters: stale-while-revalidate (bounded)
 // - pages: handled by the browser; offline page when the device is offline
 // - API, uploads and videos: never cached (videos use HTTP range requests)
-const VERSION = "nn-v9";
+const VERSION = "nn-v10";
 const STATIC = `${VERSION}-static`;
 const IMAGES = `${VERSION}-images`;
 const OFFLINE_URL = "/offline.html";
@@ -85,9 +85,13 @@ self.addEventListener("notificationclick", (event) => {
       const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const win = list.find((c) => c.url.startsWith(self.location.origin));
       if (!win) return self.clients.openWindow(url);
-      const focused = await win.focus().catch(() => win);
-      if ("navigate" in focused) return focused.navigate(url).catch(() => self.clients.openWindow(url));
-      return self.clients.openWindow(url);
+      try {
+        await win.focus();
+      } catch {
+        return self.clients.openWindow(url);
+      }
+      // The open page navigates itself (WindowClient.navigate is unreliable on iPhone).
+      win.postMessage({ type: "nn:open", url });
     })(),
   );
 });
