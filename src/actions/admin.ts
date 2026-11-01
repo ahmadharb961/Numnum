@@ -78,6 +78,29 @@ export async function decideVerificationAction(verificationId: string, status: E
   }, "Decision saved");
 }
 
+/** Admin verifies a restaurant directly (no request needed), after checking its business documents. */
+export async function verifyRestaurantAction(restaurantId: string, note: string) {
+  const { user, ip } = await admin();
+  return wrap(async () => {
+    if (!note.trim()) throw new Error("Say how you checked the business (e.g. commercial registration seen)");
+    const now = new Date();
+    const r = await prisma.restaurant.findUniqueOrThrow({ where: { id: restaurantId }, select: { slug: true, verificationStatus: true } });
+    if (r.verificationStatus === "APPROVED") return;
+    await prisma.$transaction([
+      prisma.restaurant.update({ where: { id: restaurantId }, data: { verificationStatus: "APPROVED" } }),
+      // close any open request, and keep a record of this decision
+      prisma.restaurantVerification.updateMany({ where: { restaurantId, status: { in: ["PENDING", "INFO_REQUIRED"] } }, data: { status: "APPROVED", adminNote: note, reviewedById: user.id, reviewedAt: now } }),
+      prisma.restaurantVerification.create({ data: { restaurantId, status: "APPROVED", adminNote: note, reviewedById: user.id, reviewedAt: now } }),
+    ]);
+    await audit({ actorId: user.id, action: "verification.admin_verify", entityType: "restaurant", entityId: restaurantId, data: { note, before: r.verificationStatus }, ipHash: ip });
+    await notifyRestaurant(restaurantId, { type: "VERIFICATION_UPDATE", title: "You're verified! ✓", body: "The verified badge now shows on your profile.", link: "/dashboard/verification" }, undefined, { email: true });
+    revalidatePath(`/admin/restaurants/${restaurantId}`);
+    revalidatePath("/admin/restaurants");
+    revalidatePath("/admin/verifications");
+    revalidatePath(`/r/${r.slug}`);
+  }, "Restaurant verified");
+}
+
 export async function revokeVerificationAction(restaurantId: string, note: string) {
   const { user, ip } = await admin();
   return wrap(async () => {

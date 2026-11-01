@@ -9,13 +9,15 @@ import { RestaurantAdminForm } from "@/components/admin/restaurant-admin-form";
 import { AdjustmentForm } from "@/components/admin/adjustment-form";
 import { StatusBadge } from "@/components/dashboard/invoice-status";
 import { Badge, StatCard } from "@/components/ui/misc";
-import { setRestaurantStatusAction, revokeVerificationAction } from "@/actions/admin";
+import { setRestaurantStatusAction, revokeVerificationAction, verifyRestaurantAction } from "@/actions/admin";
 import { formatMoney, formatRate } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { deliveryRadiusKm, normalizeZones } from "@/lib/geo";
 import { compactNumber, formatDate, formatDateTime, periodLabel } from "@/lib/utils";
 
 export const metadata = { title: "Restaurant" };
+
+const VERIFICATION_LABEL: Record<string, string> = { APPROVED: "✓ verified", PENDING: "verification requested", INFO_REQUIRED: "verification: info needed", REJECTED: "verification rejected", REVOKED: "badge revoked", NOT_REQUESTED: "not verified" };
 
 export default async function AdminRestaurant({ params }: { params: Promise<{ id: string }> }) {
   const id = (await params).id;
@@ -40,7 +42,7 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
         <span className="flex flex-wrap items-center gap-2">
           {r.businessName}
           <Badge tone={r.status === "ACTIVE" ? "green" : r.status === "SUSPENDED" ? "red" : "amber"}>{r.status.toLowerCase()}</Badge>
-          <Badge tone={r.verificationStatus === "APPROVED" ? "blue" : "gray"}>{r.verificationStatus.toLowerCase()}</Badge>
+          <Badge tone={r.verificationStatus === "APPROVED" ? "blue" : r.verificationStatus === "PENDING" ? "amber" : "gray"}>{VERIFICATION_LABEL[r.verificationStatus] ?? r.verificationStatus.toLowerCase()}</Badge>
           {reports > 0 && <Badge tone="red">{reports} open reports</Badge>}
         </span>
       }
@@ -64,9 +66,13 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
               Suspend
             </ActionButton>
           )}
-          {r.verificationStatus === "APPROVED" && (
+          {r.verificationStatus === "APPROVED" ? (
             <ActionButton action={revokeVerificationAction.bind(null, r.id)} prompt="Why revoke the verified badge?">
               Revoke badge
+            </ActionButton>
+          ) : (
+            <ActionButton variant="primary" action={verifyRestaurantAction.bind(null, r.id)} prompt="How did you check this business? (kept in the audit log, e.g. commercial registration seen)">
+              Mark as verified
             </ActionButton>
           )}
         </>
