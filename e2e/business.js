@@ -71,11 +71,14 @@ async function sweep(page, paths, errors) {
   const admin = await login(actx, "admin@numnum.app", "admin1234");
   console.log("admin landed:", new URL(admin.url()).pathname);
   if (!process.env.SKIP) {
-  await admin.goto("/admin/payments");
+  await admin.goto("/admin/payments", { waitUntil: "networkidle" });
+  if (!(await admin.getByRole("button", { name: /^Approve/ }).count())) console.log("no Whish payment waiting (the demo one was approved in an earlier run): approval step skipped");
+  else {
   await admin.getByRole("button", { name: /^Approve/ }).isDisabled().then((d) => console.log("approve disabled before confirming funds:", d));
   await admin.check("text=I confirmed the funds were received in the Whish account");
   await admin.getByRole("button", { name: /^Approve/ }).click();
   await admin.waitForTimeout(2000);
+  }
   }
   await admin.goto(`/admin/invoices/${invId}`);
   console.log("invoice status after approval:", await admin.locator("section span.rounded-full").first().textContent());
