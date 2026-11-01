@@ -1,4 +1,6 @@
-// Admin verifies a restaurant directly: note required, badge shown, audit + notification, then restored.
+// Admin flows: verify a restaurant directly (note required, badge, audit, notification, then restored)
+// and "Manage as admin" there and back. Run it through a proxy too (like Hostinger) to catch
+// redirects that point at the server's internal address.
 //   BASE_URL=http://localhost:3000 node e2e/admin-verify.js
 const { chromium } = require("playwright");
 const { PrismaClient } = require("@prisma/client");
@@ -35,6 +37,21 @@ let fails = 0; const check = (c, m, x) => { console.log(`${c ? "✓" : "✗"} ${
   await g.screenshot({ path: `${S}/verify-public.png` });
   await p.goto("/admin/restaurants?filter=verified", { waitUntil: "networkidle" });
   check((await p.locator("tbody").innerText()).includes("Pizza Forno"), "listed under the Verified filter");
+  // Manage as admin → the restaurant's dashboard with the admin bar → Back to admin
+  await p.goto(`/admin/restaurants/${r.id}`, { waitUntil: "networkidle" });
+  await Promise.all([p.waitForURL(/\/dashboard/, { timeout: 15000 }).catch(() => {}), p.getByRole("button", { name: /Manage as admin/ }).click()]);
+  const u1 = new URL(p.url());
+  check(u1.origin === new URL(BASE).origin && u1.pathname.startsWith("/dashboard"), "Manage as admin opens the dashboard on the same site", p.url());
+  check(await p.getByText(/Admin: managing/).count() > 0 && (await p.locator("body").innerText()).includes("Pizza Forno"), "dashboard shows the admin bar for Pizza Forno");
+  await p.screenshot({ path: `${S}/manage-dashboard.png` });
+  await p.goto("/dashboard/menu", { waitUntil: "networkidle" });
+  check(new URL(p.url()).pathname === "/dashboard/menu" && (await p.locator("body").innerText()).includes("Pizza Forno"), "admin can open the restaurant's menu manager");
+  await Promise.all([p.waitForURL(/\/admin\/restaurants\//, { timeout: 15000 }).catch(() => {}), p.getByRole("button", { name: "Back to admin" }).click()]);
+  const u2 = new URL(p.url());
+  check(u2.origin === new URL(BASE).origin && u2.pathname === `/admin/restaurants/${r.id}`, "Back to admin returns to the restaurant's admin page", p.url());
+  await p.goto("/dashboard", { waitUntil: "networkidle" });
+  check(!(await p.getByText(/Admin: managing/).count()), "after leaving, the admin is no longer managing the restaurant");
+
   // put it back as it was
   await db.restaurant.update({ where: { id: r.id }, data: { verificationStatus: r.verificationStatus } });
   await b.close(); await db.$disconnect();

@@ -8,6 +8,15 @@ import { formatKm } from "@/lib/geo";
 
 type Texts = Record<string, { k: string; v?: Record<string, string | number> }>;
 
+/**
+ * Redirect to a path on this site. The Location stays relative: behind a proxy (Hostinger) the
+ * request URL is the server's internal address (e.g. http://0.0.0.0:3000), not the public domain.
+ */
+export function seeOther(path: string) {
+  if (!path.startsWith("/") || path.startsWith("//")) path = "/";
+  return new NextResponse(null, { status: 303, headers: { Location: path } });
+}
+
 export function json(data: unknown, init?: number | ResponseInit) {
   return NextResponse.json(data, typeof init === "number" ? { status: init } : init);
 }
