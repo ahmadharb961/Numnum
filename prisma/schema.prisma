@@ -34,6 +34,7 @@ model User {
   updatedAt    DateTime  @updatedAt
   lastLoginAt  DateTime?
   locale       String?   // "en" | "ar": language of the app, emails and notifications
+  emailVerifiedAt DateTime? // set when they open the link in the confirmation email
 
   roles         UserRole[]
   orders        Order[]

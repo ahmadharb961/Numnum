@@ -17,6 +17,10 @@ vi.mock("@/server/email", () => ({
     emails.push({ to, subject, text });
     return true;
   },
+  sendRichEmail: async (to: string, subject: string, _html: string, text: string) => {
+    emails.push({ to, subject, text });
+    return true;
+  },
 }));
 
 import { prisma } from "@/server/db";

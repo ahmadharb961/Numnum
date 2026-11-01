@@ -7,6 +7,7 @@ import Link from "next/link";
 import { NewOrderAlert } from "@/components/dashboard/new-order-alert";
 import { InstallGate } from "@/components/dashboard/install-gate";
 import { getT } from "@/i18n/server";
+import { VerifyEmailBanner } from "@/components/dashboard/verify-email-banner";
 
 export const metadata: Metadata = {
   title: { default: "Dashboard", template: "%s · numnum for restaurants" },
@@ -19,9 +20,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const t = await getT();
   const ctx = await requireRestaurant();
   const r = ctx.restaurant;
-  const [unread, pendingOrders] = await Promise.all([
+  const [unread, pendingOrders, me] = await Promise.all([
     prisma.notification.count({ where: { restaurantId: r.id, audience: "RESTAURANT", readAt: null } }),
     prisma.order.count({ where: { restaurantId: r.id, status: "PLACED" } }),
+    prisma.user.findUnique({ where: { id: ctx.user.id }, select: { email: true, emailVerifiedAt: true } }),
   ]);
   return (
     <div className="min-h-dvh bg-cream">
@@ -41,6 +43,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="flex justify-end px-4 pt-3 lg:px-8">
           <NewOrderAlert initialCount={pendingOrders} />
         </div>
+        {!ctx.asAdmin && me && !me.emailVerifiedAt && (
+          <div className="px-4 pt-4 lg:px-8">
+            <VerifyEmailBanner email={me.email} />
+          </div>
+        )}
         {r.status === "SUSPENDED" && (
           <div className="px-4 pt-4 lg:px-8">
             <Alert tone="red">

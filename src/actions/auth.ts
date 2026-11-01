@@ -14,6 +14,8 @@ import { normalizePhone, normalizeMobile } from "@/lib/phone";
 import { uniqueSlug } from "@/server/restaurants";
 import { notifyAdmins } from "@/server/notifications";
 import { audit } from "@/server/audit";
+import { sendRestaurantWelcome, sendVerifyEmail } from "@/server/restaurant-emails";
+import { getLocale } from "@/i18n/server";
 import { cookies } from "next/headers";
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string>; ok?: boolean; message?: string } | undefined;
@@ -102,7 +104,7 @@ export async function registerRestaurantAction(_: FormState, form: FormData): Pr
   const result = await prisma.$transaction(async (tx) => {
     const user =
       existing ??
-      (await tx.user.create({ data: { email: d.email, name: d.ownerName, phone: phone.e164, passwordHash: await hashPassword(d.password) } }));
+      (await tx.user.create({ data: { email: d.email, name: d.ownerName, phone: phone.e164, passwordHash: await hashPassword(d.password), locale: await getLocale() } }));
     if (!existing?.roles.some((r) => r.role === "RESTAURANT")) await tx.userRole.create({ data: { userId: user.id, role: "RESTAURANT" } });
     const restaurant = await tx.restaurant.create({
       data: {
@@ -121,6 +123,10 @@ export async function registerRestaurantAction(_: FormState, form: FormData): Pr
   });
   await audit({ actorId: result.user.id, action: "restaurant.register", entityType: "restaurant", entityId: result.restaurant.id });
   await notifyAdmins({ type: "NEW_RESTAURANT", title: `New restaurant registered: ${d.displayName}`, link: `/admin/restaurants/${result.restaurant.id}` });
+  // Confirm the email first; the welcome email goes out once it's confirmed (right away for an
+  // account that's already confirmed). Best effort: never blocks sign-up.
+  const verified = (await prisma.user.findUnique({ where: { id: result.user.id }, select: { emailVerifiedAt: true } }))?.emailVerifiedAt;
+  void (verified ? sendRestaurantWelcome(result.restaurant.id) : sendVerifyEmail(result.user.id)).catch((e) => console.error("[email] restaurant signup", e));
   if (!session) await createSession(result.user.id, (await headers()).get("user-agent"));
   (await cookies()).set(RESTAURANT_COOKIE, result.restaurant.id, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" });
   redirect("/dashboard?welcome=1");

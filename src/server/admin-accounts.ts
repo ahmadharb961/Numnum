@@ -7,6 +7,7 @@ import { hashPassword, validatePassword } from "./passwords";
 import { uniqueSlug } from "./restaurants";
 import { normalizeMobile, normalizePhone } from "@/lib/phone";
 import { isValidLatLng, MAX_ZONE_KM } from "@/lib/geo";
+import { sendRestaurantWelcome } from "./restaurant-emails";
 
 // Accounts created by a platform admin: complete restaurants (owner + profile + delivery +
 // commission, optionally live right away) and customer accounts.
@@ -79,7 +80,8 @@ export async function createRestaurantByAdmin(adminId: string, input: AdminResta
   const settings = await getSettings();
   const slug = await uniqueSlug(d.displayName);
   const restaurant = await prisma.$transaction(async (tx) => {
-    const owner = existing ?? (await tx.user.create({ data: { email: d.ownerEmail, name: d.ownerName, phone: phone.e164, passwordHash: await hashPassword(d.ownerPassword!) } }));
+    // The admin set this account up (and checked the email), so it counts as confirmed.
+    const owner = existing ?? (await tx.user.create({ data: { email: d.ownerEmail, name: d.ownerName, phone: phone.e164, passwordHash: await hashPassword(d.ownerPassword!), emailVerifiedAt: new Date() } }));
     await tx.userRole.upsert({ where: { userId_role: { userId: owner.id, role: "RESTAURANT" } }, create: { userId: owner.id, role: "RESTAURANT" }, update: {} });
     return tx.restaurant.create({
       data: {
@@ -110,6 +112,7 @@ export async function createRestaurantByAdmin(adminId: string, input: AdminResta
       },
     });
   });
+  void sendRestaurantWelcome(restaurant.id).catch((e) => console.error("[email] welcome", e));
   await audit({ actorId: adminId, action: "restaurant.admin_create", entityType: "restaurant", entityId: restaurant.id, data: { ...d, ownerPassword: undefined, ownerExisted: !!existing } });
   return { ok: true, id: restaurant.id, message: d.live ? "Restaurant created and live" : "Restaurant created as a draft" };
 }

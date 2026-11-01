@@ -29,6 +29,19 @@ export function emailHtml(text: string) {
   return `<!doctype html><html><body style="margin:0;background:#fdf8f2;padding:24px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px"><tr><td style="padding:0 4px 16px">${logo}</td></tr><tr><td style="background:#ffffff;border-radius:16px;padding:24px;font:15px/1.6 Arial,Helvetica,sans-serif;color:#16120f">${body}</td></tr><tr><td style="padding:16px 4px;font:12px Arial,sans-serif;color:#7a706b">numnum · Watch it. Crave it. Order it.</td></tr></table></td></tr></table></body></html>`;
 }
 
+/** A designed HTML email (with a plain-text version for clients that don't show HTML). */
+export async function sendRichEmail(to: string, subject: string, html: string, text: string): Promise<boolean> {
+  const t = getTransport();
+  if (!t) return false;
+  try {
+    await t.sendMail({ from: process.env.MAIL_FROM || process.env.SMTP_USER, to, subject, text, html });
+    return true;
+  } catch (e) {
+    console.error("[email] failed", e);
+    return false;
+  }
+}
+
 export async function sendEmail(to: string, subject: string, text: string): Promise<boolean> {
   const t = getTransport();
   if (!t) return false;

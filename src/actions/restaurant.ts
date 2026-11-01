@@ -256,3 +256,13 @@ export async function markNotificationsReadAction(): Promise<ActionResult> {
 }
 
 
+
+/** Resends the email confirmation link (dashboard reminder). */
+export async function resendVerifyEmailAction(): Promise<ActionResult> {
+  const ctx = await requireRestaurant();
+  const { rateLimit } = await import("@/server/rate-limit");
+  if (!rateLimit(`verify-email:${ctx.user.id}`, 3, 60 * 60_000).ok) return { ok: false, error: "You can resend 3 times per hour. Check your spam folder too." };
+  const { sendVerifyEmail } = await import("@/server/restaurant-emails");
+  const sent = await sendVerifyEmail(ctx.user.id);
+  return sent ? { ok: true, message: "Sent: check your inbox (and spam)" } : { ok: false, error: "We couldn't send the email right now. Try again later." };
+}
