@@ -19,7 +19,20 @@ export const metadata: Metadata = {
   applicationName: "numnum",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "numnum", statusBarStyle: "black-translucent" },
-  icons: { icon: "/icons/v2/icon.svg", apple: "/icons/v2/apple-touch-icon.png" },
+  // Every browser gets an icon it can show: .ico (all browsers, Google results), PNG (Safari and
+  // Android browsers ignore SVG favicons), SVG (sharp on modern desktops). "?v=" busts old caches.
+  icons: {
+    icon: [
+      { url: "/favicon.ico?v=3", sizes: "16x16 32x32 48x48" },
+      { url: "/icons/v2/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/v2/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icons/v2/favicon-96.png", sizes: "96x96", type: "image/png" },
+      { url: "/icons/v2/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/v2/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico?v=3",
+    apple: [{ url: "/icons/v2/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   openGraph: { type: "website", siteName: "numnum", locale: "en_LB", images: [{ url: "/og.png", width: 1200, height: 630, alt: "numnum — Watch it. Crave it. Order it." }] },
   twitter: { card: "summary_large_image", images: ["/og.png"] },
   formatDetection: { telephone: false },

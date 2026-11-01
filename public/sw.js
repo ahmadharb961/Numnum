@@ -3,13 +3,13 @@
 // - images/posters: stale-while-revalidate (bounded)
 // - pages: handled by the browser; offline page when the device is offline
 // - API, uploads and videos: never cached (videos use HTTP range requests)
-const VERSION = "nn-v7";
+const VERSION = "nn-v8";
 const STATIC = `${VERSION}-static`;
 const IMAGES = `${VERSION}-images`;
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(STATIC).then((c) => c.addAll([OFFLINE_URL, "/icons/v2/icon-192.png"])).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(STATIC).then((c) => c.addAll([OFFLINE_URL, "/icons/v2/icon-192.png", "/icons/v2/favicon-32.png"])).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {

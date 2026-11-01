@@ -13,6 +13,7 @@ const BASE = process.env.BASE_URL || "http://localhost:3000";
 const SHOTS = process.env.SHOTS || require("os").tmpdir();
 const db = new PrismaClient();
 const problems = [];
+const checkedIcons = new Set();
 let pages = 0;
 const flag = (where, what) => problems.push(`${where} — ${what}`);
 
@@ -122,6 +123,21 @@ async function visit(ctx, label, path, opts = {}) {
     const dir = await page.evaluate(() => document.documentElement.dir);
     if (dir !== "rtl") flag(where, `dir="${dir}" (expected rtl)`);
     for (const t of await englishLeftovers(page)) flag(where, `English left in Arabic: "${t.slice(0, 90)}"`);
+  }
+  // Favicon on every page, in formats every browser shows (.ico + PNG; Safari ignores SVG ones).
+  const icons = await page.evaluate(() => ({
+    icon: [...document.querySelectorAll('link[rel~="icon"]')].map((l) => l.getAttribute("href")),
+    apple: [...document.querySelectorAll('link[rel="apple-touch-icon"]')].map((l) => l.getAttribute("href")),
+  }));
+  if (!icons.icon.some((h) => /favicon\.ico/.test(h))) flag(where, "no favicon.ico link");
+  if (!icons.icon.some((h) => /\.png/.test(h))) flag(where, "no PNG favicon link");
+  if (!icons.apple.length) flag(where, "no apple-touch-icon link");
+  for (const h of [...icons.icon, ...icons.apple]) {
+    if (checkedIcons.has(h)) continue;
+    checkedIcons.add(h);
+    const r = await page.request.get(h);
+    const type = r.headers()["content-type"] || "";
+    if (r.status() !== 200 || !/^image\//.test(type)) flag(where, `icon ${h} → HTTP ${r.status()} ${type}`);
   }
   const title = await page.title();
   if (!title || /undefined|null/.test(title)) flag(where, `bad page title "${title}"`);
@@ -390,10 +406,14 @@ async function visit(ctx, label, path, opts = {}) {
   if (ONLY.includes("seo")) {
     const ctx = await desktop();
     const pg = await ctx.newPage();
-    for (const p of ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/sw.js", "/offline.html", "/icons/v2/icon-192.png", "/apple-touch-icon.png"]) {
+    for (const p of ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/sw.js", "/offline.html", "/icons/v2/icon-192.png", "/apple-touch-icon.png", "/favicon.ico", "/favicon.ico?v=3"]) {
       const r = await pg.goto(p).catch(() => null);
       if (!r || r.status() !== 200) flag(`[static] ${p}`, `HTTP ${r ? r.status() : "failed"}`);
     }
+    const fav = await pg.request.get("/favicon.ico");
+    if (!/image\//.test(fav.headers()["content-type"] || "")) flag("[static] /favicon.ico", `content-type ${fav.headers()["content-type"]}`);
+    await pg.goto("/offline.html");
+    if (!(await pg.locator('link[rel~="icon"][href*="favicon.ico"]').count())) flag("[static] /offline.html", "no favicon link");
     const r = await pg.goto("/");
     const h = r.headers();
     for (const k of ["x-content-type-options", "referrer-policy"]) if (!h[k]) flag("[headers] /", `missing ${k}`);

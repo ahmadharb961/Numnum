@@ -17,6 +17,29 @@ const iconSvg = ({ rx = 0, w = 0.66 } = {}) => {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}"><rect width="${s}" height="${s}" rx="${rx}" fill="${ORANGE}"/><path fill="#fff" transform="translate(${(s - mw) / 2} ${(s - mh) / 2}) scale(${sc})" d="${STACK}"/></svg>`;
 };
 
+/** ICO file holding PNG images (supported by every current browser). */
+function ico(pngs) {
+  const head = Buffer.alloc(6 + 16 * pngs.length);
+  head.writeUInt16LE(0, 0);
+  head.writeUInt16LE(1, 2); // icon
+  head.writeUInt16LE(pngs.length, 4);
+  let offset = head.length;
+  pngs.forEach((buf, i) => {
+    const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20); // from the PNG IHDR chunk
+    const e = 6 + 16 * i;
+    head.writeUInt8(w >= 256 ? 0 : w, e);
+    head.writeUInt8(h >= 256 ? 0 : h, e + 1);
+    head.writeUInt8(0, e + 2); // palette
+    head.writeUInt8(0, e + 3);
+    head.writeUInt16LE(1, e + 4); // planes
+    head.writeUInt16LE(32, e + 6); // bits per pixel
+    head.writeUInt32LE(buf.length, e + 8);
+    head.writeUInt32LE(offset, e + 12);
+    offset += buf.length;
+  });
+  return Buffer.concat([head, ...pngs]);
+}
+
 const out = (p, data) => {
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, data);
@@ -47,6 +70,10 @@ const out = (p, data) => {
   await png(iconSvg({ w: 0.64 }), 180, 180, "public/apple-touch-icon.png", false);
   await png(iconSvg({ w: 0.56 }), 512, 512, "public/icons/v2/maskable-512.png", false);
   await png(iconSvg({ rx: 112, w: 0.8 }), 32, 32, "public/favicon.png");
+  // Browser tab icons: PNGs (Safari and some Android browsers don't show SVG favicons) and a
+  // classic multi-size /favicon.ico, which browsers and search engines request on their own.
+  for (const s of [16, 32, 48, 96]) await png(iconSvg({ rx: 112, w: 0.8 }), s, s, `public/icons/v2/favicon-${s}.png`);
+  out(path.join(root, "public/favicon.ico"), ico([16, 32, 48].map((s) => fs.readFileSync(path.join(root, `public/icons/v2/favicon-${s}.png`)))));
   // Emails can't show SVG: a PNG at 2× the size it's shown (96 px wide).
   await png(stackSvg(ORANGE), 192, Math.round((192 * STACK_H) / STACK_W), "public/logo/numnum-email.png");
   // Downloads for social media and print.
