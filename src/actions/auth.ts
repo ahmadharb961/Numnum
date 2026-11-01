@@ -10,7 +10,7 @@ import { claimDeviceOrders } from "@/server/orders";
 import { deviceId } from "@/server/request";
 import { rateLimit } from "@/server/rate-limit";
 import { clientIp } from "@/server/request";
-import { normalizePhone } from "@/lib/phone";
+import { normalizePhone, normalizeMobile } from "@/lib/phone";
 import { uniqueSlug } from "@/server/restaurants";
 import { notifyAdmins } from "@/server/notifications";
 import { audit } from "@/server/audit";
@@ -58,12 +58,10 @@ export async function registerCustomerAction(_: FormState, form: FormData): Prom
   const { name, email, password } = parsed.data;
   const pwErr = validatePassword(password);
   if (pwErr) return { fieldErrors: { password: pwErr } };
-  let phone: string | null = null;
-  if (parsed.data.phone) {
-    const p = normalizePhone(parsed.data.phone);
-    if (!p.ok) return { fieldErrors: { phone: p.error } };
-    phone = p.e164;
-  }
+  // A mobile number is required: restaurants call or WhatsApp customers about their orders.
+  const mobile = normalizeMobile(parsed.data.phone ?? "");
+  if (!mobile.ok) return { fieldErrors: { phone: mobile.error } };
+  const phone = mobile.e164;
   if (await prisma.user.findUnique({ where: { email } })) return { fieldErrors: { email: "An account with this email already exists" } };
   const user = await prisma.user.create({ data: { email, name, phone, passwordHash: await hashPassword(password), roles: { create: { role: "CUSTOMER" } } } });
   await createSession(user.id, (await headers()).get("user-agent"));
@@ -133,12 +131,8 @@ export async function updateCustomerProfileAction(_: FormState, form: FormData):
   const name = String(form.get("name") || "").trim();
   const phoneRaw = String(form.get("phone") || "").trim();
   if (name.length < 2) return { fieldErrors: { name: "Enter your name" } };
-  let phone: string | null = null;
-  if (phoneRaw) {
-    const p = normalizePhone(phoneRaw);
-    if (!p.ok) return { fieldErrors: { phone: p.error } };
-    phone = p.e164;
-  }
-  await prisma.user.update({ where: { id: user.id }, data: { name, phone } });
+  const mobile = normalizeMobile(phoneRaw);
+  if (!mobile.ok) return { fieldErrors: { phone: mobile.error } };
+  await prisma.user.update({ where: { id: user.id }, data: { name, phone: mobile.e164 } });
   return { ok: true, message: "Profile updated" };
 }

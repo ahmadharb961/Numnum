@@ -9,7 +9,7 @@ import { distanceKm, formatKm, type DeliveryZone } from "@/lib/geo";
 import { writeLocation } from "./location-picker";
 import { useCart, lineTotal } from "./cart";
 import { formatMoney, minorDigits } from "@/lib/money";
-import { normalizePhone } from "@/lib/phone";
+import { normalizeMobile } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Alert, Field, Spinner } from "@/components/ui/misc";
@@ -144,7 +144,7 @@ export function Checkout() {
   function validateDetails() {
     const e: Record<string, string> = {};
     if (d.name.trim().length < 2) e.name = "Enter your full name";
-    const p = normalizePhone(d.phone);
+    const p = normalizeMobile(d.phone);
     if (!p.ok) e.phone = p.error;
     if (method === "DELIVERY") {
       if (!savedAddress && d.address.trim().length < 4) e.address = "Enter your street address";
@@ -281,7 +281,7 @@ export function Checkout() {
               <Field label="Full name" error={errors.name} htmlFor="name">
                 <input id="name" className="input" autoComplete="name" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} />
               </Field>
-              <Field label="Phone number" error={errors.phone} hint="The restaurant or driver may call you" htmlFor="phone">
+              <Field label="Mobile number" error={errors.phone} hint="The restaurant contacts you on WhatsApp or by phone about this order" htmlFor="phone">
                 <input id="phone" className="input" type="tel" inputMode="tel" autoComplete="tel" placeholder="70 123 456" value={d.phone} onChange={(e) => setD({ ...d, phone: e.target.value })} />
               </Field>
             </div>

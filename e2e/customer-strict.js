@@ -159,6 +159,10 @@ async function chooseDelivery(page) {
   await c.getByRole("button", { name: "Review order" }).click();
   await c.waitForTimeout(400);
   check((await c.locator("[data-error], .text-red-600").count()) > 0, "invalid phone shows an error");
+  await c.fill("#phone", "01 234 567");
+  await c.getByRole("button", { name: "Review order" }).click();
+  await c.waitForTimeout(400);
+  check((await c.getByText(/Enter a mobile number/).count()) > 0, "a landline is refused: a mobile number is required");
   await c.fill("#phone", "71 234 567");
   await c.getByRole("button", { name: "Review order" }).click();
   await c.waitForTimeout(400);
@@ -217,6 +221,11 @@ async function chooseDelivery(page) {
   check(rBody.includes("pays with $50.00, bring $20.50 change"), "restaurant sees 'pays with $50.00, bring $20.50 change'");
   check(rBody.includes("Bliss Street"), "restaurant sees the address");
   await shot(r, "restaurant-new");
+  // One tap to reach the customer on WhatsApp (ready message with the order number) or by phone
+  const wa = r.getByRole("link", { name: /^WhatsApp Strict Tester$/ }).first();
+  const waHref = (await wa.getAttribute("href").catch(() => "")) || "";
+  check(waHref.startsWith("https://wa.me/96171234567?text=") && decodeURIComponent(waHref).includes(ref), "green WhatsApp button opens the customer's number with the order number", waHref);
+  check((await r.getByRole("link", { name: /^Call Strict Tester$/ }).first().getAttribute("href")) === "tel:+96171234567", "Call button dials the customer");
   const accept = r.getByRole("button", { name: /Accept · \d+ min/ }).first();
   check(await accept.isVisible(), "green 'Accept · N min' button");
   check(await r.getByRole("button", { name: /^Reject$/ }).first().isVisible(), "red 'Reject' button");

@@ -74,7 +74,7 @@ export function CustomerRegisterForm({ next }: { next?: string }) {
       <Field label="Email" error={fe.email} htmlFor="email">
         <input id="email" name="email" defaultValue={v.email} type="email" autoComplete="email" required className="input" />
       </Field>
-      <Field label="Phone" error={fe.phone} hint="The restaurant and driver use it to reach you about your orders." htmlFor="phone">
+      <Field label="Mobile number" error={fe.phone} hint="Restaurants contact you on WhatsApp or by phone about your orders." htmlFor="phone">
         <input id="phone" name="phone" defaultValue={v.phone} type="tel" autoComplete="tel" placeholder="70 123 456" className="input" required />
       </Field>
       <Field label="Password" error={fe.password} hint="At least 8 characters" htmlFor="password">

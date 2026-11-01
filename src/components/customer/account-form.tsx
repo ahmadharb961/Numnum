@@ -18,8 +18,8 @@ export function AccountForm({ name, phone, email }: { name: string; phone: strin
       <Field label="Name" error={state?.fieldErrors?.name}>
         <input name="name" className="input" defaultValue={name} />
       </Field>
-      <Field label="Phone" error={state?.fieldErrors?.phone} hint="Used to link your reviews to orders you placed with this number.">
-        <input name="phone" type="tel" className="input" defaultValue={phone} />
+      <Field label="Mobile number" error={state?.fieldErrors?.phone} hint="Restaurants contact you on WhatsApp or by phone about your orders.">
+        <input name="phone" type="tel" className="input" defaultValue={phone} required placeholder="70 123 456" />
       </Field>
       <Button type="submit" block loading={pending}>
         {t("Save")}

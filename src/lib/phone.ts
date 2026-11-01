@@ -40,6 +40,17 @@ export function normalizePhone(input: string): PhoneResult {
   return { ok: true, e164: digits, national: false };
 }
 
+/**
+ * A number the restaurant can reach on WhatsApp: Lebanese mobiles, or international numbers
+ * (we can't tell mobile from landline abroad). Lebanese landlines are refused.
+ */
+export function normalizeMobile(input: string): PhoneResult {
+  const p = normalizePhone(input);
+  if (!p.ok) return (input || "").trim() ? p : { ok: false, error: "Enter your mobile number" };
+  if (p.e164.startsWith("961") && !isLebaneseMobile(p.e164)) return { ok: false, error: "Enter a mobile number (e.g. 70 123 456): the restaurant contacts you on WhatsApp" };
+  return p;
+}
+
 export function isLebaneseMobile(e164: string): boolean {
   return e164.startsWith("961") && LB_MOBILE.test(e164.slice(3));
 }

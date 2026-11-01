@@ -21,3 +21,19 @@ describe("phone normalization", () => {
     expect(normalizePhone(input).ok).toBe(false);
   });
 });
+
+import { normalizeMobile } from "@/lib/phone";
+
+describe("mobile numbers (required to order: restaurants reach customers on WhatsApp)", () => {
+  it.each(["70 123 456", "03 123 456", "+961 71 234 567", "0096181123456", "+44 7700 900123"])("accepts %s", (input) => {
+    expect(normalizeMobile(input).ok).toBe(true);
+  });
+  it.each(["01 234 567", "04 123 456", "+961 1 234 567"])("refuses the Lebanese landline %s", (input) => {
+    const r = normalizeMobile(input);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/mobile number/);
+  });
+  it("requires a number", () => {
+    expect(normalizeMobile("")).toEqual({ ok: false, error: "Enter your mobile number" });
+  });
+});

@@ -224,4 +224,13 @@ export const AR5: Record<string, string> = {
   "Open link": "فتح الرابط",
   "All notifications": "كل الإشعارات",
   "Back to numnum": "العودة إلى numnum",
+  "Hi {name}, this is {restaurant} about your order {ref}.": "مرحباً {name}، معك {restaurant} بخصوص طلبك {ref}.",
+  "WhatsApp {name}": "واتساب {name}",
+  "Call {name}": "اتصال بـ{name}",
+  "WhatsApp": "واتساب",
+  "Enter your mobile number": "أدخل رقم هاتفك الخلوي",
+  "Enter a mobile number (e.g. 70 123 456): the restaurant contacts you on WhatsApp": "أدخل رقماً خلوياً (مثلاً 70 123 456): يتواصل معك المطعم عبر واتساب",
+  "Mobile number": "رقم الهاتف الخلوي",
+  "The restaurant contacts you on WhatsApp or by phone about this order": "يتواصل معك المطعم عبر واتساب أو الهاتف بخصوص هذا الطلب",
+  "Restaurants contact you on WhatsApp or by phone about your orders.": "تتواصل معك المطاعم عبر واتساب أو الهاتف بخصوص طلباتك.",
 };

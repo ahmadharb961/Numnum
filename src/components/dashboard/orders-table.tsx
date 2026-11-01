@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, Bike, Check, ChevronDown, Clock, MapPin, MessageCircle, Phone, X } from "lucide-react";
+import { Banknote, Bike, Check, ChevronDown, Clock, MapPin, Phone, X } from "lucide-react";
+import { WhatsAppIcon } from "@/components/brand-icons";
 import { driverWhatsAppUrl } from "@/lib/driver-message";
 import { orderAction } from "@/actions/orders";
 import { formatMoney, formatRate } from "@/lib/money";
@@ -157,13 +158,24 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                 <div className="space-y-1.5 text-sm">
                   <div className="text-xs font-bold uppercase tracking-wide text-ink-muted">{t("Customer")}</div>
                   <div className="font-semibold">{o.customerName}</div>
-                  <div className="flex flex-wrap gap-2">
-                    <a href={`tel:+${o.customerPhone}`} className="chip h-8 text-xs">
-                      <Phone className="h-3.5 w-3.5" /> {formatPhone(o.customerPhone)}
+                  {/* One tap to reach the customer: WhatsApp (chat opens with a ready message; the call
+                      button is at the top of the chat) or a normal phone call. */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <a
+                      href={`https://wa.me/${o.customerPhone}?text=${encodeURIComponent(t("Hi {name}, this is {restaurant} about your order {ref}.", { name: o.customerName.split(" ")[0], restaurant: restaurantName, ref: o.reference }))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex h-12 items-center justify-center gap-2 rounded-xl bg-[#25D366] text-sm font-bold text-white shadow-sm hover:bg-[#1ebe5b] active:scale-[0.98]"
+                      aria-label={t("WhatsApp {name}", { name: o.customerName })}
+                    >
+                      <WhatsAppIcon className="h-5 w-5" /> {t("WhatsApp")}
                     </a>
-                    <a href={`https://wa.me/${o.customerPhone}`} target="_blank" rel="noopener noreferrer" className="chip h-8 text-xs">
-                      <MessageCircle className="h-3.5 w-3.5" /> {t("Message")}
+                    <a href={`tel:+${o.customerPhone}`} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-black/10 bg-white text-sm font-bold active:scale-[0.98]" aria-label={t("Call {name}", { name: o.customerName })}>
+                      <Phone className="h-4 w-4" /> {t("Call")}
                     </a>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                    <span className="tabular" dir="ltr">{formatPhone(o.customerPhone)}</span>
                     {o.mapsUrl && (
                       <a href={o.mapsUrl} target="_blank" rel="noopener noreferrer" className="chip h-8 text-xs">
                         <MapPin className="h-3.5 w-3.5" /> {t("Map")}

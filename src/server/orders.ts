@@ -10,7 +10,7 @@ import { sendEmail } from "./email";
 import { tFor } from "@/i18n/server";
 import { randomToken } from "./crypto";
 import { validateSelections, unitPrice, type CustomizationGroupDef } from "@/lib/customization";
-import { formatPhone, normalizePhone } from "@/lib/phone";
+import { formatPhone, normalizeMobile } from "@/lib/phone";
 import { formatMoney, parseAmount, toUsdCents } from "@/lib/money";
 import { isOpenAt, type OpeningHours } from "@/lib/hours";
 import { STATUS_META, type OrderStatusKey } from "@/lib/order-status";
@@ -47,7 +47,7 @@ export const orderInputSchema = z.object({
   changeFor: z.string().trim().max(20).optional().nullable(),
   customer: z.object({
     name: z.string().trim().min(2, "Enter your full name").max(80),
-    phone: z.string().trim().min(6, "Enter your phone number").max(30),
+    phone: z.string().trim().min(6, "Enter your mobile number").max(30),
     addressId: z.string().optional().nullable(),
     address: z.string().trim().max(300).optional().nullable(),
     building: z.string().trim().max(120).optional().nullable(),
@@ -185,7 +185,7 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
 
   const fieldErrors: Record<string, string> = {};
   const texts: NonNullable<OrderError["texts"]> = {};
-  const phone = normalizePhone(c.phone);
+  const phone = normalizeMobile(c.phone);
   if (!phone.ok) fieldErrors["customer.phone"] = phone.error;
   const mapsUrl = normalizeMapsUrl(c.mapsUrl, c.latitude, c.longitude);
   if (c.mapsUrl && !mapsUrl && c.latitude == null) fieldErrors["customer.mapsUrl"] = "Enter a valid Google Maps link";

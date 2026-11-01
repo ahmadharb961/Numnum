@@ -5,7 +5,7 @@ import { audit } from "./audit";
 import { getSettings } from "./settings";
 import { hashPassword, validatePassword } from "./passwords";
 import { uniqueSlug } from "./restaurants";
-import { normalizePhone } from "@/lib/phone";
+import { normalizeMobile, normalizePhone } from "@/lib/phone";
 import { isValidLatLng, MAX_ZONE_KM } from "@/lib/geo";
 
 // Accounts created by a platform admin: complete restaurants (owner + profile + delivery +
@@ -130,7 +130,7 @@ export async function createCustomerByAdmin(adminId: string, input: AdminCustome
   if (pwErr) return { ok: false, fieldErrors: { password: pwErr } };
   let phone: string | null = null;
   if (d.phone) {
-    const p = normalizePhone(d.phone);
+    const p = normalizeMobile(d.phone);
     if (!p.ok) return { ok: false, fieldErrors: { phone: p.error } };
     phone = p.e164;
   }

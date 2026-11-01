@@ -53,6 +53,14 @@ describe("cash-on-delivery checkout", () => {
     expect(pickup.totalCents).toBe(2000);
   });
 
+  it("requires a mobile number (no landlines) so the restaurant can WhatsApp the customer", async () => {
+    const f = await makeRestaurant();
+    const p = orderPayload(f, key("land"));
+    await expect(createOrder({ ...p, customer: { ...p.customer, phone: "01 234 567" } }, meta)).rejects.toMatchObject({ fieldErrors: { "customer.phone": expect.stringMatching(/mobile number/) } });
+    const ok = await createOrder({ ...orderPayload(f, key("mob")), customer: { ...p.customer, phone: "71 234 567" } }, meta);
+    expect((await prisma.order.findUniqueOrThrow({ where: { reference: ok.reference } })).customerPhone).toBe("96171234567");
+  });
+
   it("requires an account to order", async () => {
     const f = await makeRestaurant();
     await expect(createOrder(orderPayload(f, key("anon")), { ...meta, userId: null })).rejects.toThrow(/log in/);
