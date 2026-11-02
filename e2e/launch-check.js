@@ -366,6 +366,7 @@ async function visit(ctx, label, path, opts = {}) {
       if (!opened) flag("[customer] report a reel", "report form did not open");
       else {
         await pg.getByRole("button", { name: "Misleading information" }).click();
+        await pg.getByTestId("report-also-block").locator("input").uncheck(); // report only: don't block the demo restaurant
         await pg.getByRole("button", { name: "Submit report" }).click();
         if (!(await pg.getByText("Thanks — our team will review it").waitFor({ timeout: 5000 }).then(() => true, () => false))) flag("[customer] report a reel", "no confirmation after submitting");
       }

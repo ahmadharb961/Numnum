@@ -81,7 +81,7 @@ export function CustomerRegisterForm({ next }: { next?: string }) {
         <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />
       </Field>
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="terms" required className="mt-0.5 h-5 w-5 accent-brand-500" data-testid="customer-terms" />
+        <input type="checkbox" name="terms" required defaultChecked={v.terms === "on"} className="mt-0.5 h-5 w-5 accent-brand-500" data-testid="customer-terms" />
         <span>
           {rich(t, "I agree to the {terms} and {privacy}, including the content rules.", {
             terms: (
@@ -139,7 +139,7 @@ export function RestaurantRegisterForm({ loggedInEmail }: { loggedInEmail?: stri
         </Field>
       </div>
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="terms" className="mt-0.5 h-5 w-5 accent-brand-500" />
+        <input type="checkbox" name="terms" defaultChecked={v.terms === "on"} className="mt-0.5 h-5 w-5 accent-brand-500" />
         <span>
           {rich(t, "I agree to the {terms} and {privacy}. I'll review the commission agreement before enabling online ordering.", {
             terms: (

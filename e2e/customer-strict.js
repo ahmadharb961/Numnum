@@ -147,6 +147,7 @@ async function chooseDelivery(page) {
   await c.getByRole("button", { name: "Create account" }).click();
   await c.waitForTimeout(1200);
   check(/account\/register/.test(c.url()) && (await c.getByText(/8 characters/).count()) > 0, "short password rejected with a message");
+  check(await c.locator('[data-testid="customer-terms"]').isChecked(), "after an error the terms box stays ticked (and the other fields keep their values)");
   await c.fill("#password", "strictpass1");
   await Promise.all([c.waitForURL((u) => u.pathname === "/checkout", { timeout: 15000 }), c.getByRole("button", { name: "Create account" }).click()]);
   const user = await db.user.findUnique({ where: { email }, include: { roles: true } });
