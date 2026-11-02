@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield } from "lucide-react";
+import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff } from "lucide-react";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { PageHeader } from "@/components/customer/page-header";
@@ -61,6 +61,7 @@ export default async function AccountPage() {
             { href: "/account/orders", icon: Receipt, label: "My orders", sub: t(orderCount === 1 ? "{n} order" : "{n} orders", { n: orderCount }) },
             { href: "/account/addresses", icon: MapPin, label: "Saved addresses", sub: t("{n} saved", { n: addressCount }) },
             { href: "/saved", icon: Bookmark, label: "Saved dishes & restaurants", sub: "Reels, dishes, restaurants" },
+            { href: "/account/blocked", icon: EyeOff, label: "Blocked", sub: "Restaurants and people you hid" },
           ].map((l) => (
             <Link key={l.href} href={l.href} className="flex items-center gap-3 p-4">
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
@@ -83,6 +84,9 @@ export default async function AccountPage() {
             {t("Log out")}
           </Button>
         </form>
+        <Link href="/account/delete" className="block text-center text-sm font-semibold text-red-600" data-testid="delete-account-link">
+          {t("Delete account")}
+        </Link>
         <p className="pb-2 text-center text-xs text-ink-muted">
           <Badge>{t("Cash on delivery")}</Badge> {t("is the only payment method — no card details are ever stored.")}
         </p>

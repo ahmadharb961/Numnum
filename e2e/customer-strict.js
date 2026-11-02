@@ -138,6 +138,11 @@ async function chooseDelivery(page) {
   await c.fill("#name", "Strict Tester");
   await c.fill("#email", email);
   await c.fill("#phone", "71 234 567");
+  await c.fill("#password", "strictpass1");
+  await c.getByRole("button", { name: "Create account" }).click(); // terms not accepted → not submitted
+  await c.waitForTimeout(600);
+  check(/account\/register/.test(c.url()) && !(await db.user.findUnique({ where: { email } })), "sign-up requires accepting the terms");
+  await c.check('[data-testid="customer-terms"]');
   await c.fill("#password", "short");
   await c.getByRole("button", { name: "Create account" }).click();
   await c.waitForTimeout(1200);

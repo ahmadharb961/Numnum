@@ -1,4 +1,5 @@
 import "server-only";
+import { getBlocks } from "./blocks";
 import { prisma } from "./db";
 
 export async function getPublicItem(id: string) {
@@ -14,8 +15,9 @@ export async function getPublicItem(id: string) {
     },
   });
   if (!item) return null;
+  const hidden = (await getBlocks()).userIds; // reviewers the visitor blocked
   const reviews = await prisma.itemReview.findMany({
-    where: { menuItemId: id, status: "VISIBLE" },
+    where: { menuItemId: id, status: "VISIBLE", ...(hidden.length ? { userId: { notIn: hidden } } : {}) },
     orderBy: { createdAt: "desc" },
     take: 10,
     select: { id: true, rating: true, body: true, photoUrl: true, evidence: true, reply: true, createdAt: true, user: { select: { name: true } } },

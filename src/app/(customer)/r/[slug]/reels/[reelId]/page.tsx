@@ -1,4 +1,6 @@
 import type { Viewport } from "next";
+import { BlockedNotice } from "@/components/customer/blocked-notice";
+import { restaurantBlockFor } from "@/server/blocks";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db";
 import { publicReelWhere, reelCardSelect, toPublicReel } from "@/server/feed";
@@ -15,6 +17,8 @@ export default async function RestaurantReelsViewer({ params }: { params: Promis
   const reels = await prisma.reel.findMany({ where: { ...publicReelWhere, restaurant: { slug, status: "ACTIVE" } }, select: reelCardSelect, orderBy: { publishedAt: "desc" } });
   const idx = reels.findIndex((r) => r.id === reelId);
   if (idx === -1) notFound();
+  const blocked = await restaurantBlockFor(reels[idx].restaurantId);
+  if (blocked) return <BlockedNotice blockId={blocked.id} name={reels[idx].restaurant.displayName} />;
   const settings = await getSettings();
   const pub = reels.map((r) => toPublicReel(r));
   const { liked, saved } = await likedAndSaved(pub.map((r) => r.id));

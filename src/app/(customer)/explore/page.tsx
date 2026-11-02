@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getBlocks } from "@/server/blocks";
 import { SearchControls } from "@/components/customer/search-controls";
 import { ExploreResults } from "@/components/customer/explore-results";
 import { facets, parseSearchParams, restaurantsDeliveringTo } from "@/server/search";
@@ -18,7 +19,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const loc = await customerLocation();
   if (p.delivery && loc) p.nearIds = await restaurantsDeliveringTo(loc);
   // First page comes with the HTML; after that the browser asks /api/search as the person types.
-  const [f, initial] = await Promise.all([facets(), exploreSearch({ ...p, page: 1 }, loc ? { lat: loc.lat, lng: loc.lng } : null)]);
+  const [f, initial] = await Promise.all([facets(), exploreSearch({ ...p, page: 1, blockedIds: (await getBlocks()).restaurantIds }, loc ? { lat: loc.lat, lng: loc.lng } : null)]);
   return (
     <main className="pb-nav">
       {/* No Suspense around these: the page is always rendered per request, and streaming them

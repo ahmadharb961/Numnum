@@ -1,4 +1,5 @@
 import { parseSearchParams, restaurantsDeliveringTo } from "@/server/search";
+import { getBlocks } from "@/server/blocks";
 import { exploreSearch } from "@/server/explore-search";
 import { customerLocation } from "@/server/location";
 import { errorResponse, json, limit } from "@/server/http";
@@ -10,6 +11,7 @@ export async function GET(req: Request) {
     const p = parseSearchParams(Object.fromEntries(new URL(req.url).searchParams));
     const loc = await customerLocation();
     if (p.delivery && loc) p.nearIds = await restaurantsDeliveringTo(loc);
+    p.blockedIds = (await getBlocks()).restaurantIds;
     return json(await exploreSearch(p, loc ? { lat: loc.lat, lng: loc.lng } : null));
   } catch (e) {
     return errorResponse(e);

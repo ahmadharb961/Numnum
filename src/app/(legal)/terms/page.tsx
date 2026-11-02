@@ -20,6 +20,10 @@ export default async function TermsPage() {
         <p>تقدّم المطاعم القوائم والأسعار والمكوّنات ومعلومات مسبّبات الحساسية. نحن لا نستنتج المكوّنات أو مسبّبات الحساسية من الصور. إذا كانت لديك حساسية، تأكّد من المطعم قبل الطلب. يحدّد كل مطعم رسوم التوصيل وتظهر قبل إرسال طلبك.</p>
         <h2>التقييمات والمحتوى</h2>
         <p>يجب أن تعكس التقييمات تجارب حقيقية. قد نُخفي أو نزيل المحتوى المزيّف أو المسيء أو المضلّل أو المخالف، وفق قواعد المراجعة لدينا. تؤكد شارة التوثيق هوية المطعم كمؤسسة، وليست تقييماً لجودة الأكل. يتم تمييز المحتوى المموَّل.</p>
+        <h2>قواعد المحتوى</h2>
+        <p>لا نتسامح مطلقاً مع المحتوى المرفوض أو المستخدمين المسيئين. يُمنع نشر أي محتوى (فيديو، صور، تقييمات، ردود) يتضمن خطاب كراهية أو تحرّشاً أو تهديداً أو عنفاً أو محتوى جنسياً أو أنشطة غير قانونية أو معلومات شخصية لآخرين أو محتوى مضللاً أو مزيّفاً. يمكنك الإبلاغ عن أي فيديو أو تقييم أو مطعم، وحظر أي مطعم أو شخص لإخفاء محتواه عنك. نراجع البلاغات خلال 24 ساعة، ونزيل المحتوى المخالف ونوقف حسابات من ينشره.</p>
+        <h2>حسابك</h2>
+        <p>يمكنك حذف حسابك في أي وقت من الحساب ← حذف الحساب. تُحذف بياناتك الشخصية، وتبقى الطلبات السابقة لدى المطاعم لسجلاتها دون اسمك أو هاتفك أو عنوانك.</p>
         <h2>المطاعم</h2>
         <p>توافق المطاعم على اتفاقية العمولة، وعلى إبقاء معلومات القائمة دقيقة، واستخدام بيانات الزبائن لتنفيذ الطلبات فقط.</p>
         <h2>المسؤولية</h2>
@@ -35,6 +39,10 @@ export default async function TermsPage() {
       <p>Menus, prices, ingredients and allergen information are provided by restaurants. We do not infer ingredients or allergens from images. If you have an allergy, confirm with the restaurant before ordering. Delivery fees are set by each restaurant and shown before you place your order.</p>
       <h2>Reviews & content</h2>
       <p>Reviews must reflect genuine experiences. We may hide or remove content that is fake, abusive, misleading or infringing, under our moderation rules. The verified badge confirms a restaurant&apos;s business identity, not food quality. Sponsored content is labeled.</p>
+      <h2>Content rules</h2>
+      <p>There is no tolerance for objectionable content or abusive users. You may not post content (videos, photos, reviews, replies) that contains hate speech, harassment, threats, violence, sexual content, illegal activity, other people&apos;s personal information, or fake or misleading information. You can report any reel, review or restaurant, and block any restaurant or person to hide their content. We review reports within 24 hours, remove content that breaks these rules and suspend the accounts that post it.</p>
+      <h2>Your account</h2>
+      <p>You can delete your account at any time from Account → Delete account. Your personal data is deleted; past orders stay with the restaurants for their records, without your name, phone or address.</p>
       <h2>Restaurants</h2>
       <p>Restaurants agree to the commission agreement, to keep menu information accurate, and to handle customer data only to fulfill orders.</p>
       <h2>Liability</h2>

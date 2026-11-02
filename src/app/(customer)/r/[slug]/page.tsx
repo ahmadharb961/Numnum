@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { BlockedNotice } from "@/components/customer/blocked-notice";
+import { restaurantBlockFor } from "@/server/blocks";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { BadgeCheck, Bike, ChevronLeft, ChevronRight, Clapperboard, Clock, ConciergeBell, Globe, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, UtensilsCrossed } from "lucide-react";
@@ -40,6 +42,8 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
   const lang = await getLocale();
   const data = await getPublicRestaurant((await params).slug);
   if (!data) notFound();
+  const blocked = await restaurantBlockFor(data.restaurant.id);
+  if (blocked) return <BlockedNotice blockId={blocked.id} name={data.restaurant.displayName} />;
   const { restaurant: r, sections, reels, reviews, subRatings } = data;
   const key = await ownerKey();
   const saved = key ? !!(await prisma.savedItem.findUnique({ where: { ownerKey_type_refId: { ownerKey: key, type: "RESTAURANT", refId: r.id } } })) : false;
@@ -138,7 +142,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           <BadgeCheck className="me-1 inline h-3.5 w-3.5 align-[-2px]" />
           {t("The verified badge confirms business identity, not food quality.")}
         </p>
-        <ReportButton targetType="RESTAURANT" targetId={r.id} label={t("Report this restaurant")} />
+        <ReportButton targetType="RESTAURANT" targetId={r.id} label={t("Report this restaurant")} block={{ target: { restaurantId: r.id }, name: r.displayName }} />
       </div>
     </div>
   );
@@ -198,7 +202,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
               </div>
             )}
             <div className="mt-2 text-end">
-              <ReportButton targetType="RESTAURANT_REVIEW" targetId={rv.id} />
+              <ReportButton targetType="RESTAURANT_REVIEW" targetId={rv.id} block={{ target: { reviewId: rv.id, reviewType: "RESTAURANT" }, name: rv.userName }} />
             </div>
           </li>
         ))}

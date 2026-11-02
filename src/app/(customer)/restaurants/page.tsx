@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getBlocks } from "@/server/blocks";
 import Link from "next/link";
 import { Store } from "lucide-react";
 import { RestaurantCard } from "@/components/customer/cards";
@@ -22,7 +23,7 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
   const t = await getT();
   const sp = await searchParams;
   const loc = await customerLocation();
-  const [raw, f] = await Promise.all([searchRestaurants({ area: sp.area, category: sp.category, page: 1 }), facets()]);
+  const [raw, f] = await Promise.all([searchRestaurants({ area: sp.area, category: sp.category, page: 1, blockedIds: (await getBlocks()).restaurantIds }), facets()]);
   // With a location: show distance, deliverable restaurants first, and an optional "delivers to me" filter.
   const withQ = raw.map((r) => ({ r, q: loc ? quoteDelivery(r, loc) : null }));
   const list = (loc ? withQ.filter((x) => sp.near !== "1" || (x.r.deliveryEnabled && x.q?.deliverable)).sort((a, b) => Number(!!b.q?.deliverable) - Number(!!a.q?.deliverable) || (a.q?.km ?? 999) - (b.q?.km ?? 999)) : withQ);

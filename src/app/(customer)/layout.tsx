@@ -1,6 +1,7 @@
 import { BottomNav } from "@/components/customer/bottom-nav";
 import { DesktopSidebar } from "@/components/customer/desktop-sidebar";
 import { ReviewPrompt } from "@/components/customer/review-prompt";
+import { QueryToast } from "@/components/customer/query-toast";
 import { prisma } from "@/server/db";
 import { customerLocation } from "@/server/location";
 import { getCurrentUser } from "@/server/auth";
@@ -15,6 +16,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       <DesktopSidebar categories={categories} locationLabel={loc?.label ?? null} />
       <BottomNav />
       <ReviewPrompt />
+      <QueryToast />
     </LoginGateProvider>
   );
 }

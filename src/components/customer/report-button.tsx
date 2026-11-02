@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Flag } from "lucide-react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,12 @@ import { useLoginGate } from "./login-gate";
 
 const REASONS = ["Spam", "Offensive or inappropriate", "Misleading information", "Fake review", "Copyright", "Food safety concern", "Other"] as const;
 
-export function ReportButton({ targetType, targetId, label, dark, rail, next }: { targetType: "REEL" | "ITEM_REVIEW" | "RESTAURANT_REVIEW" | "RESTAURANT" | "MENU_ITEM"; targetId: string; label?: string; dark?: boolean; rail?: boolean; next?: string }) {
+type BlockTarget = { restaurantId: string } | { reviewId: string; reviewType: "ITEM" | "RESTAURANT" };
+
+export function ReportButton({ targetType, targetId, label, dark, rail, next, block }: { targetType: "REEL" | "ITEM_REVIEW" | "RESTAURANT_REVIEW" | "RESTAURANT" | "MENU_ITEM"; targetId: string; label?: string; dark?: boolean; rail?: boolean; next?: string; block?: { target: BlockTarget; name: string } }) {
   const t = useT();
+  const router = useRouter();
+  const [alsoBlock, setAlsoBlock] = useState(true);
   const { requireLogin, askLogin } = useLoginGate();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<string>("");
@@ -42,6 +47,15 @@ export function ReportButton({ targetType, targetId, label, dark, rail, next }: 
             ))}
           </div>
           <textarea className="input" placeholder={t("Anything else we should know? (optional)")} maxLength={1000} value={details} onChange={(e) => setDetails(e.target.value)} />
+          {block && (
+            <label className="flex items-start gap-3 rounded-xl bg-black/[0.03] p-3 text-sm" data-testid="report-also-block">
+              <input type="checkbox" checked={alsoBlock} onChange={(e) => setAlsoBlock(e.target.checked)} className="mt-0.5 h-5 w-5 accent-brand-500" />
+              <span>
+                <b>{t("Also hide content from {name}", { name: block.name })}</b>
+                <span className="block text-xs text-ink-muted">{t("You can undo this any time from Account → Blocked.")}</span>
+              </span>
+            </label>
+          )}
           <Button
             block
             disabled={!reason}
@@ -50,8 +64,15 @@ export function ReportButton({ targetType, targetId, label, dark, rail, next }: 
               setBusy(true);
               try {
                 await api("/api/reports", { targetType, targetId, reason, details: details || undefined });
-                toast(t("Thanks — our team will review it"), "success");
-                setOpen(false);
+                if (block && alsoBlock) {
+                  await api("/api/blocks", block.target);
+                  toast(t("Thanks — {name} is now hidden for you", { name: block.name }), "success");
+                  setOpen(false);
+                  router.refresh();
+                } else {
+                  toast(t("Thanks — our team will review it"), "success");
+                  setOpen(false);
+                }
               } catch (e) {
                 if ((e as { status?: number }).status === 401) {
                   setOpen(false);

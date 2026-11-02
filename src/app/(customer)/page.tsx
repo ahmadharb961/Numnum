@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import { getBlocks } from "@/server/blocks";
 import { ReelFeed } from "@/components/customer/reel-feed";
 import { getFeed } from "@/server/feed";
 import { likedAndSaved } from "@/server/engagement";
@@ -13,7 +14,7 @@ export const viewport: Viewport = { themeColor: "#000000" };
 export default async function HomePage() {
   const t = await getT();
   const loc = await customerLocation();
-  const [feed, settings] = await Promise.all([getFeed({ cursor: 0, limit: 6, location: loc }), getSettings()]);
+  const [feed, settings] = await Promise.all([getFeed({ cursor: 0, limit: 6, location: loc, blockedRestaurantIds: (await getBlocks()).restaurantIds }), getSettings()]);
   const { liked, saved } = await likedAndSaved(feed.reels.map((r) => r.id));
   return (
     <main>

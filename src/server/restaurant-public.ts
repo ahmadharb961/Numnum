@@ -1,4 +1,5 @@
 import "server-only";
+import { getBlocks } from "./blocks";
 import { prisma } from "./db";
 import { getMainImages } from "./menu";
 
@@ -22,8 +23,9 @@ export async function getPublicRestaurant(slug: string) {
     orderBy: { publishedAt: "desc" },
     select: { id: true, posterUrl: true, viewCount: true, menuItem: { select: { name: true } } },
   });
+  const hidden = (await getBlocks()).userIds; // reviewers the visitor blocked
   const reviews = await prisma.restaurantReview.findMany({
-    where: { restaurantId: r.id, status: "VISIBLE" },
+    where: { restaurantId: r.id, status: "VISIBLE", ...(hidden.length ? { userId: { notIn: hidden } } : {}) },
     orderBy: { createdAt: "desc" },
     take: 20,
     select: { id: true, rating: true, foodQuality: true, service: true, value: true, delivery: true, body: true, evidence: true, reply: true, createdAt: true, user: { select: { name: true } } },

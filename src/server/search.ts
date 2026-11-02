@@ -22,6 +22,8 @@ export type SearchParams = {
   page?: number;
   /** restaurant ids that deliver to the viewer (set when "Delivers to me" is on) */
   nearIds?: string[];
+  /** restaurants the viewer blocked (never shown) */
+  blockedIds?: string[];
 };
 
 export function parseSearchParams(sp: Record<string, string | string[] | undefined>): SearchParams {
@@ -52,6 +54,7 @@ export function parseSearchParams(sp: Record<string, string | string[] | undefin
 
 function restaurantWhere(p: SearchParams): Prisma.RestaurantWhereInput {
   const and: Prisma.RestaurantWhereInput[] = [{ status: "ACTIVE" }];
+  if (p.blockedIds?.length) and.push({ id: { notIn: p.blockedIds } });
   if (p.cuisine) and.push({ cuisine: { contains: p.cuisine, mode: "insensitive" } });
   if (p.area) and.push({ OR: [{ area: { contains: p.area, mode: "insensitive" } }, { city: { contains: p.area, mode: "insensitive" } }] });
   if (p.nearIds) and.push({ id: { in: p.nearIds } });

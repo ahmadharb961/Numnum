@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { ReportButton } from "./report-button";
 import Link from "next/link";
 import { Check, Clock, Minus, Plus, Play } from "lucide-react";
 import type { PublicItem } from "@/server/items";
@@ -348,10 +349,13 @@ function ItemReviews({ item }: { item: PublicItem }) {
             )}
             {r.reply && (
               <div className="mt-3 rounded-xl bg-cream px-3 py-2 text-sm">
-                <div className="text-xs font-bold text-ink-soft">Reply from {item.restaurant.name}</div>
+                <div className="text-xs font-bold text-ink-soft">{t("Reply from {name}", { name: item.restaurant.name })}</div>
                 <p className="mt-0.5 text-ink-soft">{r.reply}</p>
               </div>
             )}
+            <div className="mt-2 text-end">
+              <ReportButton targetType="ITEM_REVIEW" targetId={r.id} block={{ target: { reviewId: r.id, reviewType: "ITEM" }, name: r.userName }} />
+            </div>
           </li>
         ))}
       </ul>

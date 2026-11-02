@@ -80,6 +80,24 @@ export function CustomerRegisterForm({ next }: { next?: string }) {
       <Field label="Password" error={fe.password} hint="At least 8 characters" htmlFor="password">
         <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />
       </Field>
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" name="terms" required className="mt-0.5 h-5 w-5 accent-brand-500" data-testid="customer-terms" />
+        <span>
+          {rich(t, "I agree to the {terms} and {privacy}, including the content rules.", {
+            terms: (
+              <Link href="/terms" className="font-semibold text-brand-600 underline" target="_blank">
+                {t("Terms of Service")}
+              </Link>
+            ),
+            privacy: (
+              <Link href="/privacy" className="font-semibold text-brand-600 underline" target="_blank">
+                {t("Privacy Policy")}
+              </Link>
+            ),
+          })}
+        </span>
+      </label>
+      {fe.terms && <p className="text-xs font-medium text-red-600">{t(fe.terms)}</p>}
       <Button type="submit" size="lg" block loading={pending}>
         {t("Create account")}
       </Button>

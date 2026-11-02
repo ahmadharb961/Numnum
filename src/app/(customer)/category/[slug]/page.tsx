@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getBlocks } from "@/server/blocks";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/server/db";
@@ -23,7 +24,8 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
   const slug = (await params).slug;
   const c = await prisma.foodCategory.findFirst({ where: { slug, active: true } });
   if (!c) notFound();
-  const [dishes, reels] = await Promise.all([searchDishes({ category: slug, page: 1 }), searchReels({ category: slug, page: 1 })]);
+  const blockedIds = (await getBlocks()).restaurantIds;
+  const [dishes, reels] = await Promise.all([searchDishes({ category: slug, page: 1, blockedIds }), searchReels({ category: slug, page: 1, blockedIds })]);
   return (
     <main className="pb-nav">
       <PageHeader title={`${c.emoji ?? ""} ${localName(await getLocale(), c.name, c.nameAr)}`} />

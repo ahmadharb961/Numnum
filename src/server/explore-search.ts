@@ -77,6 +77,7 @@ function restaurantFilters(p: SearchParams) {
   if (p.cuisine) f.push(Prisma.sql`r."cuisine" ILIKE ${`%${likeEscape(p.cuisine)}%`}`);
   if (p.area) f.push(Prisma.sql`(r."area" ILIKE ${`%${likeEscape(p.area)}%`} OR r."city" ILIKE ${`%${likeEscape(p.area)}%`})`);
   if (p.nearIds) f.push(p.nearIds.length ? Prisma.sql`r."id" = ANY(${p.nearIds}::text[])` : Prisma.sql`false`);
+  if (p.blockedIds?.length) f.push(Prisma.sql`NOT (r."id" = ANY(${p.blockedIds}::text[]))`);
   if (p.delivery) f.push(Prisma.sql`r."deliveryEnabled" = true`);
   if (p.pickup) f.push(Prisma.sql`r."pickupEnabled" = true`);
   if (p.verified) f.push(Prisma.sql`r."verificationStatus" = 'APPROVED'`);

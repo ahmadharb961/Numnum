@@ -510,7 +510,7 @@ function ReelSlide({
           <Eye className="h-6 w-6 drop-shadow" />
           {compactNumber(reel.viewCount)}
         </div>
-        <ReportButton rail targetType="REEL" targetId={reel.id} label="Report this reel" next={`/reel/${reel.id}`} />
+        <ReportButton rail targetType="REEL" targetId={reel.id} label="Report this reel" next={`/reel/${reel.id}`} block={{ target: { restaurantId: reel.restaurant.id }, name: reel.restaurant.name }} />
       </div>
 
       {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}

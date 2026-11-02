@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { BlockedNotice } from "@/components/customer/blocked-notice";
+import { restaurantBlockFor } from "@/server/blocks";
 import { getT } from "@/i18n/server";
 import { notFound } from "next/navigation";
 import { getPublicItem } from "@/server/items";
@@ -20,6 +22,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const item = await getPublicItem((await params).id);
   if (!item) notFound();
+  const blocked = await restaurantBlockFor(item.restaurant.id);
+  if (blocked) return <BlockedNotice blockId={blocked.id} name={item.restaurant.name} />;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "MenuItem",

@@ -24,19 +24,21 @@ enum Role {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  name         String
-  phone        String?
-  disabled     Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  lastLoginAt  DateTime?
-  locale       String?   // "en" | "ar": language of the app, emails and notifications
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  name            String
+  phone           String?
+  disabled        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastLoginAt     DateTime?
+  locale          String? // "en" | "ar": language of the app, emails and notifications
   emailVerifiedAt DateTime? // set when they open the link in the confirmation email
 
   roles         UserRole[]
+  blocks        UserBlock[]        @relation("blocker")
+  blockedBy     UserBlock[]        @relation("blockedUser")
   orders        Order[]
   addresses     CustomerAddress[]
   pushSubs      PushSubscription[]
@@ -184,6 +186,7 @@ model Restaurant {
   menuItems         MenuItem[]
   customizationGrps CustomizationGroup[]
   reels             Reel[]
+  blockedBy         UserBlock[]
   media             MediaAsset[]
   orders            Order[]
   commissionEvents  CommissionEvent[]
@@ -196,8 +199,8 @@ model Restaurant {
   notifications     Notification[]
   importJobs        MenuImport[]
   // Search: name, cuisine, area and the dishes it serves, normalized (see src/server/search-text.ts).
-  searchName        String             @default("")
-  searchText        String             @default("")
+  searchName        String                   @default("")
+  searchText        String                   @default("")
   searchedAt        DateTime?
 
   @@index([status])
@@ -360,9 +363,9 @@ model MenuItem {
   orderItems     OrderItem[]
 
   // Search: normalized text kept up to date by src/server/search-text.ts (NULL searchedAt = needs refresh).
-  searchName      String        @default("")
-  searchText      String        @default("")
-  searchedAt      DateTime?
+  searchName String    @default("")
+  searchText String    @default("")
+  searchedAt DateTime?
 
   @@unique([restaurantId, sku])
   @@index([restaurantId, archived])
@@ -1089,4 +1092,21 @@ model PushBroadcast {
 
   @@index([createdAt])
   @@map("push_broadcasts")
+}
+
+/// Content a customer chose not to see: a restaurant (its reels, dishes, page) or a reviewer.
+model UserBlock {
+  id            String      @id @default(cuid())
+  userId        String
+  restaurantId  String?
+  blockedUserId String?
+  createdAt     DateTime    @default(now())
+  user          User        @relation("blocker", fields: [userId], references: [id], onDelete: Cascade)
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  blockedUser   User?       @relation("blockedUser", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, restaurantId])
+  @@unique([userId, blockedUserId])
+  @@index([userId])
+  @@map("user_blocks")
 }

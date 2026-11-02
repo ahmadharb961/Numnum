@@ -57,6 +57,7 @@ export async function registerCustomerAction(_: FormState, form: FormData): Prom
   if (!rateLimit(`register:${ip}`, 5, 60 * 60_000).ok) return { error: "Too many sign-ups from this network. Try later." };
   const parsed = customerSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [i.path[0], i.message])) };
+  if (form.get("terms") !== "on") return { fieldErrors: { terms: "Please accept the terms of service" } };
   const { name, email, password } = parsed.data;
   const pwErr = validatePassword(password);
   if (pwErr) return { fieldErrors: { password: pwErr } };
@@ -141,4 +142,24 @@ export async function updateCustomerProfileAction(_: FormState, form: FormData):
   if (!mobile.ok) return { fieldErrors: { phone: mobile.error } };
   await prisma.user.update({ where: { id: user.id }, data: { name, phone: mobile.e164 } });
   return { ok: true, message: "Profile updated" };
+}
+
+/** "Delete my account": confirmed with the password; the session ends with the account. */
+export async function deleteAccountAction(_: FormState, form: FormData): Promise<FormState> {
+  const user = await (await import("@/server/auth")).requireUser("/account/delete");
+  if (String(form.get("confirm") || "") !== "on") return { fieldErrors: { confirm: "Tick the box to confirm" } };
+  const { deleteAccount } = await import("@/server/account-deletion");
+  const r = await deleteAccount(user.id, String(form.get("password") || ""));
+  if (!r.ok) return r.error === "Incorrect password" ? { fieldErrors: { password: r.error } } : { error: r.error };
+  await destroySession();
+  redirect("/?account=deleted");
+}
+
+/** Restaurant owners ask numnum to close the restaurant account. */
+export async function requestClosureAction(_: FormState, form: FormData): Promise<FormState> {
+  const user = await (await import("@/server/auth")).requireUser("/account/delete");
+  if (!rateLimit(`closure:${user.id}`, 3, 24 * 3600_000).ok) return { error: "Request already sent. We'll contact you shortly." };
+  const { requestRestaurantClosure } = await import("@/server/account-deletion");
+  const ok = await requestRestaurantClosure(user.id, String(form.get("note") || ""));
+  return ok ? { ok: true, message: "Request sent. We'll contact you within 2 business days to close your restaurant and delete your account." } : { error: "Something went wrong" };
 }
