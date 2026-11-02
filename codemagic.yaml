@@ -1,0 +1,39 @@
+# Builds the numnum iPhone app on Codemagic's Macs (no Mac needed) and sends it to TestFlight.
+# One-time setup in Codemagic: connect the GitHub repo, then Team settings → Integrations →
+# App Store Connect: add the API key (name it "numnum"). Signing is created automatically.
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: numnum
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: me.numnum.app
+      vars:
+        XCODE_PROJECT: ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+      node: 22
+      xcode: latest
+    triggering:
+      events: []
+    scripts:
+      - name: Install packages
+        script: npm ci --ignore-scripts
+      - name: Copy the app shell and plugins into the iOS project
+        script: npx cap sync ios
+      - name: Use the signing profiles
+        script: xcode-project use-profiles
+      - name: Build number
+        script: agvtool new-version -all $(($BUILD_NUMBER + 1))
+        working_directory: ios/App
+      - name: Build the app
+        script: xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

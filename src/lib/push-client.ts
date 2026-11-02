@@ -5,8 +5,11 @@ export type PushState = "unsupported" | "ios-needs-install" | "blocked" | "off" 
 export const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 export const isAndroid = () => /Android/i.test(navigator.userAgent);
 export const isMobile = () => isIos() || isAndroid();
-export const isInstalled = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-const supported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+/** Running inside the numnum store app (Capacitor adds "NumnumApp" to the user agent). */
+export const isNativeApp = () => typeof navigator !== "undefined" && /NumnumApp\//.test(navigator.userAgent);
+export const isInstalled = () => isNativeApp() || window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+// Browser (web) push; inside the store app, notifications go through the phone's native push instead.
+const supported = () => !isNativeApp() && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
 function keyBytes(base64: string) {
   const pad = "=".repeat((4 - (base64.length % 4)) % 4);
