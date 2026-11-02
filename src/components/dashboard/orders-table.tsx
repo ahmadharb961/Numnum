@@ -43,7 +43,7 @@ type Order = {
 };
 
 const REJECT_REASONS = ["Item(s) unavailable", "Outside delivery area", "Too busy right now", "Closing soon", "Customer unreachable"];
-const FAIL_REASONS = ["Customer unreachable", "Customer refused the order", "Wrong address", "Customer didn't pick up"];
+const FAIL_REASONS = ["Customer canceled by phone", "Customer unreachable", "Customer refused the order", "Wrong address", "Customer didn't pick up"];
 const ETAS = [15, 20, 30, 45, 60, 90];
 
 function minutesAgo(iso: string, t: T, lang: string) {
@@ -253,7 +253,7 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                           {delivery ? t("Delivered · cash collected") : t("Picked up · cash collected")}
                         </Button>
                         <Button size="sm" variant="ghost" className="text-red-600" onClick={() => { setReasonFor({ order: o, kind: "FAIL" }); setReason(""); }}>
-                          {delivery ? t("Couldn't deliver") : t("Not picked up")}
+                          {delivery ? t("Canceled / not delivered") : t("Canceled / not picked up")}
                         </Button>
                       </>
                     )}
@@ -274,7 +274,12 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
             ))}
           </div>
           <textarea className="input" placeholder={reasonFor?.kind === "REJECT" ? t("Reason (shown to the customer)") : t("What happened?")} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} />
-          <p className="text-xs text-ink-muted">{reasonFor?.kind === "REJECT" ? t("The customer is notified right away. Frequent rejections are reviewed by numnum.") : t("Failed deliveries are reviewed by numnum. Use this only when the customer didn't receive the order.")}</p>
+          <p className="text-xs text-ink-muted">{reasonFor?.kind === "REJECT" ? t("The customer is notified right away. Frequent rejections are reviewed by numnum.") : t("Use this when the customer canceled or didn't receive the order. numnum reviews these orders.")}</p>
+          <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900 ring-1 ring-amber-100" data-testid="verdict-warning">
+            {reasonFor?.kind === "REJECT"
+              ? t("The customer will be asked if they still received food from this order. If they say yes, commission applies.")
+              : t("The customer will be asked to confirm. If they say they received the food or didn't cancel, commission applies.")}
+          </div>
           <Button
             variant="danger"
             block

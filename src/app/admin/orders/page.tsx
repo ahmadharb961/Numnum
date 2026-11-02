@@ -14,7 +14,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const where: Prisma.OrderWhereInput = {
-    ...(sp.f === "suspicious" ? { suspicious: true } : sp.f === "waiting" ? { status: "PLACED" as const } : sp.f === "failed" ? { status: { in: ["FAILED", "REJECTED"] as ("FAILED" | "REJECTED")[] } } : sp.f === "billable" ? { commission: { isNot: null } } : {}),
+    ...(sp.f === "suspicious" ? { suspicious: true } : sp.f === "waiting" ? { status: "PLACED" as const } : sp.f === "failed" ? { status: { in: ["FAILED", "REJECTED"] as ("FAILED" | "REJECTED")[] } } : sp.f === "billable" ? { commission: { isNot: null } } : sp.f === "contradicted" ? { customerVerdict: { in: ["RECEIVED", "NOT_CANCELED"] } } : {}),
     ...(sp.q ? { OR: [{ reference: { contains: sp.q.toUpperCase() } }, { restaurantName: { contains: sp.q, mode: "insensitive" } }] } : {}),
   };
   const [orders, total, funnel] = await Promise.all([
@@ -43,6 +43,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: Prom
           ["suspicious", "Suspicious"],
           ["waiting", "Waiting for restaurant"],
           ["failed", "Rejected / failed"],
+          ["contradicted", "Customer disagrees"],
           ["billable", "Commissionable"],
         ].map(([k, l]) => (
           <Link key={k} href={`/admin/orders${k ? `?f=${k}` : ""}`} className={cn("chip h-9 text-xs", (sp.f ?? "") === k && "chip-active")}>
@@ -88,8 +89,17 @@ export default async function AdminOrders({ searchParams }: { searchParams: Prom
                 </td>
                 <td className="whitespace-nowrap text-xs">{formatDateTime(o.createdAt)}</td>
                 <td className="tabular">{formatMoney(o.subtotalCents, o.currency)}</td>
-                <td>
+                <td className="max-w-[260px]">
                   <Badge>{o.status.toLowerCase().replace(/_/g, " ")}</Badge>
+                  {(o.status === "FAILED" || o.status === "REJECTED") && (
+                    <div className="mt-1 space-y-1 text-[11px]">
+                      <div className="text-ink-muted">Restaurant: “{o.failureReason ?? o.rejectionReason ?? "-"}”</div>
+                      {o.customerVerdict === "CONFIRMED" && <Badge tone="green">customer confirmed</Badge>}
+                      {o.customerVerdict === "RECEIVED" && <Badge tone="red">customer says they received it</Badge>}
+                      {o.customerVerdict === "NOT_CANCELED" && <Badge tone="red">customer says they didn&apos;t cancel</Badge>}
+                      {!o.customerVerdict && <span className="text-ink-muted">customer hasn&apos;t answered</span>}
+                    </div>
+                  )}
                 </td>
                 <td className="tabular">{formatMoney(o.totalCents, o.currency)}</td>
                 <td className="text-xs">{o.commission ? `${formatMoney(o.commission.commissionCents)} · ${o.commission.status.toLowerCase()}` : "—"}</td>

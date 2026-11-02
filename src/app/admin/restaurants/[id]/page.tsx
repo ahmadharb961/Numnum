@@ -26,13 +26,19 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
     include: { staff: { include: { user: { select: { name: true, email: true } } } }, _count: { select: { menuItems: { where: { archived: false } }, reels: true, orders: true } } },
   });
   if (!r) notFound();
-  const [settings, invoices, accrued, recentOrders, reports, audits] = await Promise.all([
+  const [settings, invoices, accrued, recentOrders, reports, audits, honesty] = await Promise.all([
     getSettings(),
     prisma.invoice.findMany({ where: { restaurantId: id }, orderBy: { createdAt: "desc" }, take: 12 }),
     prisma.commissionEvent.aggregate({ where: { restaurantId: id, status: "ACCRUED", invoiceId: null }, _sum: { commissionCents: true }, _count: true }),
     prisma.order.findMany({ where: { restaurantId: id }, orderBy: { createdAt: "desc" }, take: 10, select: { id: true, reference: true, status: true, subtotalCents: true, currency: true, createdAt: true, suspicious: true } }),
     prisma.report.count({ where: { targetType: "RESTAURANT", targetId: id, status: "OPEN" } }),
     prisma.auditLog.findMany({ where: { entityType: "restaurant", entityId: id }, orderBy: { createdAt: "desc" }, take: 15, include: { actor: { select: { name: true } } } }),
+    // Rejected / not delivered and what customers answered about them
+    Promise.all([
+      prisma.order.count({ where: { restaurantId: id, status: { in: ["FAILED", "REJECTED"] } } }),
+      prisma.order.count({ where: { restaurantId: id, customerVerdict: "CONFIRMED" } }),
+      prisma.order.count({ where: { restaurantId: id, customerVerdict: { in: ["RECEIVED", "NOT_CANCELED"] } } }),
+    ]),
   ]);
   const owed = invoices.reduce((s, i) => s + outstanding(i), 0);
   return (
@@ -100,6 +106,17 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
             <dd>{r.agreementAcceptedAt ? `v${r.agreementVersion} · ${formatDateTime(r.agreementAcceptedAt)}` : "Not accepted"}</dd>
             <dt className="text-ink-muted">Commission</dt>
             <dd>{formatRate(r.commissionRateBps ?? settings.defaultCommissionRateBps)} {r.commissionRateBps == null && <span className="text-ink-muted">(default)</span>}</dd>
+            <dt className="text-ink-muted">Not delivered / rejected</dt>
+            <dd>
+              {honesty[0]} orders · {honesty[1]} confirmed by customers ·{" "}
+              {honesty[2] ? (
+                <Link href={`/admin/orders?f=contradicted&q=${encodeURIComponent(r.displayName)}`} className="font-bold text-red-600 underline">
+                  {honesty[2]} contradicted
+                </Link>
+              ) : (
+                "0 contradicted"
+              )}
+            </dd>
             <dt className="text-ink-muted">Staff</dt>
             <dd>
               {r.staff.map((s) => (

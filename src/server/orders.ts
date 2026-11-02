@@ -4,8 +4,8 @@ import type { Fulfillment, OrderStatus, Prisma } from "@prisma/client";
 import { prisma, type Tx } from "./db";
 import { getSettings, type Settings } from "./settings";
 import { nextCounter } from "./counters";
-import { ensureCommission, isUniqueViolation } from "./commission";
-import { notifyRestaurant, notifyUser, render, type Text } from "./notifications";
+import { chargeContradictedOrder, ensureCommission, isUniqueViolation } from "./commission";
+import { notifyAdmins, notifyRestaurant, notifyUser, render, type Text } from "./notifications";
 import { sendEmail } from "./email";
 import { tFor } from "@/i18n/server";
 import { randomToken } from "./crypto";
@@ -384,7 +384,10 @@ async function notifyCustomer(tx: Tx, order: { id: string; userId: string | null
   const u = await tx.user.findUnique({ where: { id: order.userId }, select: { email: true, locale: true } });
   const t = tFor(u?.locale);
   const title = `${order.restaurantName}: ${t(STATUS_META[status].customer)}`;
-  const note = render(t, extra);
+  const asks = status === "FAILED" || status === "REJECTED";
+  const reason = render(t, extra);
+  // Rejected / not delivered: the customer is asked to confirm the restaurant's version.
+  const note = asks ? [reason && t("Reason: {reason}", { reason }), t("Tap to tell us if that's right.")].filter(Boolean).join(" · ") : reason;
   await notifyUser(order.userId, { type: "ORDER_STATUS", title, body: note, link: `/order/${order.reference}` }, tx);
   if (u?.email) void sendEmail(u.email, t("Order {ref} — {status}", { ref: order.reference, status: t(STATUS_META[status].label) }), `${title}${note ? `\n${note}` : ""}\n\n${process.env.APP_URL ?? ""}/order/${order.reference}?t=${order.trackingToken}`);
   // Phone notification (if they turned notifications on); tapping opens the order.
@@ -452,6 +455,52 @@ export type OrderViewer = { userId: string | null; deviceKey: string | null; tok
 /** Customers can see an order they placed: same account, same device, or the private tracking link. */
 export function canViewOrder(order: { userId: string | null; deviceKey: string | null; trackingToken: string }, v: OrderViewer) {
   return (!!order.userId && order.userId === v.userId) || (!!order.deviceKey && order.deviceKey === v.deviceKey) || (!!v.token && v.token === order.trackingToken);
+}
+
+export type CustomerVerdict = "CONFIRMED" | "RECEIVED" | "NOT_CANCELED";
+const VERDICT_DAYS = 7;
+
+/** Rejected / not-delivered orders the customer can still answer about (their own, within 7 days). */
+export function verdictAllowed(order: { status: string; userId: string | null; customerVerdict: string | null; rejectedAt: Date | null; failedAt: Date | null }, userId: string | null | undefined) {
+  if (!userId || order.userId !== userId || order.customerVerdict) return false;
+  const at = order.status === "FAILED" ? order.failedAt : order.status === "REJECTED" ? order.rejectedAt : null;
+  return !!at && Date.now() - at.getTime() < VERDICT_DAYS * 86_400_000;
+}
+
+/**
+ * The customer answers "is the restaurant's version right?". If they say they received the food
+ * (or didn't cancel), the order is flagged as contradicted, commission applies, and the admin and
+ * the restaurant are told. The restaurant can still dispute the entry from Billing.
+ */
+export async function customerVerdictOnOrder(reference: string, userId: string, verdict: CustomerVerdict) {
+  const settings = await getSettings();
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM orders WHERE reference = ${reference} FOR UPDATE`;
+    if (!rows.length) throw new OrderError("Order not found");
+    const order = await tx.order.findUniqueOrThrow({ where: { id: rows[0].id } });
+    if (order.userId !== userId) throw new OrderError("Order not found");
+    if (order.customerVerdict) return order; // answered already
+    if (!verdictAllowed(order, userId)) throw new OrderError("This order can't be answered any more");
+    if (order.status === "REJECTED" && verdict === "NOT_CANCELED") verdict = "RECEIVED";
+    const updated = await tx.order.update({ where: { id: order.id }, data: { customerVerdict: verdict, customerVerdictAt: new Date() } });
+    await tx.orderEvent.create({ data: { orderId: order.id, type: verdict === "CONFIRMED" ? "CUSTOMER_CONFIRMED" : "CUSTOMER_CONTRADICTED", actorType: "CUSTOMER", actorId: userId, data: { verdict } } });
+    if (verdict !== "CONFIRMED") {
+      await chargeContradictedOrder(tx, order.id, settings);
+      const what = verdict === "RECEIVED" ? "says they received the food" : "says they did not cancel";
+      await notifyAdmins({ type: "ORDER_CONTRADICTED", title: `${order.restaurantName}: customer ${what} (${order.reference})`, body: `Restaurant marked it ${order.status === "FAILED" ? "not delivered" : "rejected"}: ${order.failureReason ?? order.rejectionReason ?? "-"}. Commission applied.`, link: `/admin/orders?f=contradicted` }, tx);
+      await notifyRestaurant(
+        order.restaurantId,
+        {
+          type: "ORDER_CONTRADICTED",
+          title: { k: verdict === "RECEIVED" ? "The customer says they received order {ref}" : "The customer says they didn't cancel order {ref}", v: { ref: order.reference } },
+          body: "Commission applies to this order. If that's wrong, open a dispute from Billing with your evidence.",
+          link: `/dashboard/orders?ref=${order.reference}`,
+        },
+        tx,
+      );
+    }
+    return updated;
+  });
 }
 
 /** Customers may cancel only while the restaurant hasn't accepted yet. */

@@ -28,10 +28,10 @@ function AgreementTextEn({ platformName, rateBps, billableEvent, dueDays, disput
       </p>
       <h3>3. When commission is charged</h3>
       <p>
-        A commission entry is created exactly once per order, <b>{BILLABLE[billableEvent] ?? BILLABLE.COMPLETED}</b>. Orders you reject, and orders the customer cancels before you accept them, are never charged. Video views, likes and clicks are never charged.
+        A commission entry is created exactly once per order, <b>{BILLABLE[billableEvent] ?? BILLABLE.COMPLETED}</b>. Orders you reject, and orders the customer cancels before you accept them, are not charged, unless the customer confirms they still received the food (section 4). Video views, likes and clicks are never charged.
       </p>
       <h3>4. Closing orders</h3>
-      <p>Please mark each order as delivered or picked up when you hand it over. An accepted order that is still open {autoCompleteHours} hours after you accepted it is completed automatically. If an order couldn&apos;t be delivered (customer unreachable, refused or wrong address), report it from the order before then, or dispute the entry later (section 7).</p>
+      <p>Please mark each order as delivered or picked up when you hand it over. An accepted order that is still open {autoCompleteHours} hours after you accepted it is completed automatically. If an order couldn&apos;t be delivered (customer unreachable, refused or wrong address), report it from the order before then, or dispute the entry later (section 7). When you reject an order or mark it as not delivered, {platformName} asks the customer to confirm. If the customer says they received the food, or that they did not cancel, the order is charged as completed; you can dispute it with evidence (section 7).</p>
       <h3>5. Billing cycle</h3>
       <p>Commission entries accumulate during each calendar month (UTC). At the start of the following month we issue an itemized invoice listing every order reference, its date, item subtotal, rate and commission. Issued invoices are never silently changed — corrections are made through documented adjustments or credit notes.</p>
       <h3>6. Payment terms</h3>
@@ -68,9 +68,9 @@ function AgreementTextAr({ platformName, rateBps, billableEvent, dueDays, disput
         مثال: طلب مجموع أطباقه ‎$20.00 ← عمولة {rate} = <b>${((2000 * rateBps) / 10000 / 100).toFixed(2)}</b>.
       </p>
       <h3>٣. متى تُحتسب العمولة</h3>
-      <p>يُسجَّل قيد عمولة واحد فقط لكل طلب، <b>{BILLABLE_AR[billableEvent] ?? BILLABLE_AR.COMPLETED}</b>. الطلبات التي ترفضها، والطلبات التي يلغيها الزبون قبل قبولك لها، لا تُحتسب أبداً. ولا تُحتسب مشاهدات الفيديو والإعجابات والنقرات.</p>
+      <p>يُسجَّل قيد عمولة واحد فقط لكل طلب، <b>{BILLABLE_AR[billableEvent] ?? BILLABLE_AR.COMPLETED}</b>. الطلبات التي ترفضها، والطلبات التي يلغيها الزبون قبل قبولك لها، لا تُحتسب، إلا إذا أكّد الزبون أنه استلم الطعام (البند ٤). ولا تُحتسب مشاهدات الفيديو والإعجابات والنقرات.</p>
       <h3>٤. إغلاق الطلبات</h3>
-      <p>يرجى تعليم كل طلب كمُوصَل أو مُستلَم عند تسليمه. الطلب المقبول الذي يبقى مفتوحاً بعد {autoCompleteHours} ساعة من قبوله يكتمل تلقائياً. إذا تعذّر توصيل طلب (لم يُرد الزبون، أو رفض، أو العنوان خاطئ)، أبلغ عنه من الطلب قبل ذلك، أو اعترض على القيد لاحقاً (البند ٧).</p>
+      <p>يرجى تعليم كل طلب كمُوصَل أو مُستلَم عند تسليمه. الطلب المقبول الذي يبقى مفتوحاً بعد {autoCompleteHours} ساعة من قبوله يكتمل تلقائياً. إذا تعذّر توصيل طلب (لم يُرد الزبون، أو رفض، أو العنوان خاطئ)، أبلغ عنه من الطلب قبل ذلك، أو اعترض على القيد لاحقاً (البند ٧). عندما ترفض طلباً أو تعلّمه كغير مُوصَل، تطلب {platformName} من الزبون التأكيد. إذا قال الزبون إنه استلم الطعام أو إنه لم يُلغِ الطلب، يُحتسب الطلب كمكتمل، ويمكنك الاعتراض عليه مع إثبات (البند ٧).</p>
       <h3>٥. دورة الفوترة</h3>
       <p>تتراكم قيود العمولة خلال كل شهر ميلادي (UTC). في بداية الشهر التالي نُصدر فاتورة مفصّلة تتضمن كل رقم طلب وتاريخه ومجموع أطباقه والنسبة والعمولة. لا تُعدَّل الفواتير الصادرة بصمت أبداً — تتم التصحيحات عبر تعديلات موثّقة أو إشعارات دائنة.</p>
       <h3>٦. شروط الدفع</h3>

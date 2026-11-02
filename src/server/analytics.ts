@@ -53,7 +53,10 @@ export async function suspiciousRestaurants(threshold: number) {
     if (r.status === "FAILED") m.failed += r._count;
     by.set(r.restaurantId, m);
   }
-  const flagged = [...by.entries()].filter(([, m]) => m.total >= 5 && (m.rejected + m.failed) / m.total >= threshold);
+  // Customers who contradicted the restaurant ("I received it" / "I didn't cancel")
+  const contra = await prisma.order.groupBy({ by: ["restaurantId"], where: { createdAt: { gte: since }, customerVerdict: { in: ["RECEIVED", "NOT_CANCELED"] } }, _count: true });
+  const contradicted = new Map(contra.map((c) => [c.restaurantId, c._count]));
+  const flagged = [...by.entries()].filter(([id, m]) => (m.total >= 5 && (m.rejected + m.failed) / m.total >= threshold) || (contradicted.get(id) ?? 0) >= 2);
   const names = await prisma.restaurant.findMany({ where: { id: { in: flagged.map(([id]) => id) } }, select: { id: true, displayName: true } });
-  return flagged.map(([id, m]) => ({ id, name: names.find((n) => n.id === id)?.displayName ?? id, ...m, rate: (m.rejected + m.failed) / m.total }));
+  return flagged.map(([id, m]) => ({ id, name: names.find((n) => n.id === id)?.displayName ?? id, ...m, contradicted: contradicted.get(id) ?? 0, rate: (m.rejected + m.failed) / m.total }));
 }

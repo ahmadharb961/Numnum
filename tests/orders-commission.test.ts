@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/server/db";
-import { autoCompleteStaleOrders, canViewOrder, claimDeviceOrders, createOrder, customerCancelOrder, OrderError, restaurantOrderAction } from "@/server/orders";
+import { autoCompleteStaleOrders, canViewOrder, claimDeviceOrders, createOrder, customerCancelOrder, customerVerdictOnOrder, OrderError, restaurantOrderAction } from "@/server/orders";
 import { generateInvoice, reviewPayment, submitPayment, openDispute, resolveDispute, runMonthlyBilling } from "@/server/billing";
 import { DEFAULT_SETTINGS } from "@/server/settings";
 import { makeCustomer, makeRestaurant, orderPayload, resetDb } from "./helpers";
@@ -311,5 +311,69 @@ describe("order access control", () => {
     expect(canViewOrder(order, { ...viewer, token: order.trackingToken })).toBe(true); // the private tracking link
     await expect(customerCancelOrder(order.reference, viewer)).rejects.toThrow(/Order not found/);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("PLACED");
+  });
+});
+
+
+describe("customer confirms rejected / not-delivered orders", () => {
+  async function failed(f: Awaited<ReturnType<typeof makeRestaurant>>, k: string) {
+    const { order } = await place(f, k);
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT", { etaMinutes: 20 });
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "FAIL", { reason: "Customer canceled by phone" });
+    return order;
+  }
+
+  it("'I received it' → commission charged once, admin and restaurant alerted", async () => {
+    const f = await makeRestaurant();
+    const order = await failed(f, "v1");
+    expect(await prisma.commissionEvent.count({ where: { orderId: order.id } })).toBe(0);
+    const o = await customerVerdictOnOrder(order.reference, meta.userId!, "RECEIVED");
+    expect(o).toMatchObject({ customerVerdict: "RECEIVED", status: "FAILED" });
+    const ev = await prisma.commissionEvent.findUniqueOrThrow({ where: { orderId: order.id } });
+    expect(ev).toMatchObject({ billableEvent: "CUSTOMER_CONFIRMED", baseCents: 2000, rateBps: 1400, commissionCents: 280, status: "ACCRUED" });
+    expect(await prisma.notification.count({ where: { audience: "ADMIN", type: "ORDER_CONTRADICTED" } })).toBe(1);
+    expect(await prisma.notification.count({ where: { restaurantId: f.restaurant.id, type: "ORDER_CONTRADICTED" } })).toBe(1);
+    // answering again changes nothing
+    await customerVerdictOnOrder(order.reference, meta.userId!, "CONFIRMED");
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).customerVerdict).toBe("RECEIVED");
+    expect(await prisma.commissionEvent.count({ where: { orderId: order.id } })).toBe(1);
+  });
+
+  it("'that's right' → no commission, nobody alerted", async () => {
+    const f = await makeRestaurant();
+    const order = await failed(f, "v2");
+    await customerVerdictOnOrder(order.reference, meta.userId!, "CONFIRMED");
+    expect(await prisma.commissionEvent.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.notification.count({ where: { type: "ORDER_CONTRADICTED" } })).toBe(0);
+  });
+
+  it("rejected but delivered anyway → charged when the customer says they received it", async () => {
+    const f = await makeRestaurant();
+    const { order } = await place(f, "v3");
+    await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "REJECT", { reason: "Too busy" });
+    const o = await customerVerdictOnOrder(order.reference, meta.userId!, "NOT_CANCELED"); // means "received" for a rejection
+    expect(o.customerVerdict).toBe("RECEIVED");
+    expect(await prisma.commissionEvent.count({ where: { orderId: order.id } })).toBe(1);
+  });
+
+  it("only the customer who ordered can answer, within 7 days, and only for rejected / not-delivered orders", async () => {
+    const f = await makeRestaurant();
+    const order = await failed(f, "v4");
+    const stranger = await makeCustomer();
+    await expect(customerVerdictOnOrder(order.reference, stranger.id, "RECEIVED")).rejects.toThrow(/Order not found/);
+    await prisma.order.update({ where: { id: order.id }, data: { failedAt: new Date(Date.now() - 8 * 86400_000) } });
+    await expect(customerVerdictOnOrder(order.reference, meta.userId!, "RECEIVED")).rejects.toThrow(/can't be answered/);
+    const { order: live } = await place(f, "v5");
+    await expect(customerVerdictOnOrder(live.reference, meta.userId!, "RECEIVED")).rejects.toThrow(/can't be answered/);
+    expect(await prisma.commissionEvent.count()).toBe(0);
+  });
+
+  it("never double-charges (commission already created at acceptance)", async () => {
+    await prisma.platformSetting.create({ data: { key: "billableEvent", value: "ACCEPTED" } });
+    const f = await makeRestaurant();
+    const order = await failed(f, "v6");
+    expect(await prisma.commissionEvent.count({ where: { orderId: order.id } })).toBe(1);
+    await customerVerdictOnOrder(order.reference, meta.userId!, "RECEIVED");
+    expect(await prisma.commissionEvent.count({ where: { orderId: order.id } })).toBe(1);
   });
 });

@@ -1,3 +1,4 @@
+import { verdictAllowed } from "@/server/orders";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { loadCustomerOrder } from "@/server/order-view";
@@ -54,6 +55,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
         estimatedMinutes: o.estimatedMinutes,
         rejectionReason: o.rejectionReason,
         failureReason: o.failureReason,
+        verdict: { allowed: verdictAllowed(o, user?.id), given: o.customerVerdict },
         restaurantName: o.restaurantName,
         restaurantSlug: o.restaurant.slug,
         restaurantPhone: o.restaurantPhone ?? o.restaurant.phone,

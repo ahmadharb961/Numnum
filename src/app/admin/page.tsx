@@ -51,7 +51,7 @@ export default async function AdminOverview() {
         <StatCard label="Overdue invoices" value={overdue} tone={overdue ? "red" : undefined} sub={<Link href="/admin/invoices?status=OVERDUE" className="text-brand-600">Review →</Link>} />
         <StatCard label="Default commission" value={`${settings.defaultCommissionRateBps / 100}%`} sub={`charged on ${settings.billableEvent === "COMPLETED" ? "completed" : "accepted"} orders`} />
       </div>
-      <Section title="Suspicious activity" description={`Restaurants where ≥${Math.round(settings.suspiciousRejectRate * 100)}% of orders (last 30 days, min 5) were rejected or reported as not delivered.`}>
+      <Section title="Suspicious activity" description={`Restaurants where ≥${Math.round(settings.suspiciousRejectRate * 100)}% of orders (last 30 days, min 5) were rejected or reported as not delivered, or where customers contradicted the restaurant 2+ times.`}>
         {suspicious.length ? (
           <table className="table-app">
             <thead>
@@ -60,6 +60,7 @@ export default async function AdminOverview() {
                 <th>Orders</th>
                 <th>Rejected</th>
                 <th>Not delivered</th>
+                <th>Customer disagrees</th>
                 <th>Rate</th>
               </tr>
             </thead>
@@ -74,6 +75,7 @@ export default async function AdminOverview() {
                   <td>{s.total}</td>
                   <td>{s.rejected}</td>
                   <td>{s.failed}</td>
+                  <td className={s.contradicted ? "font-bold text-red-600" : ""}>{s.contradicted}</td>
                   <td className="font-bold text-red-600">{Math.round(s.rate * 100)}%</td>
                 </tr>
               ))}

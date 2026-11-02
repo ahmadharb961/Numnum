@@ -34,6 +34,7 @@ type Order = {
   estimatedMinutes: number | null;
   rejectionReason: string | null;
   failureReason: string | null;
+  verdict: { allowed: boolean; given: string | null };
   restaurantName: string;
   restaurantSlug: string;
   restaurantPhone: string | null;
@@ -154,7 +155,11 @@ export function OrderTracker({ order: o, token, placed, loggedIn }: { order: Ord
               {o.status === "CANCELED" && (o.canceledAt ? t("This order was canceled at {time}. You won't be charged.", { time: time(o.canceledAt) }) : t("This order was canceled. You won't be charged."))}
               {o.status === "FAILED" && (o.failureReason ? t("The order couldn't be completed: {reason}", { reason: t(o.failureReason) }) : t("The order couldn't be completed."))}
             </Alert>
-          ) : (
+          ) : null}
+          {(o.status === "FAILED" || o.status === "REJECTED") && (o.verdict.allowed || o.verdict.given) ? (
+            <VerdictBox reference={o.reference} status={o.status} restaurant={o.restaurantName} verdict={o.verdict} />
+          ) : null}
+          {bad ? null : (
             <ol className="mt-5 space-y-3">
               {steps.map((s) => (
                 <li key={s.key} className="flex gap-3">
@@ -171,7 +176,7 @@ export function OrderTracker({ order: o, token, placed, loggedIn }: { order: Ord
           <div className="mt-5 flex flex-wrap gap-2">
             {o.restaurantPhone && (
               <a href={`tel:+${o.restaurantPhone}`} className={buttonClass("outline", "sm")}>
-                <Phone className="h-4 w-4" /> Call {formatPhone(o.restaurantPhone)}
+                <Phone className="h-4 w-4" /> {t("Call {phone}", { phone: formatPhone(o.restaurantPhone) })}
               </a>
             )}
             {o.status === "PLACED" && (
@@ -267,5 +272,53 @@ export function OrderTracker({ order: o, token, placed, loggedIn }: { order: Ord
         </div>
       </Sheet>
     </main>
+  );
+}
+
+
+/** Rejected / not delivered: the customer confirms or contradicts the restaurant's version. */
+function VerdictBox({ reference, status, restaurant, verdict }: { reference: string; status: "FAILED" | "REJECTED"; restaurant: string; verdict: { allowed: boolean; given: string | null } }) {
+  const t = useT();
+  const router = useRouter();
+  const toast = useToast();
+  const [given, setGiven] = useState(verdict.given);
+  const [busy, setBusy] = useState<string | null>(null);
+  const answer = async (v: "CONFIRMED" | "RECEIVED" | "NOT_CANCELED") => {
+    setBusy(v);
+    try {
+      const r = await api<{ verdict: string }>(`/api/orders/${reference}/verdict`, { verdict: v });
+      setGiven(r.verdict);
+      router.refresh();
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+  if (given)
+    return (
+      <div className="mt-3 rounded-2xl bg-black/[0.04] p-4 text-sm" data-testid="verdict-done">
+        {given === "CONFIRMED" ? t("Thanks for confirming.") : t("Thanks for telling us. Our team has been notified about this order.")}
+      </div>
+    );
+  return (
+    <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4" data-testid="verdict-box">
+      <div className="font-bold">{status === "FAILED" ? t("{restaurant} marked this order as not delivered. Is that right?", { restaurant }) : t("Did you still receive food from this order?")}</div>
+      <p className="mt-1 text-sm text-ink-muted">{t("Your answer helps us keep restaurants on numnum honest.")}</p>
+      <div className="mt-3 grid gap-2">
+        {status === "FAILED" ? (
+          <>
+            <Button size="sm" variant="outline" loading={busy === "CONFIRMED"} onClick={() => answer("CONFIRMED")}>{t("Yes, that's right")}</Button>
+            <Button size="sm" variant="outline" loading={busy === "RECEIVED"} onClick={() => answer("RECEIVED")}>{t("No, I received the food")}</Button>
+            <Button size="sm" variant="outline" loading={busy === "NOT_CANCELED"} onClick={() => answer("NOT_CANCELED")}>{t("No, I didn't cancel")}</Button>
+          </>
+        ) : (
+          <>
+            <Button size="sm" variant="outline" loading={busy === "CONFIRMED"} onClick={() => answer("CONFIRMED")}>{t("No, I didn't receive anything")}</Button>
+            <Button size="sm" variant="outline" loading={busy === "RECEIVED"} onClick={() => answer("RECEIVED")}>{t("Yes, I received the food")}</Button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

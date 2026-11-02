@@ -33,6 +33,24 @@ export async function ensureCommission(tx: Tx, orderId: string, settings: Settin
   return tx.commissionEvent.findUnique({ where: { orderId: order.id } });
 }
 
+/**
+ * The customer contradicted the restaurant's "not delivered" / "rejected" (they say they got the
+ * food, or never cancelled): commission applies, dated now. Exactly once per order.
+ */
+export async function chargeContradictedOrder(tx: Tx, orderId: string, settings: Settings) {
+  const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { restaurant: { select: { commissionRateBps: true } } } });
+  const rateBps = order.restaurant.commissionRateBps ?? settings.defaultCommissionRateBps;
+  const commissionCents = calcCommission(order.commissionBaseCents, rateBps);
+  const inserted = await tx.$executeRaw`
+    INSERT INTO commission_events (id, "orderId", "restaurantId", "orderReference", "billableEvent", "baseCents", "rateBps", "commissionCents", period, status, "createdAt")
+    VALUES (${"ce_" + order.id}, ${order.id}, ${order.restaurantId}, ${order.reference}, 'CUSTOMER_CONFIRMED', ${order.commissionBaseCents}, ${rateBps}, ${commissionCents}, ${periodOf(new Date())}, 'ACCRUED', NOW())
+    ON CONFLICT ("orderId") DO NOTHING`;
+  if (inserted === 0) return null;
+  await tx.orderEvent.create({ data: { orderId: order.id, type: "COMMISSION_CREATED", actorType: "SYSTEM", data: { baseCents: order.commissionBaseCents, rateBps, commissionCents, billableEvent: "CUSTOMER_CONFIRMED" } } });
+  await tx.analyticsEvent.create({ data: { type: "commission_created", restaurantId: order.restaurantId, orderId: order.id } });
+  return tx.commissionEvent.findUnique({ where: { orderId: order.id } });
+}
+
 export function isUniqueViolation(e: unknown) {
   return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
 }

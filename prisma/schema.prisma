@@ -689,6 +689,10 @@ model Order {
   cancelReason        String?
   failedAt            DateTime?
   failureReason       String?
+  // Rejected / not-delivered orders: the customer is asked to confirm the restaurant's version.
+  // CONFIRMED (that's right) | RECEIVED (they got the food) | NOT_CANCELED (they didn't cancel)
+  customerVerdict     String?
+  customerVerdictAt   DateTime?
   suspicious          Boolean          @default(false)
   suspiciousReason    String?
   createdAt           DateTime         @default(now())
