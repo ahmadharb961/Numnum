@@ -6,6 +6,7 @@ import { formatMoney } from "@/lib/money";
 import { compactNumber, cn } from "@/lib/utils";
 import { RatingPill, VerifiedBadge, Badge } from "@/components/ui/misc";
 import { isOpenAt, type OpeningHours } from "@/lib/hours";
+import { useNow } from "@/lib/use-now";
 import { formatKm } from "@/lib/geo";
 import { useLocale, useT } from "@/i18n/client";
 
@@ -43,7 +44,9 @@ export function DishCard({ item }: { item: { id: string; name: string; descripti
 export function RestaurantCard({ r, delivery }: { delivery?: { km: number | null; deliverable: boolean; feeCents: number | null } | null; r: { slug: string; displayName: string; logoUrl: string | null; coverUrl: string | null; cuisine: string | null; area: string | null; city: string | null; verificationStatus: string; ratingAvg: number; ratingCount: number; deliveryEnabled: boolean; pickupEnabled: boolean; openingHours: unknown; avgPrepMinutes?: number | null; _count?: { menuItems: number } } }) {
   const t = useT();
   const locale = useLocale();
-  const open = isOpenAt(r.openingHours as OpeningHours);
+  // Worked out after hydration: the server and the browser may disagree at opening/closing time.
+  const now = useNow();
+  const open = now == null ? null : isOpenAt(r.openingHours as OpeningHours, new Date(now));
   const prep = r.avgPrepMinutes ?? null;
   return (
     <Link href={`/r/${r.slug}`} className="card block overflow-hidden active:scale-[0.99]">

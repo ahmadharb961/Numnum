@@ -4,7 +4,7 @@ import nodemailer from "nodemailer";
 // Dashboard notifications are always stored; email is best-effort and only sent
 // when SMTP is configured.
 
-let transport: nodemailer.Transporter | null = null;
+let transport: ReturnType<typeof nodemailer.createTransport> | null = null;
 
 function getTransport() {
   if (transport) return transport;

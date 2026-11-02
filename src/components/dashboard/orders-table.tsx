@@ -10,6 +10,7 @@ import { formatMoney, formatRate } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { STATUS_META, isActive, type OrderStatusKey } from "@/lib/order-status";
 import { cn, formatDateTime } from "@/lib/utils";
+import { useNow } from "@/lib/use-now";
 import { Badge, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
@@ -46,14 +47,16 @@ const REJECT_REASONS = ["Item(s) unavailable", "Outside delivery area", "Too bus
 const FAIL_REASONS = ["Customer canceled by phone", "Customer unreachable", "Customer refused the order", "Wrong address", "Customer didn't pick up"];
 const ETAS = [15, 20, 30, 45, 60, 90];
 
-function minutesAgo(iso: string, t: T, lang: string) {
-  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+function minutesAgo(iso: string, now: number | null, t: T, lang: string) {
+  if (now == null) return formatDateTime(iso, lang);
+  const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
   return m < 1 ? t("just now") : m < 60 ? t("{n} min ago", { n: m }) : formatDateTime(iso, lang);
 }
 
 export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Order[]; defaultEta: number; restaurantName: string }) {
   const t = useT();
   const lang = useLocale();
+  const now = useNow();
   // Active orders start open (staff need the address, phone and next step); closed ones start collapsed.
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const toggle = (id: string) => setToggled((t) => {
@@ -99,7 +102,7 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                 <div className="mt-1 text-sm">
                   <span className="font-semibold">{o.customerName}</span>{" "}
                   <span className="text-ink-muted">
-                    · {t("{n} items", { n: o.items.reduce((n, i) => n + i.quantity, 0) })} · {minutesAgo(o.createdAt, t, lang)}
+                    · {t("{n} items", { n: o.items.reduce((n, i) => n + i.quantity, 0) })} · {minutesAgo(o.createdAt, now, t, lang)}
                     {due && ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"].includes(o.status) && <> · {t("due")} {due.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Beirut" })}</>}
                   </span>
                 </div>

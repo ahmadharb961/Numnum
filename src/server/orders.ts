@@ -37,7 +37,7 @@ export const orderInputSchema = z.object({
       z.object({
         menuItemId: z.string().min(1),
         quantity: z.number().int().min(1).max(MAX_QTY),
-        selections: z.record(z.union([z.array(z.string()), z.string()])).default({}),
+        selections: z.record(z.string(), z.union([z.array(z.string()), z.string()])).default({}),
         note: z.string().max(300).optional().nullable(),
         reelId: z.string().optional().nullable(),
       }),

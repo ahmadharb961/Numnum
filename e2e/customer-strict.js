@@ -52,7 +52,7 @@ async function chooseDelivery(page) {
   const browser = await chromium.launch();
   const errors = [];
   const watch = (p) => {
-    p.on("pageerror", (e) => errors.push(`${p.url()}: ${e.message}`));
+    p.on("pageerror", (e) => errors.push(`[step ${step}] ${p.url()}: ${e.message}`));
     p.on("response", (r) => r.status() >= 500 && errors.push(`${r.status()} ${r.url()}`));
     p.on("console", (m) => m.type() === "error" && /hydrat|did not match|418/i.test(m.text()) && errors.push(`${p.url()}: ${m.text().slice(0, 2000)}`));
   };

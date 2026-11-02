@@ -33,6 +33,10 @@ async function register(ctx, email) {
   const user = await db.user.findUniqueOrThrow({ where: { email } });
   const bh = await db.restaurant.findUniqueOrThrow({ where: { slug: "burger-house" } });
   const reel = await db.reel.findFirstOrThrow({ where: { restaurantId: bh.id, status: "READY", visibility: "PUBLISHED" } });
+  // A reviewer made for this test, with a review only they wrote (the newest on the restaurant page)
+  const tag = Date.now().toString(36);
+  const reviewer = await db.user.create({ data: { email: `reviewer${tag}@test.lb`, passwordHash: "x", name: `Reviewer ${tag}` } });
+  const rv = await db.restaurantReview.create({ data: { restaurantId: bh.id, userId: reviewer.id, rating: 4, body: `Great burgers, fast delivery ${tag}` }, include: { user: true } });
 
   // ── Block a restaurant from a reel's Report sheet
   await p.goto(`/reel/${reel.id}`, { waitUntil: "networkidle" });
@@ -63,22 +67,19 @@ async function register(ctx, email) {
   check(!(await p.getByTestId("blocked-notice").count()) && (await p.locator("h1").first().innerText()).includes("Burger House"), "after unblocking, the page is back");
 
   // ── Hide a reviewer
-  const rv = await db.restaurantReview.findFirst({ where: { restaurantId: bh.id, status: "VISIBLE", NOT: { userId: user.id } }, include: { user: true } });
-  if (rv) {
+  {
     await p.goto("/r/burger-house#reviews", { waitUntil: "networkidle" });
-    const before = await p.locator("body").innerText();
-    const first = rv.user.name.split(" ")[0];
-    check(before.includes(rv.user.name) || before.includes(first), `review by ${rv.user.name} is visible`);
-    const item = p.locator("li", { hasText: rv.body ?? rv.user.name }).first();
+    check((await p.locator("body").innerText()).includes(rv.body), `review by ${rv.user.name} is visible`);
+    const item = p.locator("li", { hasText: rv.body }).first();
     await item.getByRole("button", { name: /^Report$/ }).click();
     await p.getByRole("button", { name: "Spam" }).click();
     await p.getByRole("button", { name: "Submit report" }).click();
     await p.waitForTimeout(1500);
     check(!!(await db.userBlock.findFirst({ where: { userId: user.id, blockedUserId: rv.userId } })), "reviewer blocked");
-    await p.goto("/r/burger-house#reviews", { waitUntil: "networkidle" });
-    const shown = await p.locator("li", { hasText: rv.body ?? "§§" }).count();
-    check(!rv.body || shown === 0, "their reviews are hidden");
-  } else check(false, "demo data has a review to hide");
+    await p.reload({ waitUntil: "networkidle" });
+    check((await p.locator("li", { hasText: rv.body }).count()) === 0, "their reviews are hidden");
+  }
+  await db.user.delete({ where: { id: reviewer.id } }); // its review goes with it
 
   // ── Delete my account
   await p.goto("/account", { waitUntil: "networkidle" });
