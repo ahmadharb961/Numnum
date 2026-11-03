@@ -39,7 +39,8 @@ export async function POST(req: Request) {
     });
     if ((body as { test?: boolean }).test) {
       const staff = user ? await prisma.restaurantStaff.count({ where: { userId: user.id } }) : 0;
-      await pushToDevices({ endpoint: sub.endpoint }, staff ? { title: "numnum notifications are on ✅", body: "You'll be alerted here for every new order.", url: "/dashboard/orders", tag: "test" } : { title: "numnum notifications are on ✅", body: "You'll get your order updates and the best offers here.", url: "/", tag: "test" });
+      // In the background: the phone shouldn't wait for Apple's / Google's answer.
+      void pushToDevices({ endpoint: sub.endpoint }, staff ? { title: "numnum notifications are on ✅", body: "You'll be alerted here for every new order.", url: "/dashboard/orders", tag: "test" } : { title: "numnum notifications are on ✅", body: "You'll get your order updates and the best offers here.", url: "/", tag: "test" });
     }
     return json({ ok: true });
   } catch (e) {

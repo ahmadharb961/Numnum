@@ -12,26 +12,32 @@ const check = (c, m, x) => {
   if (!c) fails++;
 };
 
-// The phone: answers permission and token requests, and can "tap" a notification.
-const fakePhone = (platform, permission) => `
-  // Like a real phone, the answer to "Allow notifications?" is remembered across page loads.
+// The phone, behaving like the real Capacitor bridge: addListener hands back the handle directly
+// (not a promise). mode: "ok" answers normally, "silent" never sends a notification address,
+// "refuse" fails the permission request.
+const fakePhone = (platform, permission, mode = "ok") => `
   window.__nn = { permission: sessionStorage.getItem("nn-perm") || ${JSON.stringify(permission)}, channels: [], listeners: {} };
-  const on = (ev, cb) => { (window.__nn.listeners[ev] ||= []).push(cb); return Promise.resolve({ remove: async () => { window.__nn.listeners[ev] = (window.__nn.listeners[ev] || []).filter((x) => x !== cb); } }); };
+  const on = (ev, cb) => { (window.__nn.listeners[ev] ||= []).push(cb); return { remove: async () => { window.__nn.listeners[ev] = (window.__nn.listeners[ev] || []).filter((x) => x !== cb); } }; };
   const fire = (ev, v) => (window.__nn.listeners[ev] || []).forEach((cb) => cb(v));
   window.Capacitor = { getPlatform: () => ${JSON.stringify(platform)}, Plugins: { PushNotifications: {
     checkPermissions: async () => ({ receive: window.__nn.permission }),
-    requestPermissions: async () => { if (window.__nn.permission !== "denied") window.__nn.permission = "granted"; sessionStorage.setItem("nn-perm", window.__nn.permission); return { receive: window.__nn.permission }; },
-    register: async () => setTimeout(() => fire("registration", { value: ${JSON.stringify(platform === "ios" ? "ab".repeat(32) : "fcm-test-token:APA91b_e2e-1")} }), 50),
+    requestPermissions: async () => {
+      if (${JSON.stringify(mode)} === "refuse") throw new Error("Notifications are not allowed for this application");
+      if (window.__nn.permission !== "denied") window.__nn.permission = "granted";
+      sessionStorage.setItem("nn-perm", window.__nn.permission);
+      return { receive: window.__nn.permission };
+    },
+    register: async () => { if (${JSON.stringify(mode)} === "ok") setTimeout(() => fire("registration", { value: ${JSON.stringify(platform === "ios" ? "ab".repeat(32) : "fcm-test-token:APA91b_e2e-1")} }), 50); },
     addListener: on,
     createChannel: async (c) => { window.__nn.channels.push(c); },
   } } };
   window.__nnTap = (url) => fire("pushNotificationActionPerformed", { notification: { data: { url } } });
 `;
 
-async function appContext(b, platform, permission = "prompt") {
+async function appContext(b, platform, permission = "prompt", mode = "ok") {
   const ua = (platform === "ios" ? devices["iPhone 13"] : devices["Pixel 7"]).userAgent + " NumnumApp/1";
   const ctx = await b.newContext({ ...(platform === "ios" ? devices["iPhone 13"] : devices["Pixel 7"]), userAgent: ua, baseURL: BASE });
-  await ctx.addInitScript(fakePhone(platform, permission));
+  await ctx.addInitScript(fakePhone(platform, permission, mode));
   return ctx;
 }
 async function login(ctx, email, pw) {
@@ -98,6 +104,24 @@ async function login(ctx, email, pw) {
   await c.getByText("Order notifications are on for this device").waitFor({ timeout: 10000 }).catch(() => {});
   const ios = await db.pushSubscription.findFirst({ where: { endpoint: `native:ios:${"ab".repeat(32)}` }, include: { user: true } });
   check(ios?.user?.email === "customer@numnum.demo", "the iPhone is saved for the customer", ios);
+
+  // ── Things going wrong on the phone: the button always stops and says why
+  for (const [mode, what, maxS] of [["silent", "the phone never sends its notification address", 30], ["refuse", "the phone refuses the permission request", 5]]) {
+    const sctx = await appContext(b, "ios", "prompt", mode);
+    const sp = await login(sctx, "owner@forno.demo", "demo1234");
+    await sp.goto("/account", { waitUntil: "networkidle" });
+    const rate = sp.getByRole("dialog", { name: "How was your order?" });
+    if (await rate.waitFor({ timeout: 1500 }).then(() => true, () => false)) await rate.getByRole("button", { name: /Close|Not now/ }).first().click().catch(() => {});
+    const t0 = Date.now();
+    await sp.getByRole("button", { name: "Turn on notifications" }).click();
+    const shown = await sp.getByText("Couldn't turn on notifications").waitFor({ timeout: maxS * 1000 }).then(() => true, () => false);
+    const secs = Math.round((Date.now() - t0) / 1000);
+    check(shown, `${what}: the spinner stops (after ${secs} s) with a message`);
+    check(await sp.getByRole("button", { name: "Try again" }).isEnabled().catch(() => false), `${what}: 'Try again' is offered`);
+    const reason = await sp.locator("text=/\\(.+\\)/").last().innerText().catch(() => "");
+    check(reason.length > 3, `${what}: the reason is shown: ${reason}`);
+    await sctx.close();
+  }
 
   // ── The API refuses junk tokens
   const bad = await c.request.post("/api/push", { data: { native: { platform: "ios", token: "<script>" } } });

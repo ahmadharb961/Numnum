@@ -329,4 +329,5 @@ export const AR5: Record<string, string> = {
   "Request already sent. We'll contact you shortly.": "تم إرسال الطلب مسبقاً. سنتواصل معك قريباً.",
   "Request sent. We'll contact you within 2 business days to close your restaurant and delete your account.": "تم إرسال الطلب. سنتواصل معك خلال يومَي عمل لإغلاق مطعمك وحذف حسابك.",
   "Restaurants and people you hid": "المطاعم والأشخاص الذين أخفيتهم",
+  "Couldn't turn on notifications. Check your internet connection and try again.": "تعذّر تفعيل الإشعارات. تحقّق من اتصالك بالإنترنت وحاول مرة أخرى.",
 };

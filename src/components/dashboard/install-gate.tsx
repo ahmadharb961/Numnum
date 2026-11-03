@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BellRing, CheckCircle2 } from "lucide-react";
-import { isInstalled, isIos, isMobile, isNativeApp, pushState, resyncDevice, turnOn, type PushState } from "@/lib/push-client";
+import { isInstalled, isIos, isMobile, isNativeApp, lastPushError, pushState, resyncDevice, turnOn, type PushState } from "@/lib/push-client";
 import { InstallHelp } from "@/components/install-guide";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
@@ -104,8 +104,9 @@ export function InstallGate({ children, bypass }: { children: React.ReactNode; b
             <h1 className="mt-3 text-2xl font-extrabold leading-tight">{t("Allow notifications for new orders")}</h1>
             <p className="mt-2 text-ink-soft">{t("Your phone will ask for permission. Tap")} <b>{t("Allow")}</b> {t("so you never miss an order.")}</p>
             <Button size="lg" block className="mt-6" onClick={enable} loading={busy}>
-              <BellRing className="h-5 w-5" /> {t("Turn on order notifications")}
+              <BellRing className="h-5 w-5" /> {t(push === "error" ? "Try again" : "Turn on order notifications")}
             </Button>
+            {push === "error" && <p className="mt-3 text-sm font-medium text-red-600">{t("Couldn't turn on notifications. Check your internet connection and try again.")}{lastPushError && <span className="mt-1 block text-[11px] font-normal text-ink-muted">({lastPushError})</span>}</p>}
             {push === "unsupported" && <p className="mt-3 text-sm text-ink-muted">This phone doesn&apos;t support web notifications. Update your phone&apos;s software, or keep the Orders screen open.</p>}
           </>
         )}

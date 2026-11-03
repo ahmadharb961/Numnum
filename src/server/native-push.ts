@@ -153,6 +153,14 @@ function session(host: string) {
   return apnsSession;
 }
 
+/** Rejects after `ms`, so a connection that never opens can't hold a request forever. */
+function withTimeout<T>(ms: number, p: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms);
+    p.then((v) => (clearTimeout(t), resolve(v)), (e) => (clearTimeout(t), reject(e)));
+  });
+}
+
 export async function sendApns(token: string, msg: PushMessage): Promise<SendResult> {
   const cfg = apnsConfig();
   if (!cfg) {
@@ -170,7 +178,7 @@ export async function sendApns(token: string, msg: PushMessage): Promise<SendRes
       "apns-expiration": String(Math.floor(Date.now() / 1000) + (msg.requireInteraction ? 24 * 3600 : 3600)),
       ...(msg.tag ? { "apns-collapse-id": msg.tag.slice(0, 64) } : {}),
     };
-    const { status, body } = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+    const { status, body } = await withTimeout(10_000, new Promise<{ status: number; body: string }>((resolve, reject) => {
       const req = session(cfg.host).request(headers);
       let status = 0;
       let body = "";
@@ -181,7 +189,7 @@ export async function sendApns(token: string, msg: PushMessage): Promise<SendRes
       req.on("error", reject);
       req.on("close", () => status || reject(new Error("APNs request closed")));
       req.end(JSON.stringify(apnsPayload(msg)));
-    });
+    }));
     if (status === 200) return "ok";
     const reason = (() => {
       try {
@@ -195,6 +203,7 @@ export async function sendApns(token: string, msg: PushMessage): Promise<SendRes
     console.error("APNs push failed", status, reason);
     return "error";
   } catch (e) {
+    apnsSession?.destroy();
     apnsSession = null;
     console.error("APNs push error", e);
     return "error";

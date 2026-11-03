@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, BellOff, CheckCircle2 } from "lucide-react";
-import { pushState, resyncDevice, turnOn, type PushState } from "@/lib/push-client";
+import { lastPushError, pushState, resyncDevice, turnOn, type PushState } from "@/lib/push-client";
 import { Button } from "@/components/ui/button";
 import { InstallSheet } from "./install-sheet";
 import { useT } from "@/i18n/client";
@@ -34,7 +34,7 @@ export function NotifyPrompt({ compact }: { compact?: boolean }) {
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-brand-600">{state === "blocked" ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}</span>
       <div className="min-w-0 flex-1">
         <div className="font-bold">{t("Get order updates on your phone")}</div>
-        {state === "off" && (
+        {(state === "off" || state === "error") && (
           <>
             <p className="mt-0.5 text-ink-muted">We&apos;ll tell you when your order is accepted, on its way and delivered.</p>
             <Button
@@ -47,8 +47,9 @@ export function NotifyPrompt({ compact }: { compact?: boolean }) {
                 setBusy(false);
               }}
             >
-              {t("Turn on notifications")}
+              {t(state === "error" ? "Try again" : "Turn on notifications")}
             </Button>
+            {state === "error" && <p className="mt-2 text-xs font-medium text-red-600">{t("Couldn't turn on notifications. Check your internet connection and try again.")}{lastPushError && <span className="mt-1 block text-[11px] font-normal text-ink-muted">({lastPushError})</span>}</p>}
           </>
         )}
         {state === "ios-needs-install" && (
