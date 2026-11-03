@@ -18,6 +18,8 @@ const config: CapacitorConfig = {
   ios: { contentInset: "never", limitsNavigationsToAppBoundDomains: false },
   plugins: {
     SplashScreen: { launchShowDuration: 900, backgroundColor: "#ff5412", showSpinner: false },
+    // Show notifications even while the app is open (e.g. a new order while on another screen).
+    PushNotifications: { presentationOptions: ["badge", "sound", "banner", "list"] },
   },
 };
 

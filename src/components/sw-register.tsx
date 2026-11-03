@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { setUpAppNotifications } from "@/lib/push-client";
 
 export function ServiceWorker() {
   useEffect(() => {
+    setUpAppNotifications(); // inside the store app only
     if (!("serviceWorker" in navigator)) return;
     // Tapping a notification while the app is open: the worker asks this page to open its link.
     const onMessage = (e: MessageEvent) => {

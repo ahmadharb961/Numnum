@@ -2,6 +2,7 @@ import "server-only";
 import webpush from "web-push";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
+import { NATIVE_PREFIX, sendNative } from "./native-push";
 import { tFor } from "@/i18n/server";
 import type { T } from "@/i18n/core";
 
@@ -58,6 +59,15 @@ export async function pushToDevices(where: Prisma.PushSubscriptionWhereInput, ms
     let sent = 0;
     await Promise.allSettled(
       subs.map(async (s) => {
+        if (s.endpoint.startsWith(NATIVE_PREFIX)) {
+          // The numnum store app: Apple / Google push instead of web push.
+          const r = await sendNative(s.endpoint, msg);
+          if (r === "ok") {
+            sent++;
+            await prisma.pushSubscription.update({ where: { id: s.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
+          } else if (r === "gone") await prisma.pushSubscription.delete({ where: { id: s.id } }).catch(() => {});
+          return;
+        }
         try {
           await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(msg), { TTL: msg.requireInteraction ? 24 * 3600 : 60 * 60, timeout: 8000, urgency: "high" });
           sent++;

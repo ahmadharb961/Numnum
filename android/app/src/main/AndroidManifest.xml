@@ -20,6 +20,11 @@
             </intent-filter>
         </activity>
 
+        <!-- Notifications: numnum's icon and orange, on the "Orders & updates" channel the app creates -->
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_numnum" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/numnum_orange" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="orders" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
