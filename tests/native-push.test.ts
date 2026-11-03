@@ -10,7 +10,7 @@ vi.mock("web-push", () => ({
 import { prisma } from "@/server/db";
 import { pushToDevices } from "@/server/push";
 import * as native from "@/server/native-push";
-import { apnsPayload, apnsToken, fcmMessage, nativeEndpoint, parseNativeEndpoint, readSecret, sendApns, sendFcm, sendNative } from "@/server/native-push";
+import { apnsPayload, apnsToken, fcmMessage, nativeEndpoint, normalizePem, parseNativeEndpoint, readSecret, sendApns, sendFcm, sendNative } from "@/server/native-push";
 import { resetDb } from "./helpers";
 
 const ec = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -36,6 +36,31 @@ describe("device addresses and secrets", () => {
     const json = JSON.stringify(serviceAccount);
     expect(JSON.parse(readSecret(Buffer.from(json).toString("base64"))!)).toEqual(serviceAccount);
     expect(readSecret("  ")).toBeNull();
+  });
+});
+
+describe("keys pasted into a hosting panel", () => {
+  const body = p8.replace(/-----[A-Z ]+-----/g, "").replace(/\s/g, "");
+  const pasted = {
+    "as downloaded": p8,
+    "line breaks turned into spaces": p8.trim().replace(/\n/g, " "),
+    "line breaks removed": p8.trim().replace(/\n/g, ""),
+    "literal \\n": p8.trim().replace(/\n/g, "\\n"),
+    "Windows line breaks": p8.replace(/\n/g, "\r\n"),
+    "only the middle part": body,
+    base64: Buffer.from(p8).toString("base64"),
+  };
+  for (const [how, value] of Object.entries(pasted))
+    it(`signs with a key pasted ${how}`, () => {
+      const key = normalizePem(readSecret(value)!);
+      const sig = crypto.sign("SHA256", Buffer.from("x"), { key, dsaEncoding: "ieee-p1363" });
+      expect(crypto.verify("SHA256", Buffer.from("x"), { key: ec.publicKey, dsaEncoding: "ieee-p1363" }, sig)).toBe(true);
+    });
+
+  it("the Firebase key inside the JSON is repaired too", () => {
+    const flat = { ...serviceAccount, private_key: serviceAccount.private_key.trim().replace(/\n/g, " ") };
+    const key = normalizePem(flat.private_key);
+    expect(() => crypto.sign("RSA-SHA256", Buffer.from("x"), key)).not.toThrow();
   });
 });
 
@@ -166,6 +191,21 @@ describe("iPhone sending (Apple)", () => {
     expect(await sendNative(nativeEndpoint("ios", APNS_TOKEN), msg)).toBe("error");
     expect(native.lastNativeFailure).toBe("the server is missing APNS_KEY_ID");
     process.env.APNS_KEY_ID = key;
+    const good = process.env.APNS_KEY;
+    process.env.APNS_KEY = "not a key at all";
+    expect(await sendNative(nativeEndpoint("ios", APNS_TOKEN), msg)).toBe("error");
+    expect(native.lastNativeFailure).toMatch(/APNS_KEY\) can't be read/);
+    process.env.APNS_KEY = good;
+  });
+
+  it("delivers with the key exactly as a hosting panel mangles it (line breaks turned into spaces)", async () => {
+    const good = process.env.APNS_KEY;
+    process.env.APNS_KEY = p8.trim().replace(/\n/g, " ");
+    expect(await sendApns(APNS_TOKEN, msg)).toBe("ok");
+    const auth = String(seen.at(-1)!.headers.authorization).slice(7);
+    const [h, p, sig] = auth.split(".");
+    expect(crypto.verify("SHA256", Buffer.from(`${h}.${p}`), { key: ec.publicKey, dsaEncoding: "ieee-p1363" }, Buffer.from(sig, "base64url"))).toBe(true);
+    process.env.APNS_KEY = good;
   });
 
   it("an uninstalled app is 'gone'", async () => {

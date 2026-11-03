@@ -45,6 +45,18 @@ export function readSecret(raw: string | undefined): string | null {
 export let lastNativeFailure: string | null = null;
 const fail = (why: string): SendResult => ((lastNativeFailure = why), "error");
 
+/**
+ * Rebuilds a PEM key from however it was pasted: hosting panels often turn its line breaks into
+ * spaces or drop them (OpenSSL then fails with "DECODER routines::unsupported"). Also accepts
+ * literal "\n", Windows line breaks, or just the base64 body without the BEGIN/END lines.
+ */
+export function normalizePem(key: string): string {
+  const m = /-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END [A-Z0-9 ]+-----/.exec(key);
+  const label = m?.[1]?.trim() || "PRIVATE KEY";
+  const body = (m ? m[2] : key).replace(/\\[rn]/g, "").replace(/[^A-Za-z0-9+/=]/g, "");
+  return `-----BEGIN ${label}-----\n${(body.match(/.{1,64}/g) ?? []).join("\n")}\n-----END ${label}-----\n`;
+}
+
 const warned = new Set<string>();
 function warnOnce(key: string, msg: string) {
   if (warned.has(key)) return;
@@ -63,7 +75,7 @@ function serviceAccount(): ServiceAccount | null {
   try {
     const sa = JSON.parse(raw) as ServiceAccount;
     if (!sa.project_id || !sa.client_email || !sa.private_key) throw new Error("incomplete");
-    return { ...sa, private_key: sa.private_key.replace(/\\n/g, "\n") };
+    return { ...sa, private_key: normalizePem(sa.private_key) };
   } catch {
     warnOnce("fcm-bad", "FCM_SERVICE_ACCOUNT is not valid service-account JSON: Android app notifications are off");
     return null;
@@ -124,11 +136,12 @@ export async function sendFcm(token: string, msg: PushMessage): Promise<SendResu
 
 // ── iPhone: Apple Push Notification service ───────────────────────────────────────────────────
 
-let apnsJwt: { value: string; iat: number } | null = null;
+let apnsJwt: { value: string; iat: number; by: string } | null = null;
 let apnsSession: http2.ClientHttp2Session | null = null;
 
 function apnsConfig() {
-  const key = readSecret(process.env.APNS_KEY);
+  const raw = readSecret(process.env.APNS_KEY);
+  const key = raw ? normalizePem(raw) : null;
   const keyId = process.env.APNS_KEY_ID?.trim();
   const teamId = process.env.APNS_TEAM_ID?.trim();
   if (!key || !keyId || !teamId) return null;
@@ -137,10 +150,11 @@ function apnsConfig() {
 
 /** Apple's token: ES256-signed, reused for 50 minutes (Apple refuses tokens older than an hour). */
 export function apnsToken(cfg: { key: string; keyId: string; teamId: string }, now = Math.floor(Date.now() / 1000)) {
-  if (apnsJwt && now - apnsJwt.iat < 50 * 60) return apnsJwt.value;
+  const by = `${cfg.teamId}:${cfg.keyId}:${cfg.key}`; // a new key or key id signs a new token
+  if (apnsJwt && apnsJwt.by === by && now - apnsJwt.iat < 50 * 60) return apnsJwt.value;
   const unsigned = `${b64url(JSON.stringify({ alg: "ES256", kid: cfg.keyId }))}.${b64url(JSON.stringify({ iss: cfg.teamId, iat: now }))}`;
   const sig = crypto.sign("SHA256", Buffer.from(unsigned), { key: cfg.key, dsaEncoding: "ieee-p1363" });
-  apnsJwt = { value: `${unsigned}.${b64url(sig)}`, iat: now };
+  apnsJwt = { value: `${unsigned}.${b64url(sig)}`, iat: now, by };
   return apnsJwt.value;
 }
 
@@ -172,11 +186,18 @@ export async function sendApns(token: string, msg: PushMessage): Promise<SendRes
     const missing = ["APNS_KEY", "APNS_KEY_ID", "APNS_TEAM_ID"].filter((k) => !process.env[k]?.trim());
     return fail(missing.length ? `the server is missing ${missing.join(", ")}` : "the server's Apple key (APNS_KEY) isn't readable");
   }
+  let jwt: string;
+  try {
+    jwt = apnsToken(cfg);
+  } catch (e) {
+    console.error("APNS_KEY can't be used", e);
+    return fail("the server's Apple key (APNS_KEY) can't be read: paste the whole .p8 file again in Hostinger");
+  }
   try {
     const headers: http2.OutgoingHttpHeaders = {
       ":method": "POST",
       ":path": `/3/device/${token}`,
-      authorization: `bearer ${apnsToken(cfg)}`,
+      authorization: `bearer ${jwt}`,
       "apns-topic": cfg.topic,
       "apns-push-type": "alert",
       "apns-priority": "10",
