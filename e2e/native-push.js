@@ -102,6 +102,11 @@ async function login(ctx, email, pw) {
   check(await btn.isVisible().catch(() => false), "app: customer account offers order notifications");
   await btn.click().catch(() => {});
   await c.getByText("Order notifications are on for this device").waitFor({ timeout: 10000 }).catch(() => {});
+  // "Send me a test notification" shows what the server / Apple answered
+  await c.getByTestId("send-test-notification").click();
+  const answer = await c.getByText(/Sent\. It should arrive|couldn't be sent/).first().innerText({ timeout: 25000 }).catch(() => "");
+  const reason = await c.locator("text=/\\(.+\\)/").last().innerText().catch(() => "");
+  check(/couldn't be sent/.test(answer) && /APNS_KEY/.test(reason), `test notification: the server's answer is shown (${reason || answer})`);
   const ios = await db.pushSubscription.findFirst({ where: { endpoint: `native:ios:${"ab".repeat(32)}` }, include: { user: true } });
   check(ios?.user?.email === "customer@numnum.demo", "the iPhone is saved for the customer", ios);
 

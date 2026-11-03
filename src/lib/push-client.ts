@@ -66,10 +66,31 @@ function nativeToken(np: NativePush): Promise<string> {
   ).finally(() => offs.forEach((off) => off()));
 }
 
-async function saveNative(np: NativePush, test = false) {
+type SaveAnswer = { delivery?: "ok" | "gone" | "error"; detail?: string | null };
+async function saveNative(np: NativePush, test = false): Promise<SaveAnswer> {
   const token = await nativeToken(np);
-  const r = await fetch("/api/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ native: { platform: nativePlatform(), token }, test }), signal: AbortSignal.timeout(15_000) }).catch(() => null);
+  const r = await fetch("/api/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ native: { platform: nativePlatform(), token }, test }), signal: AbortSignal.timeout(25_000) }).catch(() => null);
   if (!r?.ok) throw new Error(r ? `server answered ${r.status}` : "couldn't reach numnum");
+  return (await r.json().catch(() => ({}))) as SaveAnswer;
+}
+
+/**
+ * "Send me a test notification": saves this device again and sends it a test. In the app the
+ * answer includes what Apple / Google said, so a problem can be read straight off the screen.
+ */
+export async function sendTestNotification(): Promise<{ ok: boolean; detail: string | null }> {
+  try {
+    const np = nativePush();
+    if (np) {
+      const a = await saveNative(np, true);
+      return { ok: a.delivery === "ok", detail: a.delivery === "ok" ? null : (a.detail ?? "not delivered") };
+    }
+    const sub = supported() ? await (await navigator.serviceWorker.getRegistration("/"))?.pushManager.getSubscription() : null;
+    if (!sub) return { ok: false, detail: "notifications aren't on in this browser" };
+    return { ok: await save(sub, true), detail: null };
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 let appReady = false;

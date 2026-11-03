@@ -9,7 +9,8 @@ vi.mock("web-push", () => ({
 
 import { prisma } from "@/server/db";
 import { pushToDevices } from "@/server/push";
-import { apnsPayload, apnsToken, fcmMessage, nativeEndpoint, parseNativeEndpoint, readSecret, sendApns, sendFcm } from "@/server/native-push";
+import * as native from "@/server/native-push";
+import { apnsPayload, apnsToken, fcmMessage, nativeEndpoint, parseNativeEndpoint, readSecret, sendApns, sendFcm, sendNative } from "@/server/native-push";
 import { resetDb } from "./helpers";
 
 const ec = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -151,6 +152,20 @@ describe("iPhone sending (Apple)", () => {
     expect(headers["apns-collapse-id"]).toBe(msg.tag);
     expect(String(headers.authorization)).toMatch(/^bearer [\w-]+\.[\w-]+\.[\w-]+$/);
     expect(JSON.parse(body)).toEqual(apnsPayload(msg));
+  });
+
+  it("explains failures in plain words (shown by 'Send me a test notification')", async () => {
+    reply = { status: 403, body: JSON.stringify({ reason: "InvalidProviderToken" }) };
+    expect(await sendNative(nativeEndpoint("ios", APNS_TOKEN), msg)).toBe("error");
+    expect(native.lastNativeFailure).toBe("Apple answered 403 InvalidProviderToken");
+    reply = { status: 200 };
+    expect(await sendNative(nativeEndpoint("ios", APNS_TOKEN), msg)).toBe("ok");
+    expect(native.lastNativeFailure).toBeNull();
+    const key = process.env.APNS_KEY_ID;
+    delete process.env.APNS_KEY_ID;
+    expect(await sendNative(nativeEndpoint("ios", APNS_TOKEN), msg)).toBe("error");
+    expect(native.lastNativeFailure).toBe("the server is missing APNS_KEY_ID");
+    process.env.APNS_KEY_ID = key;
   });
 
   it("an uninstalled app is 'gone'", async () => {

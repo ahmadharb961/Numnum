@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, BellOff, CheckCircle2 } from "lucide-react";
-import { lastPushError, pushState, resyncDevice, turnOn, type PushState } from "@/lib/push-client";
+import { lastPushError, pushState, resyncDevice, sendTestNotification, turnOn, type PushState } from "@/lib/push-client";
 import { Button } from "@/components/ui/button";
 import { InstallSheet } from "./install-sheet";
 import { useT } from "@/i18n/client";
@@ -13,6 +13,8 @@ export function NotifyPrompt({ compact }: { compact?: boolean }) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [guide, setGuide] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [test, setTest] = useState<{ ok: boolean; detail: string | null } | null>(null);
 
   useEffect(() => {
     void pushState().then((s) => {
@@ -24,8 +26,30 @@ export function NotifyPrompt({ compact }: { compact?: boolean }) {
   if (state === null || state === "unsupported") return null;
   if (state === "on")
     return compact ? null : (
-      <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-        <CheckCircle2 className="h-5 w-5" /> {t("Order notifications are on for this device")}
+      <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="flex items-center gap-2 font-semibold">
+          <CheckCircle2 className="h-5 w-5" /> {t("Order notifications are on for this device")}
+        </div>
+        <button
+          type="button"
+          disabled={testing}
+          onClick={async () => {
+            setTesting(true);
+            setTest(null);
+            setTest(await sendTestNotification());
+            setTesting(false);
+          }}
+          className="mt-2 text-xs font-bold text-emerald-900 underline disabled:opacity-60"
+          data-testid="send-test-notification"
+        >
+          {testing ? t("Sending…") : t("Send me a test notification")}
+        </button>
+        {test?.ok && <p className="mt-1 text-xs">{t("Sent. It should arrive in a few seconds.")}</p>}
+        {test && !test.ok && (
+          <p className="mt-1 text-xs font-medium text-red-600">
+            {t("The test notification couldn't be sent.")} <span className="font-normal text-ink-muted">({test.detail})</span>
+          </p>
+        )}
       </div>
     );
 

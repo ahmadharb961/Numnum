@@ -330,4 +330,8 @@ export const AR5: Record<string, string> = {
   "Request sent. We'll contact you within 2 business days to close your restaurant and delete your account.": "تم إرسال الطلب. سنتواصل معك خلال يومَي عمل لإغلاق مطعمك وحذف حسابك.",
   "Restaurants and people you hid": "المطاعم والأشخاص الذين أخفيتهم",
   "Couldn't turn on notifications. Check your internet connection and try again.": "تعذّر تفعيل الإشعارات. تحقّق من اتصالك بالإنترنت وحاول مرة أخرى.",
+  "Send me a test notification": "أرسل لي إشعاراً تجريبياً",
+  "Sending…": "جارٍ الإرسال…",
+  "Sent. It should arrive in a few seconds.": "تم الإرسال. سيصلك خلال ثوانٍ.",
+  "The test notification couldn't be sent.": "تعذّر إرسال الإشعار التجريبي.",
 };

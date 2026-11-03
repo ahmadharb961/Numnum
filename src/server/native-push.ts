@@ -41,6 +41,10 @@ export function readSecret(raw: string | undefined): string | null {
   return !v.startsWith("{") && v.includes("-----BEGIN") ? v.replace(/\\n/g, "\n") : v;
 }
 
+/** Why the last app notification wasn't delivered, in plain words (shown by "Send me a test notification"). */
+export let lastNativeFailure: string | null = null;
+const fail = (why: string): SendResult => ((lastNativeFailure = why), "error");
+
 const warned = new Set<string>();
 function warnOnce(key: string, msg: string) {
   if (warned.has(key)) return;
@@ -96,7 +100,7 @@ export async function sendFcm(token: string, msg: PushMessage): Promise<SendResu
   const sa = serviceAccount();
   if (!sa) {
     warnOnce("fcm-missing", "FCM_SERVICE_ACCOUNT is not set: Android app notifications are off");
-    return "error";
+    return fail(process.env.FCM_SERVICE_ACCOUNT ? "the server's Firebase key (FCM_SERVICE_ACCOUNT) isn't valid" : "the server's Firebase key (FCM_SERVICE_ACCOUNT) isn't set");
   }
   try {
     const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
@@ -111,10 +115,10 @@ export async function sendFcm(token: string, msg: PushMessage): Promise<SendResu
     if (r.status === 400 && /INVALID_ARGUMENT/.test(text) && /token/i.test(text)) return "gone";
     if (r.status === 401) googleToken = null;
     console.error("FCM push failed", r.status, text.slice(0, 300));
-    return "error";
+    return fail(`Google answered ${r.status}: ${(/"message":\s*"([^"]+)"/.exec(text)?.[1] ?? text).slice(0, 160)}`);
   } catch (e) {
     console.error("FCM push error", e);
-    return "error";
+    return fail(`couldn't reach Google: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200));
   }
 }
 
@@ -165,7 +169,8 @@ export async function sendApns(token: string, msg: PushMessage): Promise<SendRes
   const cfg = apnsConfig();
   if (!cfg) {
     warnOnce("apns-missing", "APNS_KEY / APNS_KEY_ID / APNS_TEAM_ID are not set: iPhone app notifications are off");
-    return "error";
+    const missing = ["APNS_KEY", "APNS_KEY_ID", "APNS_TEAM_ID"].filter((k) => !process.env[k]?.trim());
+    return fail(missing.length ? `the server is missing ${missing.join(", ")}` : "the server's Apple key (APNS_KEY) isn't readable");
   }
   try {
     const headers: http2.OutgoingHttpHeaders = {
@@ -201,16 +206,17 @@ export async function sendApns(token: string, msg: PushMessage): Promise<SendRes
     if (status === 410 || reason === "BadDeviceToken" || reason === "Unregistered" || reason === "DeviceTokenNotForTopic") return "gone";
     if (reason === "ExpiredProviderToken") apnsJwt = null;
     console.error("APNs push failed", status, reason);
-    return "error";
+    return fail(`Apple answered ${status}${reason ? ` ${reason}` : ""}`);
   } catch (e) {
     apnsSession?.destroy();
     apnsSession = null;
     console.error("APNs push error", e);
-    return "error";
+    return fail(`couldn't reach Apple: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200));
   }
 }
 
 export function sendNative(endpoint: string, msg: PushMessage): Promise<SendResult> {
+  lastNativeFailure = null;
   const d = parseNativeEndpoint(endpoint);
   if (!d) return Promise.resolve("gone");
   return d.platform === "ios" ? sendApns(d.token, msg) : sendFcm(d.token, msg);

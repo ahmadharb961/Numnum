@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db";
 import { getCurrentUser } from "@/server/auth";
 import { vapidKeys, pushToDevices } from "@/server/push";
-import { nativeEndpoint } from "@/server/native-push";
+import { lastNativeFailure, nativeEndpoint, sendNative } from "@/server/native-push";
 import { errorResponse, json, readJson } from "@/server/http";
 
 const subSchema = z.object({ endpoint: z.string().url().max(1000), keys: z.object({ p256dh: z.string().min(10).max(200), auth: z.string().min(8).max(100) }) });
@@ -39,8 +39,14 @@ export async function POST(req: Request) {
     });
     if ((body as { test?: boolean }).test) {
       const staff = user ? await prisma.restaurantStaff.count({ where: { userId: user.id } }) : 0;
-      // In the background: the phone shouldn't wait for Apple's / Google's answer.
-      void pushToDevices({ endpoint: sub.endpoint }, staff ? { title: "numnum notifications are on ✅", body: "You'll be alerted here for every new order.", url: "/dashboard/orders", tag: "test" } : { title: "numnum notifications are on ✅", body: "You'll get your order updates and the best offers here.", url: "/", tag: "test" });
+      const msg = staff ? { title: "numnum notifications are on ✅", body: "You'll be alerted here for every new order.", url: "/dashboard/orders", tag: "test" } : { title: "numnum notifications are on ✅", body: "You'll get your order updates and the best offers here.", url: "/", tag: "test" };
+      if (body.native) {
+        // The app waits for Apple's / Google's answer (10 s at most) so it can show it.
+        const delivery = await sendNative(sub.endpoint, msg);
+        if (delivery === "gone") await prisma.pushSubscription.deleteMany({ where: { endpoint: sub.endpoint } });
+        return json({ ok: true, delivery, detail: delivery === "ok" ? null : delivery === "gone" ? "Apple/Google refused this phone's notification address" : lastNativeFailure });
+      }
+      void pushToDevices({ endpoint: sub.endpoint }, msg); // browsers: in the background
     }
     return json({ ok: true });
   } catch (e) {
