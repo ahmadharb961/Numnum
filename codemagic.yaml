@@ -26,9 +26,8 @@ workflows:
         script: npx cap sync ios
       - name: Use the signing profiles
         script: xcode-project use-profiles
-      - name: Build number
-        script: agvtool new-version -all $(($BUILD_NUMBER + 1))
-        working_directory: ios/App
+      - name: Build number (Codemagic's counter, so every upload is higher than the last)
+        script: sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/g" ios/App/App.xcodeproj/project.pbxproj
       - name: Build the app
         script: xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
     artifacts:
