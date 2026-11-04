@@ -343,4 +343,5 @@ export const AR5: Record<string, string> = {
   "New orders arrive as notifications, even when your phone is locked.": "تصلك الطلبات الجديدة كإشعارات، حتى عندما يكون هاتفك مقفلاً.",
   "Get the numnum app to receive order notifications on your iPhone.": "حمّل تطبيق numnum لتصلك إشعارات الطلبات على iPhone.",
   "Get the app": "حمّل التطبيق",
+  "The test couldn't be sent. Please try again later or contact numnum support.": "تعذّر إرسال الإشعار التجريبي. حاول لاحقاً أو تواصل مع دعم numnum.",
 };

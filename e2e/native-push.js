@@ -106,7 +106,8 @@ async function login(ctx, email, pw) {
   await c.getByTestId("send-test-notification").click();
   const answer = await c.getByText(/Sent\. It should arrive|couldn't be sent/).first().innerText({ timeout: 25000 }).catch(() => "");
   const reason = await c.locator("text=/\\(.+\\)/").last().innerText().catch(() => "");
-  check(/couldn't be sent/.test(answer) && /APNS_KEY/.test(reason), `test notification: the server's answer is shown (${reason || answer})`);
+  check(/couldn't be sent/.test(answer) && /contact numnum support/.test(answer), "test notification (customer): a plain message", answer);
+  check(!(await c.locator("body").innerText()).includes("APNS_KEY"), "customers don't see the technical reason");
   const ios = await db.pushSubscription.findFirst({ where: { endpoint: `native:ios:${"ab".repeat(32)}` }, include: { user: true } });
   check(ios?.user?.email === "customer@numnum.demo", "the iPhone is saved for the customer", ios);
 
@@ -123,10 +124,19 @@ async function login(ctx, email, pw) {
     const secs = Math.round((Date.now() - t0) / 1000);
     check(shown, `${what}: the spinner stops (after ${secs} s) with a message`);
     check(await sp.getByRole("button", { name: "Try again" }).isEnabled().catch(() => false), `${what}: 'Try again' is offered`);
-    const reason = await sp.locator("text=/\\(.+\\)/").last().innerText().catch(() => "");
-    check(reason.length > 3, `${what}: the reason is shown: ${reason}`);
+    const body = await sp.locator("body").innerText();
+    check(!/no answer after|not allowed for this application/.test(body), `${what}: no technical reason shown to the restaurant`);
     await sctx.close();
   }
+
+  // ── An admin sees the technical reason (for support)
+  const adctx = await appContext(b, "ios", "granted");
+  const ad = await login(adctx, process.env.ADMIN_EMAIL || "admin@numnum.app", process.env.ADMIN_PASSWORD || "admin1234");
+  await ad.goto("/account", { waitUntil: "networkidle" });
+  await ad.getByTestId("send-test-notification").click();
+  await ad.getByText(/couldn't be sent/).first().waitFor({ timeout: 25000 }).catch(() => {});
+  check((await ad.locator("body").innerText()).includes("APNS_KEY"), "admin: the technical reason is shown (here: the missing Apple key)");
+  await adctx.close();
 
   // ── The API refuses junk tokens
   const bad = await c.request.post("/api/push", { data: { native: { platform: "ios", token: "<script>" } } });

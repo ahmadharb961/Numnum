@@ -108,7 +108,7 @@ export function InstallGate({ children, bypass }: { children: React.ReactNode; b
             <Button size="lg" block className="mt-6" onClick={enable} loading={busy}>
               <BellRing className="h-5 w-5" /> {t(push === "error" ? "Try again" : "Turn on order notifications")}
             </Button>
-            {push === "error" && <p className="mt-3 text-sm font-medium text-red-600">{t("Couldn't turn on notifications. Check your internet connection and try again.")}{lastPushError && <span className="mt-1 block text-[11px] font-normal text-ink-muted">({lastPushError})</span>}</p>}
+            {push === "error" && <p className="mt-3 text-sm font-medium text-red-600">{t("Couldn't turn on notifications. Check your internet connection and try again.")}{bypass && lastPushError && <span className="mt-1 block text-[11px] font-normal text-ink-muted">({lastPushError})</span>}</p>}
             {push === "unsupported" && <p className="mt-3 text-sm text-ink-muted">This phone doesn&apos;t support web notifications. Update your phone&apos;s software, or keep the Orders screen open.</p>}
           </>
         )}

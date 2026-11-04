@@ -44,7 +44,9 @@ export async function POST(req: Request) {
         // The app waits for Apple's / Google's answer (10 s at most) so it can show it.
         const delivery = await sendNative(sub.endpoint, msg);
         if (delivery === "gone") await prisma.pushSubscription.deleteMany({ where: { endpoint: sub.endpoint } });
-        return json({ ok: true, delivery, detail: delivery === "ok" ? null : delivery === "gone" ? "Apple/Google refused this phone's notification address" : lastNativeFailure });
+        // The technical reason is for admins (support); everyone else gets a plain message.
+        const why = delivery === "ok" ? null : delivery === "gone" ? "Apple/Google refused this phone's notification address" : lastNativeFailure;
+        return json({ ok: true, delivery, detail: user?.roles.includes("ADMIN") ? why : null });
       }
       void pushToDevices({ endpoint: sub.endpoint }, msg); // browsers: in the background
     }

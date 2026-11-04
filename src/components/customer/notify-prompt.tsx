@@ -9,7 +9,8 @@ import { useT } from "@/i18n/client";
 import { useStoreLink } from "@/components/app-links";
 
 /** "Get order updates on your phone": lets a signed-in customer turn on push notifications. */
-export function NotifyPrompt({ compact }: { compact?: boolean }) {
+/** `details`: also show the technical reason when something fails (admins, for support). */
+export function NotifyPrompt({ compact, details }: { compact?: boolean; details?: boolean }) {
   const t = useT();
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,7 +50,7 @@ export function NotifyPrompt({ compact }: { compact?: boolean }) {
         {test?.ok && <p className="mt-1 text-xs">{t("Sent. It should arrive in a few seconds.")}</p>}
         {test && !test.ok && (
           <p className="mt-1 text-xs font-medium text-red-600">
-            {t("The test notification couldn't be sent.")} <span className="font-normal text-ink-muted">({test.detail})</span>
+            {t("The test couldn't be sent. Please try again later or contact numnum support.")} {details && test.detail && <span className="font-normal text-ink-muted">({test.detail})</span>}
           </p>
         )}
       </div>
@@ -75,7 +76,7 @@ export function NotifyPrompt({ compact }: { compact?: boolean }) {
             >
               {t(state === "error" ? "Try again" : "Turn on notifications")}
             </Button>
-            {state === "error" && <p className="mt-2 text-xs font-medium text-red-600">{t("Couldn't turn on notifications. Check your internet connection and try again.")}{lastPushError && <span className="mt-1 block text-[11px] font-normal text-ink-muted">({lastPushError})</span>}</p>}
+            {state === "error" && <p className="mt-2 text-xs font-medium text-red-600">{t("Couldn't turn on notifications. Check your internet connection and try again.")}{details && lastPushError && <span className="mt-1 block text-[11px] font-normal text-ink-muted">({lastPushError})</span>}</p>}
           </>
         )}
         {state === "ios-needs-install" && (

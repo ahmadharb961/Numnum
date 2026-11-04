@@ -47,7 +47,7 @@ export default async function AccountPage() {
             <span className="tabular text-sm font-semibold">{formatMoney(o.totalCents, o.currency)}</span>
           </Link>
         ))}
-        <NotifyPrompt />
+        <NotifyPrompt details={user.roles.includes("ADMIN")} />
         <section className="card flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <h2 className="font-extrabold">{t("Language")}</h2>
