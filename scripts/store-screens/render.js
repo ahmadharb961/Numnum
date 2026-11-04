@@ -134,6 +134,7 @@ function featureHtml() {
 (async () => {
   const sets = [
     { dir: "apple-6.9in", w: 1320, h: 2868 }, // iPhone 6.9" (App Store's required size)
+    { dir: "apple-6.3in", w: 1206, h: 2622 }, // iPhone 6.1"/6.3" ("iPhone with Dynamic Island, medium display")
     { dir: "google-play-phone", w: 1080, h: 2160 }, // Google Play: at most 2:1
   ];
   const b = await chromium.launch();
