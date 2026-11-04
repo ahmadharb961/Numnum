@@ -14,10 +14,13 @@ const HAMRA = { latitude: 33.8975, longitude: 35.4815 };
   let p = await guest.newPage();
   await p.goto("/", { waitUntil: "networkidle" }); await shot(p, "1-reels");
   await p.goto("/explore", { waitUntil: "networkidle" }); await shot(p, "2-explore");
+  // Pizza Forno is in Jounieh: look at it from nearby, as a customer there would.
+  await guest.addCookies([{ name: "nn_loc", value: encodeURIComponent(JSON.stringify({ lat: 33.9712, lng: 35.6121, label: "Jounieh" })), url: BASE }]);
   await p.goto("/r/pizza-forno", { waitUntil: "networkidle" });
   await p.getByRole("tab", { name: /Reels/ }).first().click().catch(async () => p.getByText("Reels", { exact: true }).first().click().catch(() => {}));
   await p.evaluate(() => { document.querySelector(".app-scroll")?.scrollTo(0, 0); window.scrollTo(0, 0); });
   await shot(p, "3-profile");
+  await guest.addCookies(loc);
   await p.goto("/r/burger-house", { waitUntil: "networkidle" });
   await p.getByLabel("Add Classic Cheeseburger").first().click(); await p.getByRole("button", { name: /Add to cart/ }).waitFor();
   await shot(p, "4-dish");
