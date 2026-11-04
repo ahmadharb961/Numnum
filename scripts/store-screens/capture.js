@@ -19,8 +19,6 @@ const HAMRA = { latitude: 33.9712, longitude: 35.6121 };
   await db.$disconnect();
   await p.goto(`/reel/${reel.id}`, { waitUntil: "networkidle" }); await shot(p, "1-reels");
   await p.goto("/explore", { waitUntil: "networkidle" });
-  await p.getByRole("button", { name: /Pizza/ }).first().click().catch(() => p.getByText("Pizza", { exact: true }).first().click());
-  await p.waitForLoadState("networkidle");
   await shot(p, "2-explore");
   // Pizza Forno is in Jounieh: look at it from nearby, as a customer there would.
   await p.goto("/r/pizza-forno", { waitUntil: "networkidle" });
