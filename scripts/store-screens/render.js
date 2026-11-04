@@ -22,7 +22,7 @@ const icons = {
 
 // Each store image: theme, icon, headline, subline, which screen, phone tilt.
 const PANELS = [
-  { id: "01-reels", theme: "dark", brand: true, title: "The Food Reel App", sub: "Watch · Discover · Order", screen: "1-reels.png", tilt: -6 },
+  { id: "01-reels", theme: "dark", brand: true, title: "The Food Reel App", sub: "Watch · Discover · Order", screen: "1-reels.png", tilt: -4, whole: true },
   { id: "02-explore", theme: "light", icon: "play", title: "Discover\n& Explore", sub: "Lebanon's best restaurants,\ndishes and trending reels", screen: "2-explore.png", tilt: 5 },
   { id: "03-profile", theme: "dark", icon: "store", title: "Restaurant\nProfiles", sub: "Reels, menu, reviews\nand hours in one place", screen: "3-profile.png", tilt: -5 },
   { id: "04-order", theme: "light", icon: "bag", title: "Order\nin Seconds", sub: "Choose, customize\nand order your way", screen: "4-dish.png", tilt: 5 },
@@ -65,6 +65,13 @@ function html(p, size, top) {
   const { w, h } = size;
   const t = THEMES[p.theme];
   const k = w / 1320; // everything is designed on the 1320-wide canvas
+  const H = h / k; // canvas height in design pixels (2868 for Apple, 2640 for Google Play)
+  // "whole" panels show the entire phone (e.g. the reel's Order button): scaled down, resting near the bottom.
+  const PHONE_H = 52 + 150 + (948 * 2532) / 1170; // bezel + status bar + screen, at 1000 px wide
+  const scale = p.whole ? Math.min(0.86, (H - 880 - 70) / PHONE_H) : 1; // as big as fits under the headline
+  const phoneTop = p.whole ? Math.round(H - PHONE_H * scale - 70) : p.brand ? 1220 : 1130;
+  const metaFile = path.join(RAW, p.screen.replace(/\.png$/, ".json"));
+  const hl = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, "utf8")).highlight : null;
   const screenFile = path.join(RAW, p.screen);
   const head = p.brand
     ? `<svg class="logo" viewBox="0 0 ${logo.w} ${logo.h}"><path d="${logo.d}" fill="#fff"/></svg>
@@ -80,25 +87,28 @@ function html(p, size, top) {
   html, body { width: ${w}px; height: ${h}px; overflow: hidden; }
   body { font-family: "Inter Display", "Inter", sans-serif; background: ${t.bg}; color: ${t.text}; -webkit-font-smoothing: antialiased; }
   .wrap { position: absolute; inset: 0; transform-origin: 0 0; transform: scale(${k}); width: 1320px; height: ${h / k}px; }
-  .head { position: absolute; top: ${p.brand ? 150 : 170}px; left: 0; right: 0; text-align: center; padding: 0 80px; }
-  .logo { height: 300px; display: block; margin: 0 auto 70px; }
+  .head { position: absolute; top: ${p.whole ? 110 : p.brand ? 150 : 170}px; left: 0; right: 0; text-align: center; padding: 0 80px; }
+  .logo { height: ${p.whole ? 200 : 300}px; display: block; margin: 0 auto ${p.whole ? 44 : 70}px; }
   .icon { width: 150px; height: 150px; display: block; margin: 0 auto 60px; }
   .title { font-size: 150px; font-weight: 800; line-height: 1.02; letter-spacing: -4px; }
   .brandtitle { font-size: 128px; }
   .swoosh { width: 280px; height: 18px; border-radius: 99px; background: ${ORANGE}; margin: 44px auto 0; transform: rotate(-2deg); }
   .sub { margin-top: 48px; font-size: 62px; font-weight: 500; line-height: 1.3; color: ${t.sub}; }
-  .phone { position: absolute; left: 50%; width: 1000px; top: ${p.brand ? 1220 : 1130}px; transform: translateX(-50%) rotate(${p.tilt}deg); transform-origin: 50% 0;
+  .phone { position: absolute; left: 50%; width: 1000px; top: ${phoneTop}px; transform: translateX(-50%) scale(${scale}) rotate(${p.tilt}deg); transform-origin: 50% 0;
            border-radius: 150px; padding: 26px; background: linear-gradient(145deg, #3b3b40, #0c0c0e 40%, #2a2a2e);
            box-shadow: 0 80px 160px rgba(0,0,0,.45), 0 0 0 6px rgba(255,255,255,.08) inset; }
   .screen { position: relative; border-radius: 126px; overflow: hidden; background: ${top}; }
   .screen img { display: block; width: 100%; }
+  .shot { position: relative; }
+  /* glow around the button the panel is about (the reel's Order button) */
+  .ring { position: absolute; border-radius: 999px; box-shadow: 0 0 0 7px #fff, 0 0 0 16px rgba(255,84,18,.55), 0 0 90px 30px rgba(255,120,40,.85); }
   .island { position: absolute; top: 34px; left: 50%; transform: translateX(-50%); width: 300px; height: 88px; border-radius: 99px; background: #000; z-index: 3; }
   .status { height: 150px; display: flex; align-items: center; justify-content: space-between; padding: 30px 92px 0 110px; background: ${top}; }
   .time { font-size: 50px; font-weight: 700; letter-spacing: -.5px; }
   .icons { display: flex; gap: 14px; align-items: center; }
   </style></head><body><div class="wrap">
     <div class="head">${head}</div>
-    <div class="phone"><div class="screen"><div class="island"></div>${statusBar(isLight(top) ? "#000" : "#fff")}<img src="${dataUri(screenFile)}"></div></div>
+    <div class="phone"><div class="screen"><div class="island"></div>${statusBar(isLight(top) ? "#000" : "#fff")}<div class="shot"><img src="${dataUri(screenFile)}">${hl ? `<div class="ring" style="left:${hl.x * 100}%;top:${hl.y * 100}%;width:${hl.w * 100}%;height:${hl.h * 100}%"></div>` : ""}</div></div></div>
   </div></body></html>`;
 }
 

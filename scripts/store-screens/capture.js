@@ -19,6 +19,11 @@ const HAMRA = { latitude: 33.9712, longitude: 35.6121 };
   const reel = await db.reel.findFirstOrThrow({ where: { restaurant: { slug: "pizza-forno" }, status: "READY", visibility: "PUBLISHED", menuItem: { name: "Pesto Caprese" } } }).catch(() => db.reel.findFirstOrThrow({ where: { restaurant: { slug: "pizza-forno" }, status: "READY" }, orderBy: { viewCount: "desc" } }));
   await db.$disconnect();
   await p.goto(`/reel/${reel.id}`, { waitUntil: "networkidle" }); await shot(p, "1-reels");
+  // Where the reel's Order button is, so the store image can highlight it.
+  const box = await p.getByRole("button", { name: /^Order/ }).first().boundingBox().catch(() => null)
+    ?? await p.getByRole("link", { name: /^Order/ }).first().boundingBox().catch(() => null);
+  if (box) require("fs").writeFileSync(`${OUT}/1-reels.json`, JSON.stringify({ highlight: { x: box.x / 390, y: box.y / 844, w: box.width / 390, h: box.height / 844 } }));
+  console.log("order button", box);
   await p.goto("/explore", { waitUntil: "networkidle" });
   await shot(p, "2-explore");
   // Pizza Forno is in Jounieh: look at it from nearby, as a customer there would.
