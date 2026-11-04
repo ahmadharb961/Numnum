@@ -12,6 +12,7 @@ import { adminCancelOrder } from "@/server/orders";
 import { sendBroadcast, type BroadcastInput, type BroadcastResult } from "@/server/broadcast";
 import { applyAdjustmentToInvoice, createAdjustment, decideAdjustment, generateInvoice, recordManualPayment, resolveDispute, reviewPayment, runBillingMaintenance, runMonthlyBilling, previewInvoice, refreshInvoiceStatus, type PaymentReview } from "@/server/billing";
 import { recomputeItemRating, recomputeRestaurantRating } from "@/server/reviews";
+import { sendVerifyEmail } from "@/server/restaurant-emails";
 import { parseAmount } from "@/lib/money";
 import { slugify } from "@/lib/slug";
 import type { ActionResult } from "./menu";
@@ -29,6 +30,29 @@ function wrap<T>(fn: () => Promise<T>, msg?: string): Promise<ActionResult<T>> {
 }
 
 // ───── Restaurants ─────
+
+/**
+ * Fixes a mistyped login email (e.g. a restaurant that signed up with a typo and never got the
+ * confirmation). The new address must be confirmed again, so the confirmation email is sent to it.
+ */
+export async function changeLoginEmailAction(userId: string, newEmail: string) {
+  const { user, ip } = await admin();
+  return wrap(async () => {
+    const email = newEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new Error("Enter a valid email");
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, emailVerifiedAt: true, staff: { select: { restaurantId: true } } } });
+    if (!target) throw new Error("Account not found");
+    if (target.email === email) throw new Error("That's already the login email");
+    if (await prisma.user.findUnique({ where: { email } })) throw new Error("Another account already uses this email");
+    const restaurant = target.staff.length > 0;
+    // Restaurant owners confirm their email; customers never had to.
+    await prisma.user.update({ where: { id: userId }, data: { email, ...(restaurant ? { emailVerifiedAt: null } : {}) } });
+    if (restaurant) await sendVerifyEmail(userId).catch(() => false);
+    for (const s of target.staff) await audit({ actorId: user.id, action: "user.email_change", entityType: "restaurant", entityId: s.restaurantId, data: { from: target.email, to: email }, ipHash: ip });
+    revalidatePath("/admin/restaurants");
+    return restaurant;
+  }, `Login email changed to ${newEmail.trim().toLowerCase()}`);
+}
 
 export async function setRestaurantStatusAction(id: string, status: RestaurantStatus, reason?: string) {
   const { user, ip } = await admin();

@@ -9,7 +9,7 @@ import { RestaurantAdminForm } from "@/components/admin/restaurant-admin-form";
 import { AdjustmentForm } from "@/components/admin/adjustment-form";
 import { StatusBadge } from "@/components/dashboard/invoice-status";
 import { Badge, StatCard } from "@/components/ui/misc";
-import { setRestaurantStatusAction, revokeVerificationAction, verifyRestaurantAction } from "@/actions/admin";
+import { changeLoginEmailAction, setRestaurantStatusAction, revokeVerificationAction, verifyRestaurantAction } from "@/actions/admin";
 import { formatMoney, formatRate } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { deliveryRadiusKm, normalizeZones } from "@/lib/geo";
@@ -23,7 +23,7 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
   const id = (await params).id;
   const r = await prisma.restaurant.findUnique({
     where: { id },
-    include: { staff: { include: { user: { select: { name: true, email: true } } } }, _count: { select: { menuItems: { where: { archived: false } }, reels: true, orders: true } } },
+    include: { staff: { include: { user: { select: { id: true, name: true, email: true, emailVerifiedAt: true } } } }, _count: { select: { menuItems: { where: { archived: false } }, reels: true, orders: true } } },
   });
   if (!r) notFound();
   const [settings, invoices, accrued, recentOrders, reports, audits, honesty] = await Promise.all([
@@ -120,8 +120,15 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
             <dt className="text-ink-muted">Staff</dt>
             <dd>
               {r.staff.map((s) => (
-                <div key={s.id}>
-                  {s.user.name} · {s.user.email} <Badge>{s.role.toLowerCase()}</Badge>
+                <div key={s.id} className="flex flex-wrap items-center gap-2 py-0.5">
+                  <span>
+                    {s.user.name} · {s.user.email}
+                  </span>
+                  <Badge>{s.role.toLowerCase()}</Badge>
+                  {!s.user.emailVerifiedAt && <Badge tone="amber">email not confirmed</Badge>}
+                  <ActionButton action={changeLoginEmailAction.bind(null, s.user.id)} prompt={`New login email for ${s.user.name} (a confirmation email will be sent to it):`} promptDefault={s.user.email} data-testid="change-login-email">
+                    Change email
+                  </ActionButton>
                 </div>
               ))}
             </dd>
