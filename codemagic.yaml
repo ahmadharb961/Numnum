@@ -38,3 +38,30 @@ workflows:
         # Internal testers (your own team) get every build without Apple's beta review.
         # Set to true once Test Information is filled in, to also send builds to external testers.
         submit_to_testflight: false
+
+  android-play:
+    # Signed Android App Bundle (.aab) for Google Play. One-time setup in Codemagic: Team settings →
+    # codemagic.yaml settings → Code signing identities → Android keystores: add the upload keystore
+    # with the reference name "numnum_upload". Download the .aab from the build's artifacts and upload
+    # it in Google Play Console (or connect Google Play publishing later).
+    name: Android → Google Play (.aab)
+    max_build_duration: 30
+    instance_type: linux_x2
+    environment:
+      android_signing:
+        - numnum_upload
+      node: 22
+      java: 21
+    triggering:
+      events: []
+    scripts:
+      - name: Install packages
+        script: npm ci --ignore-scripts
+      - name: Copy the app shell and plugins into the Android project
+        script: npx cap sync android
+      - name: Build the signed App Bundle
+        working_directory: android
+        script: ./gradlew bundleRelease --no-daemon
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+
