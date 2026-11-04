@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff } from "lucide-react";
+import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff, LifeBuoy } from "lucide-react";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { PageHeader } from "@/components/customer/page-header";
@@ -62,6 +62,7 @@ export default async function AccountPage() {
             { href: "/account/addresses", icon: MapPin, label: "Saved addresses", sub: t("{n} saved", { n: addressCount }) },
             { href: "/saved", icon: Bookmark, label: "Saved dishes & restaurants", sub: "Reels, dishes, restaurants" },
             { href: "/account/blocked", icon: EyeOff, label: "Blocked", sub: "Restaurants and people you hid" },
+            { href: "/support", icon: LifeBuoy, label: "Help & support", sub: "Contact us, terms and privacy" },
           ].map((l) => (
             <Link key={l.href} href={l.href} className="flex items-center gap-3 p-4">
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">

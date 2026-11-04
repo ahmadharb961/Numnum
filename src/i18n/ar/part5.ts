@@ -344,4 +344,6 @@ export const AR5: Record<string, string> = {
   "Get the numnum app to receive order notifications on your iPhone.": "حمّل تطبيق numnum لتصلك إشعارات الطلبات على iPhone.",
   "Get the app": "حمّل التطبيق",
   "The test couldn't be sent. Please try again later or contact numnum support.": "تعذّر إرسال الإشعار التجريبي. حاول لاحقاً أو تواصل مع دعم numnum.",
+  "Help & support": "المساعدة والدعم",
+  "Contact us, terms and privacy": "تواصل معنا، الشروط والخصوصية",
 };

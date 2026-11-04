@@ -14,49 +14,55 @@ export default async function PrivacyPage() {
     return (
       <div className="space-y-4 text-[15px] leading-relaxed text-ink-soft [&_h2]:mt-6 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-ink">
         <h1 className="text-2xl font-black text-ink">سياسة الخصوصية</h1>
-        <p>توضح هذه السياسة ما يجمعه {p} ولماذا وكيف تتم مشاركته. {p} خدمة لاكتشاف الأكل؛ نحن لا نعالج المدفوعات ولا نوصّل الأكل.</p>
-        <h2>التصفّح بدون حساب</h2>
-        <p>يمكنك مشاهدة الفيديوهات وتصفّح القوائم والطلب دون تسجيل. نضع ملف تعريف ارتباط عشوائياً ومجهولاً للجهاز لاحتساب المشاهدات بعدل، وتذكّر الإعجابات والمحفوظات على جهازك، ومنع الطلبات المكرّرة. لا يُستخدم لتتبّعك على مواقع أخرى.</p>
+        <p>توضح هذه السياسة ما يجمعه {p} (الموقع وتطبيقات iPhone وAndroid) ولماذا وكيف تتم مشاركته. {p} خدمة لاكتشاف الأكل والطلب من المطاعم؛ نحن لا نعالج المدفوعات ولا نوصّل الأكل.</p>
+        <h2>التصفّح</h2>
+        <p>يمكنك مشاهدة الفيديوهات وتصفّح القوائم دون حساب. نضع معرّفاً عشوائياً ومجهولاً لجهازك لاحتساب المشاهدات بعدل ومنع الطلبات المكرّرة. لا يُستخدم لتتبّعك على مواقع أو تطبيقات أخرى، ولا نعرض إعلانات ولا نبيع بياناتك.</p>
+        <h2>حسابك</h2>
+        <p>لإرسال طلب أو الإعجاب أو الحفظ أو كتابة تقييم أو الإبلاغ، تحتاج إلى حساب. نحفظ اسمك وبريدك الإلكتروني وكلمة مرور مشفّرة ورقم هاتفك المحمول ولغتك المفضّلة وعناوين التوصيل المحفوظة وسجل طلباتك وإعجاباتك ومحفوظاتك وتقييماتك. تُظهر التقييمات اسمك الأول فقط.</p>
         <h2>إرسال طلب</h2>
-        <p>عندما ترسل طلباً، تقدّم اسمك ورقم هاتفك، وللتوصيل عنوانك وموقعك على الخريطة اختيارياً. تتم مشاركة هذه المعلومات <b>فقط مع المطعم الذي طلبت منه</b> ليحضّر الطلب ويوصّله ويتواصل معك بشأنه. لا تُعرض علناً أبداً ولا تُشارك مع مطاعم أخرى. الدفع نقداً عند التوصيل؛ لا نجمع أي بيانات بطاقات.</p>
-        <p>تُحفظ سلتك في متصفحك. لا تُحفظ تفاصيل التوصيل على جهازك إلا إذا اخترت «تذكّر معلوماتي».</p>
+        <p>عندما ترسل طلباً، تتم مشاركة اسمك ورقم هاتفك، وللتوصيل عنوانك وموقعك على الخريطة، <b>فقط مع المطعم الذي طلبت منه</b> ليحضّر الطلب ويوصّله ويتواصل معك بشأنه (بالهاتف أو واتساب). لا تُعرض علناً ولا تُشارك مع مطاعم أخرى. الدفع نقداً عند التوصيل؛ لا نجمع أي بيانات بطاقات.</p>
         <h2>الموقع</h2>
-        <p>لا نصل إلى موقع جهازك إلا عندما تضغط «استخدم موقعي» عند إتمام الطلب، وفقط لإنشاء رابط خريطة للمطعم. يمكنك لصق رابط Google Maps بدلاً من ذلك.</p>
-        <h2>الحسابات الاختيارية</h2>
-        <p>إذا أنشأت حساباً، نحفظ اسمك وبريدك الإلكتروني وكلمة مرور مشفّرة ورقم هاتفك وعناوين التوصيل المحفوظة وسجل طلباتك ولغتك المفضّلة. الطلبات التي أرسلتها كزائر من الجهاز نفسه تُضاف إلى حسابك عند تسجيل الدخول. تُظهر التقييمات اسمك الأول فقط.</p>
+        <p>بإذنك، نستخدم موقع جهازك لعرض المطاعم التي توصّل إليك ورسوم التوصيل، ولتحديد عنوان التوصيل على الخريطة. يمكنك اختيار منطقة أو تحديد نقطة على الخريطة بدلاً من ذلك. لا نتتبّع موقعك في الخلفية.</p>
+        <h2>الإشعارات</h2>
+        <p>إذا فعّلت الإشعارات، نحفظ معرّف الإشعارات الخاص بجهازك (من Apple أو Google أو متصفحك) لنرسل لك تحديثات طلباتك، وللمطاعم الطلبات الجديدة، وأحياناً أخبار {p}. يمكنك إيقافها في أي وقت من إعدادات هاتفك.</p>
         <h2>المطاعم</h2>
-        <p>تقدّم حسابات المطاعم تفاصيل المؤسسة والقوائم والوسائط ومعلومات الفوترة. تُحفظ إيصالات الدفع ومستندات التوثيق بشكل خاص ولا يراها إلا مالك المطعم ومشرفو {p}.</p>
+        <p>تقدّم حسابات المطاعم تفاصيل المؤسسة والقوائم والصور والفيديوهات ومعلومات الفوترة. يُستخدم إذن الكاميرا والصور فقط عندما يضيف المطعم فيديو أو صورة. تُحفظ إيصالات الدفع ومستندات التوثيق بشكل خاص ولا يراها إلا مالك المطعم ومشرفو {p}.</p>
+        <h2>الإبلاغ والحظر</h2>
+        <p>عندما تبلّغ عن محتوى أو تحظر مطعماً أو شخصاً، نحفظ ذلك مع حسابك لإخفاء المحتوى عنك ولمراجعة البلاغات خلال 24 ساعة.</p>
         <h2>الإحصاءات</h2>
-        <p>نسجّل أحداث تفاعل إجمالية (المشاهدات والإعجابات والمشاركات وفتح الأطباق والإضافة إلى السلة والطلبات) لترتيب الفيديوهات وتقديم إحصاءات للمطاعم. هذه الأحداث غير مرتبطة بهويتك.</p>
-        <h2>الاحتفاظ بالبيانات</h2>
-        <p>نحتفظ بسجلات الطلبات لمحاسبة العمولات وحل الاعتراضات، ثم تُحذف بيانات تواصل الزبون أو تُجعل مجهولة حسب جدول الاحتفاظ لدينا. يمكنك أن تطلب منا حذف حسابك وبياناتك الشخصية في أي وقت.</p>
+        <p>نسجّل أحداث تفاعل (المشاهدات والإعجابات والمشاركات وفتح الأطباق والإضافة إلى السلة والطلبات) لترتيب الفيديوهات وتقديم إحصاءات للمطاعم. تُعرض للمطاعم كأرقام إجمالية فقط.</p>
+        <h2>حذف حسابك</h2>
+        <p>يمكنك حذف حسابك في أي وقت من الحساب ← حذف الحساب. تُحذف بياناتك الشخصية فوراً، وتبقى الطلبات السابقة لدى المطاعم لسجلاتها المحاسبية دون اسمك أو هاتفك أو عنوانك.</p>
         <h2>التواصل</h2>
-        <p>للأسئلة أو طلبات الحذف: {s.supportEmail}</p>
+        <p>للأسئلة أو الطلبات: {s.supportEmail}</p>
       </div>
     );
   return (
     <div className="space-y-4 text-[15px] leading-relaxed text-ink-soft [&_h2]:mt-6 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-ink">
       <h1 className="text-2xl font-black text-ink">Privacy policy</h1>
-      <p>This policy explains what {p} collects, why, and how it is shared. {p} is a food discovery service; we do not process payments or deliver food.</p>
-      <h2>Browsing without an account</h2>
-      <p>You can watch reels, browse menus and order without registering. We set a random, anonymous device identifier cookie to count video views fairly, remember likes and saved items on your device, and prevent duplicate orders. It is not used to track you on other websites.</p>
+      <p>This policy explains what {p} (the website and the iPhone and Android apps) collects, why, and how it is shared. {p} is a food discovery and ordering service; we do not process payments or deliver food.</p>
+      <h2>Browsing</h2>
+      <p>You can watch reels and browse menus without an account. We set a random, anonymous device identifier to count video views fairly and prevent duplicate orders. It is not used to track you on other websites or apps; we show no ads and never sell your data.</p>
+      <h2>Your account</h2>
+      <p>An account is needed to place an order, like, save, review or report. We store your name, email, a hashed password, your mobile number, your preferred language, saved delivery addresses, your order history, likes, saved items and reviews. Reviews show your first name only.</p>
       <h2>Placing an order</h2>
       <p>
-        When you place an order, you provide your name, phone number, and — for delivery — your address and optionally your map location. This information is shared <b>only with the restaurant you ordered from</b> so they can prepare, deliver and contact you about the order. It is never shown publicly or shared with other restaurants. Payment is cash on delivery; we never collect card details.
+        When you place an order, your name, phone number and — for delivery — your address and map location are shared <b>only with the restaurant you ordered from</b>, so they can prepare and deliver it and contact you about it (by phone or WhatsApp). They are never shown publicly or shared with other restaurants. Payment is cash on delivery; we never collect card details.
       </p>
-      <p>Your cart is stored in your browser. Your delivery details are only remembered on your device if you tick “Remember my details”.</p>
       <h2>Location</h2>
-      <p>We only access your device location when you tap “Use my location” at checkout, and only to create a map link for the restaurant. You can paste a Google Maps link instead.</p>
-      <h2>Optional accounts</h2>
-      <p>If you create an account, we store your name, email, a hashed password, your phone number, your saved delivery addresses and your order history. Orders you placed as a guest on the same device are added to your account when you sign in. Reviews show your first name only.</p>
+      <p>With your permission, we use your device location to show restaurants that deliver to you and their delivery fees, and to pin your delivery address on the map. You can choose an area or drop a pin instead. We never track your location in the background.</p>
+      <h2>Notifications</h2>
+      <p>If you turn notifications on, we store your device&apos;s notification token (from Apple, Google or your browser) to send you order updates, new orders to restaurants, and occasional news from {p}. You can turn them off at any time in your phone&apos;s settings.</p>
       <h2>Restaurants</h2>
-      <p>Restaurant accounts provide business details, menus, media and billing information. Payment receipts and verification documents are stored privately and visible only to the restaurant owner and {p} administrators.</p>
+      <p>Restaurant accounts provide business details, menus, photos, videos and billing information. Camera and photo access is only used when a restaurant adds a reel or a photo. Payment receipts and verification documents are stored privately and visible only to the restaurant owner and {p} administrators.</p>
+      <h2>Reports and blocks</h2>
+      <p>When you report content or block a restaurant or person, we keep that with your account to hide the content from you and to review reports within 24 hours.</p>
       <h2>Analytics</h2>
-      <p>We record aggregate engagement events (views, likes, shares, product opens, add-to-cart and orders placed) to rank the feed and provide restaurant statistics. These events are not linked to your identity.</p>
-      <h2>Retention</h2>
-      <p>Order records are kept for commission accounting and dispute resolution, then customer contact details are deleted or anonymized according to our retention schedule. You can ask us to delete your account and associated personal data at any time.</p>
+      <p>We record engagement events (views, likes, shares, dish opens, add-to-cart and orders placed) to rank the feed and give restaurants statistics. Restaurants only see them as totals.</p>
+      <h2>Deleting your account</h2>
+      <p>You can delete your account at any time from Account → Delete account. Your personal data is deleted right away; past orders stay with the restaurants for their accounting records, without your name, phone or address.</p>
       <h2>Contact</h2>
-      <p>Questions or deletion requests: {s.supportEmail}</p>
+      <p>Questions or requests: {s.supportEmail}</p>
     </div>
   );
 }
