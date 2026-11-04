@@ -4,6 +4,7 @@ const { chromium, devices } = require("playwright");
 const OUT = process.argv[2];
 const BASE = "http://localhost:3005";
 const { PrismaClient } = require("@prisma/client");
+// The first shot is the Pesto Caprese reel (a full-screen vertical video).
 // The customer is in Jounieh, about 1 km from Pizza Forno, the restaurant the whole set follows.
 const HAMRA = { latitude: 33.9712, longitude: 35.6121 };
 (async () => {
@@ -15,7 +16,7 @@ const HAMRA = { latitude: 33.9712, longitude: 35.6121 };
   await guest.addCookies(loc);
   let p = await guest.newPage();
   const db = new PrismaClient();
-  const reel = await db.reel.findFirstOrThrow({ where: { restaurant: { slug: "pizza-forno" }, status: "READY", visibility: "PUBLISHED", menuItem: { name: "Margherita" } } }).catch(() => db.reel.findFirstOrThrow({ where: { restaurant: { slug: "pizza-forno" }, status: "READY" }, orderBy: { viewCount: "desc" } }));
+  const reel = await db.reel.findFirstOrThrow({ where: { restaurant: { slug: "pizza-forno" }, status: "READY", visibility: "PUBLISHED", menuItem: { name: "Pesto Caprese" } } }).catch(() => db.reel.findFirstOrThrow({ where: { restaurant: { slug: "pizza-forno" }, status: "READY" }, orderBy: { viewCount: "desc" } }));
   await db.$disconnect();
   await p.goto(`/reel/${reel.id}`, { waitUntil: "networkidle" }); await shot(p, "1-reels");
   await p.goto("/explore", { waitUntil: "networkidle" });
