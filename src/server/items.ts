@@ -1,4 +1,5 @@
 import "server-only";
+import { placeLabel } from "@/lib/utils";
 import { getBlocks } from "./blocks";
 import { prisma } from "./db";
 
@@ -47,7 +48,7 @@ export async function getPublicItem(id: string) {
       currency: item.restaurant.currency,
       verified: item.restaurant.verificationStatus === "APPROVED",
       orderingEnabled: item.restaurant.orderingEnabled,
-      location: [item.restaurant.area, item.restaurant.city].filter(Boolean).join(", "),
+      location: placeLabel(item.restaurant.area, item.restaurant.city),
     },
     images: item.images.map((i) => ({ url: i.asset.url, thumbUrl: i.asset.thumbUrl, width: i.asset.width, height: i.asset.height })),
     groups: item.customizations.map((c) => ({

@@ -13,7 +13,7 @@ import { setRestaurantStatusAction, revokeVerificationAction, verifyRestaurantAc
 import { formatMoney, formatRate } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { deliveryRadiusKm, normalizeZones } from "@/lib/geo";
-import { compactNumber, formatDate, formatDateTime, periodLabel } from "@/lib/utils";
+import { compactNumber, formatDate, formatDateTime, periodLabel, placeLabel } from "@/lib/utils";
 
 export const metadata = { title: "Restaurant" };
 
@@ -101,7 +101,7 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
             <dt className="text-ink-muted">Email</dt>
             <dd>{r.email ?? "—"}</dd>
             <dt className="text-ink-muted">Address</dt>
-            <dd>{[r.address, r.area, r.city].filter(Boolean).join(", ") || "—"}</dd>
+            <dd>{placeLabel(r.address, r.area, r.city) || "—"}</dd>
             <dt className="text-ink-muted">Agreement</dt>
             <dd>{r.agreementAcceptedAt ? `v${r.agreementVersion} · ${formatDateTime(r.agreementAcceptedAt)}` : "Not accepted"}</dd>
             <dt className="text-ink-muted">Commission</dt>

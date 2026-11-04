@@ -12,7 +12,7 @@ import { VerifiedBadge, Stars, Badge, EmptyState } from "@/components/ui/misc";
 import { DAYS, DAY_LABELS, isOpenAt, type OpeningHours } from "@/lib/hours";
 import { formatPhone, isLebaneseMobile } from "@/lib/phone";
 import { FacebookIcon, InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/brand-icons";
-import { compactNumber, formatDate } from "@/lib/utils";
+import { compactNumber, formatDate, placeLabel } from "@/lib/utils";
 import { evidenceLabel } from "@/server/reviews";
 import { ReportButton } from "@/components/customer/report-button";
 import { customerLocation } from "@/server/location";
@@ -264,7 +264,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           )}
           {(r.area || r.city) && (
             <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-4 w-4" /> {[r.area, r.city].filter(Boolean).join(", ")}
+              <MapPin className="h-4 w-4" /> {placeLabel(r.area, r.city)}
             </span>
           )}
           {open !== null && <span className={`rounded-full px-3 py-0.5 text-sm font-bold ${open ? "bg-emerald-50 text-emerald-700" : "bg-black/5 text-ink-muted"}`}>{open ? t("Open now") : t("Closed now")}</span>}

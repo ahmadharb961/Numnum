@@ -3,7 +3,7 @@ import Papa from "papaparse";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { Invoice, InvoiceLine, Payment } from "@prisma/client";
 import { formatMoney, formatRate } from "@/lib/money";
-import { formatDate, periodLabel } from "@/lib/utils";
+import { formatDate, periodLabel, placeLabel } from "@/lib/utils";
 import { drawLogo } from "./pdf-logo";
 
 type FullInvoice = Invoice & { lines: InvoiceLine[]; payments: Payment[] };
@@ -66,7 +66,7 @@ export async function invoicePdf(inv: FullInvoice, platformName: string): Promis
     text(snap.displayName, M, y, { color: muted });
     y -= 13;
   }
-  for (const l of [snap.address, [snap.area, snap.city].filter(Boolean).join(", "), snap.phone ? `+${snap.phone}` : null, snap.email].filter(Boolean) as string[]) {
+  for (const l of [snap.address, placeLabel(snap.area, snap.city), snap.phone ? `+${snap.phone}` : null, snap.email].filter(Boolean) as string[]) {
     text(l, M, y, { color: muted });
     y -= 13;
   }

@@ -1,4 +1,5 @@
 import "server-only";
+import { placeLabel } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { getSettings } from "./settings";
@@ -84,7 +85,7 @@ export function toPublicReel(r: ReelCard, location?: LatLng | null) {
       ratingCount: r.restaurant.ratingCount,
       avgPrepMinutes: r.restaurant.avgPrepMinutes,
       verified: r.restaurant.verificationStatus === "APPROVED",
-      location: [r.restaurant.area, r.restaurant.city].filter(Boolean).join(", "),
+      location: placeLabel(r.restaurant.area, r.restaurant.city),
       orderingEnabled: r.restaurant.orderingEnabled,
       distanceKm: q?.km ?? null,
       deliversToYou: q ? r.restaurant.deliveryEnabled && q.deliverable : null,

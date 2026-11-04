@@ -280,6 +280,8 @@ async function seedDemo(adminId: string) {
   const g = (name: string) => groups.find((x) => x.name === name)!;
   const opt = (gn: string, on: string) => g(gn).options.find((o) => o.name === on)!.id;
   type Plan = "complete" | "accept" | "preparing" | "out" | "placed" | "reject" | "cancel";
+  // Demo customers with real-sounding names (they show on orders, reviews and insights).
+  const NAMES = ["Rana Haddad", "Karim Nassar", "Maya Khoury", "Ziad Haddad", "Lara Saade", "Omar Itani", "Nour Fakhoury", "Georges Aoun", "Hiba Mansour", "Tarek Salem"];
   const make = async (i: number, phone: string, plan: Plan, userId: string | null) => {
     const device = `seed-device-${i}-aaaaaaaaaaaa`;
     const o = await createOrder(
@@ -292,7 +294,7 @@ async function seedDemo(adminId: string) {
           { menuItemId: burger.items.BRG001, quantity: 2, selections: { [g("Cheese").id]: [opt("Cheese", "Cheddar")], [g("Extra toppings").id]: [opt("Extra toppings", "Extra cheese")], [g("Remove ingredients").id]: [opt("Remove ingredients", "No pickles")], [g("Sauce").id]: [opt("Sauce", "BBQ sauce")], [g("Cooking preference").id]: [opt("Cooking preference", "Medium")] } },
           { menuItemId: burger.items.SD001, quantity: 1, selections: {} },
         ],
-        customer: { name: i === 0 ? "Rana Haddad" : `Customer ${i}`, phone, address: "Bliss street, near AUB gate", building: "Azar bldg, 3rd floor", area: "Hamra", latitude: 33.8995, longitude: 35.4807, saveAddress: i === 0, addressLabel: "Home" },
+        customer: { name: NAMES[i % NAMES.length], phone, address: "Bliss street, near AUB gate", building: "Azar bldg, 3rd floor", area: "Hamra", latitude: 33.8995, longitude: 35.4807, saveAddress: i === 0, addressLabel: "Home" },
       },
       { deviceKey: device, ipHash: null, userId },
     );
@@ -311,7 +313,7 @@ async function seedDemo(adminId: string) {
   const plan: Plan[] = ["complete", "complete", "complete", "complete", "complete", "reject", "out", "preparing", "placed", "cancel"];
   const buyers = [customer.id];
   for (let i = 1; i < plan.length; i++) {
-    const u = await prisma.user.create({ data: { email: `buyer${i}@numnum.demo`, name: `Customer ${i}`, phone: `96170${String(i).padStart(2, "0")}2345`, passwordHash: pw, roles: { create: { role: "CUSTOMER" } } } });
+    const u = await prisma.user.create({ data: { email: `buyer${i}@numnum.demo`, name: NAMES[i % NAMES.length], phone: `96170${String(i).padStart(2, "0")}2345`, passwordHash: pw, roles: { create: { role: "CUSTOMER" } } } });
     buyers.push(u.id);
   }
   const orders = [];

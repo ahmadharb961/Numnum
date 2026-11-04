@@ -38,3 +38,17 @@ export function periodBounds(period: string): { start: Date; end: Date } {
   const [y, m] = period.split("-").map(Number);
   return { start: new Date(Date.UTC(y, m - 1, 1)), end: new Date(Date.UTC(y, m, 1)) };
 }
+
+/** "Hamra, Beirut" from address parts, skipping empty ones and repeats ("Jounieh, Jounieh" → "Jounieh"). */
+export function placeLabel(...parts: (string | null | undefined)[]): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const v = p?.trim();
+    const key = v?.toLowerCase().replace(/\s+/g, " ");
+    if (!v || !key || seen.has(key) || out.some((o) => o.toLowerCase().includes(key))) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out.join(", ");
+}
