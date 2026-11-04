@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BellRing, CheckCircle2 } from "lucide-react";
 import { isInstalled, isIos, isMobile, isNativeApp, lastPushError, pushState, resyncDevice, turnOn, type PushState } from "@/lib/push-client";
 import { InstallHelp } from "@/components/install-guide";
+import { useStoreLink } from "@/components/app-links";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { useT } from "@/i18n/client";
@@ -18,6 +19,7 @@ type Step = "loading" | "install" | "notify" | "blocked" | "ok";
  */
 export function InstallGate({ children, bypass }: { children: React.ReactNode; bypass?: boolean }) {
   const t = useT();
+  const store = useStoreLink(); // once the app is in the stores, phones are sent there
   const [step, setStep] = useState<Step>("loading");
   const [mobile, setMobile] = useState(false);
   const [push, setPush] = useState<PushState>("off");
@@ -85,15 +87,15 @@ export function InstallGate({ children, bypass }: { children: React.ReactNode; b
         <Logo className="h-12 text-brand-600" />
         {!native && (
           <ol className="mt-6 flex gap-2 text-xs font-bold">
-            <li className={`flex-1 rounded-full px-3 py-1.5 text-center ${step === "install" ? "bg-ink text-white" : "bg-emerald-100 text-emerald-700"}`}>{t("1. Add to home screen")}</li>
+            <li className={`flex-1 rounded-full px-3 py-1.5 text-center ${step === "install" ? "bg-ink text-white" : "bg-emerald-100 text-emerald-700"}`}>{t(store ? "1. Get the app" : "1. Add to home screen")}</li>
             <li className={`flex-1 rounded-full px-3 py-1.5 text-center ${step === "install" ? "bg-black/5 text-ink-muted" : "bg-ink text-white"}`}>{t("2. Allow notifications")}</li>
           </ol>
         )}
 
         {step === "install" && (
           <>
-            <h1 className="mt-6 text-2xl font-extrabold leading-tight">{t("Add numnum to your home screen to receive orders")}</h1>
-            <p className="mb-6 mt-2 text-ink-soft">{t("Orders arrive as notifications, like a regular app, even when your phone is locked. This takes 20 seconds.")}</p>
+            <h1 className="mt-6 text-2xl font-extrabold leading-tight">{t(store ? "Get the numnum app to receive orders" : "Add numnum to your home screen to receive orders")}</h1>
+            <p className="mb-6 mt-2 text-ink-soft">{t(store ? "New orders arrive as notifications, even when your phone is locked." : "Orders arrive as notifications, like a regular app, even when your phone is locked. This takes 20 seconds.")}</p>
             <InstallHelp appName={APP} />
           </>
         )}

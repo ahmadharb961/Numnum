@@ -334,4 +334,13 @@ export const AR5: Record<string, string> = {
   "Sending…": "جارٍ الإرسال…",
   "Sent. It should arrive in a few seconds.": "تم الإرسال. سيصلك خلال ثوانٍ.",
   "The test notification couldn't be sent.": "تعذّر إرسال الإشعار التجريبي.",
+  "Download on the": "حمّله من",
+  "Get it on": "احصل عليه من",
+  "Install the app, open it and log in with the same account.": "ثبّت التطبيق وافتحه وسجّل الدخول بالحساب نفسه.",
+  "Get the numnum app and we'll notify you when the restaurant accepts your order, when it leaves and when it arrives.": "حمّل تطبيق numnum وسنُعلمك عندما يقبل المطعم طلبك، وعندما يخرج للتوصيل، وعندما يصل.",
+  "1. Get the app": "1. حمّل التطبيق",
+  "Get the numnum app to receive orders": "حمّل تطبيق numnum لتستقبل الطلبات",
+  "New orders arrive as notifications, even when your phone is locked.": "تصلك الطلبات الجديدة كإشعارات، حتى عندما يكون هاتفك مقفلاً.",
+  "Get the numnum app to receive order notifications on your iPhone.": "حمّل تطبيق numnum لتصلك إشعارات الطلبات على iPhone.",
+  "Get the app": "حمّل التطبيق",
 };

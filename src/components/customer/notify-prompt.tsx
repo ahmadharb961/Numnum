@@ -6,6 +6,7 @@ import { lastPushError, pushState, resyncDevice, sendTestNotification, turnOn, t
 import { Button } from "@/components/ui/button";
 import { InstallSheet } from "./install-sheet";
 import { useT } from "@/i18n/client";
+import { useStoreLink } from "@/components/app-links";
 
 /** "Get order updates on your phone": lets a signed-in customer turn on push notifications. */
 export function NotifyPrompt({ compact }: { compact?: boolean }) {
@@ -13,6 +14,7 @@ export function NotifyPrompt({ compact }: { compact?: boolean }) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [guide, setGuide] = useState(false);
+  const store = useStoreLink();
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<{ ok: boolean; detail: string | null } | null>(null);
 
@@ -78,9 +80,9 @@ export function NotifyPrompt({ compact }: { compact?: boolean }) {
         )}
         {state === "ios-needs-install" && (
           <>
-            <p className="mt-0.5 text-ink-muted">{t("On iPhone, add numnum to your home screen first, then turn notifications on from there.")}</p>
+            <p className="mt-0.5 text-ink-muted">{t(store ? "Get the numnum app to receive order notifications on your iPhone." : "On iPhone, add numnum to your home screen first, then turn notifications on from there.")}</p>
             <Button size="sm" className="mt-2" onClick={() => setGuide(true)}>
-              {t("Show me how")}
+              {t(store ? "Get the app" : "Show me how")}
             </Button>
             <InstallSheet open={guide} onClose={() => setGuide(false)} />
           </>

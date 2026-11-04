@@ -44,6 +44,21 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         </Button>
       </Section>
 
+      <Section title="Store apps">
+        <p className="mb-3 text-sm text-ink-muted">Fill these in once the numnum app is live in each store. From then on, phones are sent to the store instead of being shown how to add numnum to the home screen (Google Play on Android, the App Store on iPhone). Leave empty until the app is approved.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="App Store link (iPhone)" htmlFor="app-link-ios">
+            <input id="app-link-ios" className="input" inputMode="url" placeholder="https://apps.apple.com/app/id6830306966" value={s.appLinks.ios} onChange={(e) => setS({ ...s, appLinks: { ...s.appLinks, ios: e.target.value } })} />
+          </Field>
+          <Field label="Google Play link (Android)" htmlFor="app-link-android">
+            <input id="app-link-android" className="input" inputMode="url" placeholder="https://play.google.com/store/apps/details?id=me.numnum.app" value={s.appLinks.android} onChange={(e) => setS({ ...s, appLinks: { ...s.appLinks, android: e.target.value } })} />
+          </Field>
+        </div>
+        <Button className="mt-4" loading={pending} onClick={() => save(["appLinks"])} data-testid="save-app-links">
+          Save
+        </Button>
+      </Section>
+
       <Section title="Commission">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Default commission rate (%)">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { isInstalled, isMobile } from "@/lib/push-client";
 import { useT } from "@/i18n/client";
+import { useStoreLink } from "@/components/app-links";
 
 const KEY = "nn-install-later";
 
@@ -16,6 +17,7 @@ const KEY = "nn-install-later";
  */
 export function InstallSheet({ reference, open, onClose }: { reference?: string; open?: boolean; onClose?: () => void }) {
   const t = useT();
+  const store = useStoreLink();
   const [auto, setAuto] = useState(false);
   useEffect(() => {
     if (!reference || !isMobile() || isInstalled()) return;
@@ -49,7 +51,7 @@ export function InstallSheet({ reference, open, onClose }: { reference?: string;
             🛵
           </div>
           <h2 className="mt-2 text-xl font-extrabold leading-tight">{t("Know the moment your order is on its way")}</h2>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-ink-soft">{t("Add numnum to your home screen and we'll notify you when the restaurant accepts your order, when it leaves and when it arrives.")}</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-ink-soft">{store ? t("Get the numnum app and we'll notify you when the restaurant accepts your order, when it leaves and when it arrives.") : t("Add numnum to your home screen and we'll notify you when the restaurant accepts your order, when it leaves and when it arrives.")}</p>
         </div>
         <div className="mt-5">
           <InstallHelp />

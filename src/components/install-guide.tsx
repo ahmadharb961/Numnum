@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 import { rich, useT } from "@/i18n/client";
 import type { T } from "@/i18n/core";
+import { useStoreLink } from "@/components/app-links";
+import { AppleIcon, GooglePlayIcon } from "@/components/brand-icons";
 
 /** Mounted once in the root layout: keeps Android's one-tap install prompt for later. */
 export function InstallPromptListener() {
@@ -428,12 +430,37 @@ export function OpenInBrowser({ app }: { app: Exclude<InApp, null> }) {
   );
 }
 
-/** The right guide for this phone: open-in-browser first, Android's one-tap install, or picture steps. */
+/** "Get it on Google Play" / "Download on the App Store", opening the numnum app's store page. */
+export function StoreButton({ store, url }: { store: "ios" | "android"; url: string }) {
+  const t = useT();
+  return (
+    <a href={url} target="_blank" rel="noopener" className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-ink px-5 text-white shadow-lg active:scale-[0.99]" data-testid="store-button">
+      {store === "ios" ? <AppleIcon className="h-8 w-8" /> : <GooglePlayIcon className="h-8 w-8" />}
+      <span className="text-start leading-tight">
+        <span className="block text-[11px] font-semibold uppercase tracking-wide opacity-80">{t(store === "ios" ? "Download on the" : "Get it on")}</span>
+        <span className="block text-xl font-bold">{store === "ios" ? "App Store" : "Google Play"}</span>
+      </span>
+    </a>
+  );
+}
+
+/**
+ * The right guide for this phone: the numnum app's store page once it's live there (Admin →
+ * Settings → Store apps), otherwise open-in-browser first, Android's one-tap install, or picture steps.
+ */
 export function InstallHelp({ appName = "numnum", arrow = true }: { appName?: string; arrow?: boolean }) {
   const t = useT();
   const prompt = useInstallPrompt();
+  const store = useStoreLink();
   const [env, setEnv] = useState<{ inApp: InApp; kind: BrowserKind } | null>(null);
   useEffect(() => setEnv({ inApp: inAppBrowser(), kind: browserKind() }), []);
+  if (store)
+    return (
+      <div>
+        <StoreButton {...store} />
+        <p className="mt-3 text-center text-sm text-ink-muted">{t("Install the app, open it and log in with the same account.")}</p>
+      </div>
+    );
   if (!env) return null;
   if (env.inApp) return <OpenInBrowser app={env.inApp} />;
   const { steps, arrow: at } = installSteps(env.kind, appName, t);

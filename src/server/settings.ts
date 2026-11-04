@@ -37,6 +37,8 @@ export type Settings = {
     suspendAfterDays: number;
   };
   requireRestaurantApproval: boolean;
+  /** Store pages of the numnum app. Empty until it's live; once set, install prompts point there. */
+  appLinks: { ios: string; android: string };
   feedWeights: RankWeights;
   suspiciousRejectRate: number;
   templates: Record<"invoiceIssued" | "paymentDue" | "paymentApproved" | "paymentRejected" | "invoiceOverdue" | "paymentMoreInfo", NotificationTemplate>;
@@ -61,6 +63,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reminders: { onIssue: true, daysBeforeDue: 3, onDue: true, daysAfterDue: [3, 7] },
   overduePolicy: { autoApply: false, restrictPromotionAfterDays: 7, restrictReelsAfterDays: 15, suspendAfterDays: 30 },
   requireRestaurantApproval: true,
+  appLinks: { ios: "", android: "" },
   feedWeights: DEFAULT_RANK_WEIGHTS,
   suspiciousRejectRate: 0.6,
   templates: {

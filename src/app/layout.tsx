@@ -7,6 +7,8 @@ import { ServiceWorker } from "@/components/sw-register";
 import { NavHistory } from "@/components/back-button";
 import { InstallPromptListener } from "@/components/install-guide";
 import { I18nProvider } from "@/i18n/client";
+import { AppLinksProvider } from "@/components/app-links";
+import { getSettings } from "@/server/settings";
 import { dirOf } from "@/i18n/core";
 import { dictFor, getLocale } from "@/i18n/server";
 
@@ -46,11 +48,12 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const locale = await getLocale();
+  const [locale, settings] = await Promise.all([getLocale(), getSettings()]);
   return (
     <html lang={locale} dir={dirOf(locale)}>
       <body>
         <I18nProvider locale={locale} dict={dictFor(locale)}>
+        <AppLinksProvider links={settings.appLinks}>
         <ToastProvider>
           <CartProvider>
             {/* In the installed app this is the scroll container (see globals.css); elsewhere a plain wrapper. */}
@@ -60,6 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ServiceWorker />
         <NavHistory />
         <InstallPromptListener />
+        </AppLinksProvider>
         </I18nProvider>
       </body>
     </html>

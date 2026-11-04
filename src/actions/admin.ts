@@ -359,6 +359,12 @@ export async function saveSettingsAction(patch: Partial<Settings>) {
     if (patch.autoCompleteHours !== undefined && (patch.autoCompleteHours < 1 || patch.autoCompleteHours > 72)) throw new Error("Auto-complete must be between 1 and 72 hours");
     if (patch.lbpPerUsd !== undefined && !(patch.lbpPerUsd > 0)) throw new Error("Exchange rate must be positive");
     if (patch.invoiceDueDays !== undefined && (patch.invoiceDueDays < 1 || patch.invoiceDueDays > 90)) throw new Error("Due days must be 1–90");
+    if (patch.appLinks) {
+      const ok = (v: string, host: RegExp) => !v || (/^https:\/\//.test(v) && host.test(new URL(v).hostname));
+      if (!ok(patch.appLinks.ios.trim(), /(^|\.)apple\.com$/)) throw new Error("The App Store link must be an https://apps.apple.com/… address");
+      if (!ok(patch.appLinks.android.trim(), /^play\.google\.com$/)) throw new Error("The Google Play link must be an https://play.google.com/… address");
+      patch = { ...patch, appLinks: { ios: patch.appLinks.ios.trim(), android: patch.appLinks.android.trim() } };
+    }
     for (const [k, v] of Object.entries(patch) as [keyof Settings, Settings[keyof Settings]][]) {
       await updateSetting(k, v as never, user.id);
     }
