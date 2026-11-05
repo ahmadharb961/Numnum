@@ -46,7 +46,7 @@ workflows:
     # it in Google Play Console (or connect Google Play publishing later).
     name: Android → Google Play (.aab)
     max_build_duration: 30
-    instance_type: linux_x2
+    instance_type: mac_mini_m2 # included in the free plan (Linux machines aren't)
     environment:
       android_signing:
         - numnum_upload
