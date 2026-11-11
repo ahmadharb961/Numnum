@@ -12,9 +12,8 @@ export const dynamic = "force-dynamic";
 export const viewport: Viewport = { themeColor: "#000000" };
 
 export default async function HomePage() {
-  const t = await getT();
-  const loc = await customerLocation();
-  const [feed, settings] = await Promise.all([getFeed({ cursor: 0, limit: 6, location: loc, blockedRestaurantIds: (await getBlocks()).restaurantIds }), getSettings()]);
+  const [t, loc, blocks, settings] = await Promise.all([getT(), customerLocation(), getBlocks(), getSettings()]);
+  const feed = await getFeed({ cursor: 0, limit: 6, location: loc, blockedRestaurantIds: blocks.restaurantIds });
   const { liked, saved } = await likedAndSaved(feed.reels.map((r) => r.id));
   return (
     <main>

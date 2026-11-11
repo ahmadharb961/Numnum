@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "./db";
 import { DEFAULT_RANK_WEIGHTS, type RankWeights } from "@/lib/ranking";
 
@@ -86,7 +87,7 @@ function merge<T>(base: T, override: unknown): T {
   return out as T;
 }
 
-export async function getSettings(): Promise<Settings> {
+async function loadSettings(): Promise<Settings> {
   const rows = await prisma.platformSetting.findMany();
   let s: Settings = DEFAULT_SETTINGS;
   for (const r of rows) {
@@ -94,6 +95,9 @@ export async function getSettings(): Promise<Settings> {
   }
   return s;
 }
+
+/** Platform settings, read from the database once per request however many places ask. */
+export const getSettings = cache(loadSettings);
 
 export async function updateSetting<K extends keyof Settings>(key: K, value: Settings[K], userId: string) {
   await prisma.platformSetting.upsert({
