@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "./db";
 import { DEFAULT_RANK_WEIGHTS, type RankWeights } from "@/lib/ranking";
 
@@ -86,14 +87,15 @@ function merge<T>(base: T, override: unknown): T {
   return out as T;
 }
 
-export async function getSettings(): Promise<Settings> {
+/** Loaded once per request (layout, page and metadata share it). */
+export const getSettings = cache(async function getSettings(): Promise<Settings> {
   const rows = await prisma.platformSetting.findMany();
   let s: Settings = DEFAULT_SETTINGS;
   for (const r of rows) {
     if (r.key in DEFAULT_SETTINGS) s = { ...s, [r.key]: merge((DEFAULT_SETTINGS as Record<string, unknown>)[r.key], r.value) };
   }
   return s;
-}
+});
 
 export async function updateSetting<K extends keyof Settings>(key: K, value: Settings[K], userId: string) {
   await prisma.platformSetting.upsert({

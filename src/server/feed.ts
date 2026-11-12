@@ -69,7 +69,7 @@ export function toPublicReel(r: ReelCard, location?: LatLng | null) {
     id: r.id,
     caption: r.caption,
     videoUrl: r.videoUrl,
-    posterUrl: r.posterUrl,
+    posterUrl: r.posterUrl?.replace("height=1280", "height=960") ?? null,
     viewCount: r.viewCount,
     likeCount: r.likeCount,
     shareCount: r.shareCount,

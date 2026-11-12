@@ -100,7 +100,7 @@ async function customerCode(hlsHint?: string | null): Promise<string | null> {
 
 export function playbackUrls(code: string, uid: string) {
   const base = `https://customer-${code}.cloudflarestream.com/${uid}`;
-  return { hls: `${base}/manifest/video.m3u8`, poster: `${base}/thumbnails/thumbnail.jpg?time=1s&height=1280` };
+  return { hls: `${base}/manifest/video.m3u8`, poster: `${base}/thumbnails/thumbnail.jpg?time=1s&height=960` };
 }
 
 export const isStreamKey = (storageKey: string) => storageKey.startsWith("stream:");

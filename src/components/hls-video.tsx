@@ -82,6 +82,12 @@ export const HlsVideo = forwardRef<HTMLVideoElement, Props>(function HlsVideo({ 
       }
       const hls = new HlsLib({ maxBufferLength: saveData ? 6 : 12, maxMaxBufferLength: 30, capLevelToPlayerSize: true, startLevel: -1, autoStartLoad: eager });
       hls.on(HlsLib.Events.ERROR, (_e, d) => d.fatal && fatalRef.current?.());
+      // Start at about 540p so the first frame comes quickly; hls.js then raises the quality as the
+      // connection allows (what TikTok/Instagram do). iPhones choose their own start level.
+      hls.on(HlsLib.Events.MANIFEST_PARSED, (_e, d) => {
+        const light = d.levels.map((l, i) => ({ h: l.height || 0, i })).filter((l) => l.h && l.h <= 540).sort((a, b) => b.h - a.h)[0];
+        if (light) hls.startLevel = light.i;
+      });
       hls.loadSource(src);
       hls.attachMedia(v);
       hlsRef.current = hls;

@@ -5,6 +5,7 @@ import { DashboardNav } from "@/components/dashboard/nav";
 import { Alert } from "@/components/ui/misc";
 import Link from "next/link";
 import { NewOrderAlert } from "@/components/dashboard/new-order-alert";
+import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 import { InstallGate } from "@/components/dashboard/install-gate";
 import { getT } from "@/i18n/server";
 import { VerifyEmailBanner } from "@/components/dashboard/verify-email-banner";
@@ -60,6 +61,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <Alert tone="amber">{t("Some features are restricted due to an overdue invoice.")} <Link href="/dashboard/billing" className="font-semibold underline">{t("Settle now")}</Link></Alert>
           </div>
         )}
+        <FreshOnNavigate />
         {children}
       </div>
       </InstallGate>

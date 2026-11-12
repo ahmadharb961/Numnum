@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import { preconnect, preload } from "react-dom";
 import { getBlocks } from "@/server/blocks";
 import { ReelFeed } from "@/components/customer/reel-feed";
 import { getFeed } from "@/server/feed";
@@ -12,9 +13,14 @@ export const dynamic = "force-dynamic";
 export const viewport: Viewport = { themeColor: "#000000" };
 
 export default async function HomePage() {
-  const t = await getT();
-  const loc = await customerLocation();
-  const [feed, settings] = await Promise.all([getFeed({ cursor: 0, limit: 6, location: loc, blockedRestaurantIds: (await getBlocks()).restaurantIds }), getSettings()]);
+  // Independent lookups together (settings are cached per request, so getFeed reuses them).
+  const [t, loc, blocks, settings] = await Promise.all([getT(), customerLocation(), getBlocks(), getSettings()]);
+  const feed = await getFeed({ cursor: 0, limit: 6, location: loc, blockedRestaurantIds: blocks.restaurantIds });
+  // Open the connection to the video server and fetch the first cover while the page is still loading.
+  const first = feed.reels[0];
+  const videoOrigin = first?.videoUrl?.match(/^https:\/\/[^/]+/)?.[0];
+  if (videoOrigin) preconnect(videoOrigin, { crossOrigin: "anonymous" });
+  if (first?.posterUrl) preload(first.posterUrl, { as: "image", fetchPriority: "high" });
   const { liked, saved } = await likedAndSaved(feed.reels.map((r) => r.id));
   return (
     <main>

@@ -42,12 +42,13 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
   const lang = await getLocale();
   const data = await getPublicRestaurant((await params).slug);
   if (!data) notFound();
-  const blocked = await restaurantBlockFor(data.restaurant.id);
-  if (blocked) return <BlockedNotice blockId={blocked.id} name={data.restaurant.displayName} />;
   const { restaurant: r, sections, reels, reviews, subRatings } = data;
-  const key = await ownerKey();
-  const saved = key ? !!(await prisma.savedItem.findUnique({ where: { ownerKey_type_refId: { ownerKey: key, type: "RESTAURANT", refId: r.id } } })) : false;
-  const loc = await customerLocation();
+  const [blocked, saved, loc] = await Promise.all([
+    restaurantBlockFor(r.id),
+    ownerKey().then((key) => (key ? prisma.savedItem.findUnique({ where: { ownerKey_type_refId: { ownerKey: key, type: "RESTAURANT", refId: r.id } } }).then(Boolean) : false)),
+    customerLocation(),
+  ]);
+  if (blocked) return <BlockedNotice blockId={blocked.id} name={r.displayName} />;
   const dq = loc ? quoteDelivery(r, loc) : null;
   const hours = (r.openingHours ?? {}) as OpeningHours;
   const open = isOpenAt(hours);
