@@ -6,7 +6,7 @@ import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { RatingPill, EmptyState } from "@/components/ui/misc";
 import { ReelThumb } from "./cards";
-import { ItemSheet } from "./item-sheet";
+import { ItemSheet, prefetchItem } from "./item-sheet";
 import { useT } from "@/i18n/client";
 import { useLoginGate } from "./login-gate";
 
@@ -103,7 +103,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
                 <div className="grid gap-3 lg:grid-cols-2">
                   {items.map((i) => (
                     <div key={i.id} className="flex items-center gap-3 rounded-2xl bg-white p-2.5 shadow-[0_1px_2px_rgba(22,18,15,0.05),0_6px_20px_rgba(22,18,15,0.05)]">
-                      <button onClick={() => setItemId(i.id)} className="relative h-[92px] w-[110px] shrink-0 overflow-hidden rounded-xl bg-black/5" aria-label={t("View {name}", { name: i.name })}>
+                      <button onPointerDown={() => prefetchItem(i.id)} onClick={() => setItemId(i.id)} className="relative h-[92px] w-[110px] shrink-0 overflow-hidden rounded-xl bg-black/5" aria-label={t("View {name}", { name: i.name })}>
                         {i.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={i.image.thumbUrl ?? i.image.url} alt={i.name} className="h-full w-full object-cover" loading="lazy" />
@@ -112,7 +112,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
                         )}
                         {!i.available && <span className="absolute inset-0 grid place-items-center bg-white/70 text-[11px] font-bold text-ink-soft">{t("Unavailable")}</span>}
                       </button>
-                      <button onClick={() => setItemId(i.id)} className="min-w-0 flex-1 text-start">
+                      <button onPointerDown={() => prefetchItem(i.id)} onClick={() => setItemId(i.id)} className="min-w-0 flex-1 text-start">
                         <div className="line-clamp-1 text-[15px] font-bold">{i.name}</div>
                         {i.description && <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-ink-muted">{i.description}</p>}
                         <div className="mt-1 flex items-center gap-2">
@@ -121,7 +121,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
                         </div>
                       </button>
                       {i.available && orderingEnabled && (
-                        <button onClick={() => setItemId(i.id)} className="me-1 grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/30 active:scale-90" aria-label={t("Add {name}", { name: i.name })}>
+                        <button onPointerDown={() => prefetchItem(i.id)} onClick={() => setItemId(i.id)} className="me-1 grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/30 active:scale-90" aria-label={t("Add {name}", { name: i.name })}>
                           <Plus className="h-6 w-6" strokeWidth={2.5} />
                         </button>
                       )}

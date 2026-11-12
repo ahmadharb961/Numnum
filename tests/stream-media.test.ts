@@ -22,7 +22,7 @@ describe("Cloudflare Stream helpers", () => {
   });
   it("builds playback URLs from the customer code", () => {
     expect(customerCodeFromUrl("https://customer-abc123.cloudflarestream.com/uid/manifest/video.m3u8")).toBe("abc123");
-    expect(playbackUrls("abc123", "uid1")).toEqual({ hls: "https://customer-abc123.cloudflarestream.com/uid1/manifest/video.m3u8", poster: "https://customer-abc123.cloudflarestream.com/uid1/thumbnails/thumbnail.jpg?time=1s&height=1280" });
+    expect(playbackUrls("abc123", "uid1")).toEqual({ hls: "https://customer-abc123.cloudflarestream.com/uid1/manifest/video.m3u8", poster: "https://customer-abc123.cloudflarestream.com/uid1/thumbnails/thumbnail.jpg?time=1s&height=960" });
   });
   it("decodes tus metadata", () => {
     expect(parseTusMetadata(`filename ${Buffer.from("burger.mp4").toString("base64")},filetype ${Buffer.from("video/mp4").toString("base64")}`)).toEqual({ filename: "burger.mp4", filetype: "video/mp4" });

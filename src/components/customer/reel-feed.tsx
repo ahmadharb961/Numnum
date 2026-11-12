@@ -9,7 +9,7 @@ import { formatMoney } from "@/lib/money";
 import { cn, compactNumber } from "@/lib/utils";
 import { VerifiedBadge, RatingPill } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
-import { ItemSheet } from "./item-sheet";
+import { ItemSheet, prefetchItem } from "./item-sheet";
 import { api, track } from "./track";
 import { HlsVideo } from "@/components/hls-video";
 import { pooledVideo, unlockPooledVideos } from "./video-pool";
@@ -42,6 +42,12 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   const [active, setActive] = useState(startIndex);
+  // The dish of the reel on screen (and the next one) loads in the background: "Order" opens instantly.
+  useEffect(() => {
+    prefetchItem(reels[active]?.item.id);
+    const next = setTimeout(() => prefetchItem(reels[active + 1]?.item.id), 1200);
+    return () => clearTimeout(next);
+  }, [active, reels]);
   // Sound on by default. Browsers block sound until the visitor first taps the page: then the
   // reel plays muted ("soundBlocked") and the first tap turns sound on. A manual mute is remembered.
   const [muted, setMuted] = useState(false);

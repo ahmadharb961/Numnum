@@ -1,3 +1,4 @@
+// Speed check: run against `next start -p 3001`.  node scripts/perf/tab-switch.js
 // Tap → new screen visible, on a slow phone connection (300 ms latency, 1.5 Mb/s).
 const { chromium, devices } = require("playwright");
 (async () => {

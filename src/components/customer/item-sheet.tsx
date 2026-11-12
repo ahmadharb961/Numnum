@@ -9,6 +9,38 @@ import { ItemDetail } from "./item-detail";
 import { track } from "./track";
 
 const cache = new Map<string, PublicItem>();
+const fetchedAt = new Map<string, number>();
+const inflight = new Map<string, Promise<PublicItem>>();
+
+function load(itemId: string): Promise<PublicItem> {
+  const running = inflight.get(itemId);
+  if (running) return running;
+  const p = fetch(`/api/items/${itemId}`, { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Item not available"))))
+    .then((d: PublicItem) => {
+      cache.set(itemId, d);
+      fetchedAt.set(itemId, Date.now());
+      return d;
+    })
+    .finally(() => inflight.delete(itemId));
+  inflight.set(itemId, p);
+  return p;
+}
+
+/**
+ * Loads a dish in the background (details + main photo) so its sheet opens instantly: called for
+ * the reel on screen and the next one, and when a finger touches a dish on a menu.
+ */
+export function prefetchItem(itemId: string | null | undefined) {
+  if (!itemId || typeof window === "undefined") return;
+  if (inflight.has(itemId) || Date.now() - (fetchedAt.get(itemId) ?? 0) < 60_000) return;
+  void load(itemId)
+    .then((d) => {
+      const img = d.images?.[0]?.url;
+      if (img) new Image().src = img; // the photo is in the browser before the sheet opens
+    })
+    .catch(() => {});
+}
 
 export function ItemSheet({ itemId, reelId, open, onClose }: { itemId: string | null; reelId?: string | null; open: boolean; onClose: () => void }) {
   const t = useT();
@@ -19,15 +51,15 @@ export function ItemSheet({ itemId, reelId, open, onClose }: { itemId: string | 
     if (!open || !itemId) return;
     setError(null);
     track("product_opened", { menuItemId: itemId, reelId: reelId ?? undefined });
-    // Show the remembered copy instantly, but always refresh it: restaurants change photos,
-    // prices and availability while the app stays open.
+    // Show the remembered (usually prefetched) copy instantly; refresh it if it's more than a few
+    // seconds old: restaurants change photos, prices and availability while the app stays open.
     const cached = cache.get(itemId);
     setItem(cached ?? null);
     let cancelled = false;
-    fetch(`/api/items/${itemId}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Item not available"))))
+    const fresh = cached && Date.now() - (fetchedAt.get(itemId) ?? 0) < 15_000;
+    if (fresh) return;
+    load(itemId)
       .then((d: PublicItem) => {
-        cache.set(itemId, d);
         if (!cancelled) setItem(d);
       })
       .catch((e) => {
