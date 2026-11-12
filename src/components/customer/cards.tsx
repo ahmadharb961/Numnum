@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { ItemSheet, prefetchItem } from "./item-sheet";
 import { Eye, MapPin, Play, Timer } from "lucide-react";
 import { formatMoney } from "@/lib/money";
 import { compactNumber, cn } from "@/lib/utils";
@@ -12,8 +14,36 @@ import { useLocale, useT } from "@/i18n/client";
 
 export function DishCard({ item }: { item: { id: string; name: string; description: string | null; priceCents: number; currency: string; ratingAvg: number; ratingCount: number; available: boolean; image: { url: string; thumbUrl: string | null } | null; restaurant?: { slug: string; displayName: string; verificationStatus: string } } }) {
   const t = useT();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLAnchorElement>(null);
+  // Dishes on screen load in the background, so tapping one opens its sheet instantly
+  // (the link still works for a new tab, long-press or search engines).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        prefetchItem(item.id);
+        io.disconnect();
+      }
+    }, { rootMargin: "200px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [item.id]);
   return (
-    <Link href={`/item/${item.id}`} className="card flex gap-3 p-2.5 active:scale-[0.99]">
+    <>
+    <Link
+      ref={ref}
+      href={`/item/${item.id}`}
+      prefetch={false}
+      onPointerDown={() => prefetchItem(item.id)}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        setOpen(true);
+      }}
+      className="card flex gap-3 p-2.5 active:scale-[0.99]"
+    >
       <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-black/5">
         {item.image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -38,6 +68,8 @@ export function DishCard({ item }: { item: { id: string; name: string; descripti
         </div>
       </div>
     </Link>
+    {open && <ItemSheet itemId={item.id} open onClose={() => setOpen(false)} />}
+    </>
   );
 }
 
@@ -49,7 +81,7 @@ export function RestaurantCard({ r, delivery }: { delivery?: { km: number | null
   const open = now == null ? null : isOpenAt(r.openingHours as OpeningHours, new Date(now));
   const prep = r.avgPrepMinutes ?? null;
   return (
-    <Link href={`/r/${r.slug}`} className="card block overflow-hidden active:scale-[0.99]">
+    <Link href={`/r/${r.slug}`} prefetch className="card block overflow-hidden active:scale-[0.99]">
       <div className="relative aspect-[16/9] bg-gradient-to-br from-brand-100 to-brand-200">
         {r.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
