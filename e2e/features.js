@@ -108,7 +108,10 @@ const shot = (p, name, full = false) => p.screenshot({ path: `${OUT}/${name}.png
   await n.getByRole("button", { name: /Place order/ }).click();
   await n.waitForURL(/\/order\/NN-/);
   console.log("hamra order placed:", n.url().match(/NN-[\d-]+/)[0]);
-  await n.goto("/", { waitUntil: "networkidle" });
+  // The feed streams video continuously, so the network is never idle: wait for the reel instead.
+  await n.goto("/", { waitUntil: "load" });
+  await n.waitForSelector("section[data-active='true']", { timeout: 20000 });
+  await n.waitForTimeout(1000);
   await shot(n, "11-feed-location-chip");
 
   // 6. Rating popup for a delivered order (the demo customer's latest order, marked delivered)

@@ -214,6 +214,7 @@ export const AR4: Record<string, string> = {
   "an order is completed (delivered or picked up)": "يكتمل الطلب (يُوصَل أو يُستلم)",
   "avg. watch {n}s": "متوسط المشاهدة {n} ث",
   "cash on delivery": "نقداً عند التوصيل",
+  "Playing at 2x speed": "تشغيل بسرعة مضاعفة",
   "{n} sold": "تم بيع {n}",
   "{name} · Delivery · cash on delivery": "{name} · توصيل · نقداً عند التوصيل",
   "{name} · Pickup · cash on delivery": "{name} · استلام من المطعم · نقداً عند التوصيل",
