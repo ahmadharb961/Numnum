@@ -44,7 +44,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   return (
     <DashPage title={t("Orders")} description={t("Accept new orders quickly — customers see every update live. Payment is cash on delivery, collected by you.")}>
       <form className="mb-3 flex gap-2">
-        <input name="ref" defaultValue={sp.ref} className="input h-10 max-w-xs font-mono text-sm uppercase placeholder:font-sans placeholder:normal-case" placeholder={t("Find by reference")} />
+        <input name="ref" defaultValue={sp.ref} className="input h-10 max-w-xs font-mono uppercase placeholder:font-sans placeholder:normal-case" placeholder={t("Find by reference")} />
       </form>
       <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4">
         {(Object.keys(TABS) as (keyof typeof TABS)[]).map((k) => (

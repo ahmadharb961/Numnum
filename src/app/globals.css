@@ -118,6 +118,23 @@ body {
   }
 }
 
+/* iPhone zooms the page in when you tap a text field under 16px, and doesn't zoom back out.
+   Text fields are never smaller than 16px: the .input class is 16px, and fields without a size
+   of their own get at least 16px here. Don't put text-sm/text-xs on a text field. */
+@layer base {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* While typing on a phone, bars pinned to the bottom would ride up on the keyboard and cover the
+   form: hide them until the keyboard closes (see TypingWatcher). */
+html[data-typing] .hide-when-typing {
+  display: none;
+}
+
 /* Search boxes have their own clear button; hide the browser's. */
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-decoration {

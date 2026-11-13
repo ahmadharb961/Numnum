@@ -204,8 +204,8 @@ export function SettingsForm({ initial }: { initial: Settings }) {
           {(Object.keys(s.templates) as (keyof Settings["templates"])[]).map((k) => (
             <div key={k} className="grid gap-2 sm:grid-cols-[180px_1fr_2fr]">
               <div className="pt-3 text-sm font-semibold">{k}</div>
-              <input className="input text-sm" value={s.templates[k].title} onChange={(e) => setS({ ...s, templates: { ...s.templates, [k]: { ...s.templates[k], title: e.target.value } } })} />
-              <input className="input text-sm" value={s.templates[k].body} onChange={(e) => setS({ ...s, templates: { ...s.templates, [k]: { ...s.templates[k], body: e.target.value } } })} />
+              <input className="input" value={s.templates[k].title} onChange={(e) => setS({ ...s, templates: { ...s.templates, [k]: { ...s.templates[k], title: e.target.value } } })} />
+              <input className="input" value={s.templates[k].body} onChange={(e) => setS({ ...s, templates: { ...s.templates, [k]: { ...s.templates[k], body: e.target.value } } })} />
             </div>
           ))}
         </div>

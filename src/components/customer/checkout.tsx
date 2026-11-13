@@ -353,7 +353,7 @@ export function Checkout() {
                       <label className="flex items-center gap-2 font-semibold">
                         <input type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} className="h-5 w-5 accent-brand-500" /> {t("Save to my addresses")}
                       </label>
-                      {saveAddress && <input className="input h-10 w-40 text-sm" placeholder={t("Label (Home, Work…)")} value={addressLabel} onChange={(e) => setAddressLabel(e.target.value)} />}
+                      {saveAddress && <input className="input h-10 min-w-[11rem] flex-1" placeholder={t("Label (Home, Work…)")} value={addressLabel} onChange={(e) => setAddressLabel(e.target.value)} />}
                     </div>
                   </div>
                 )}

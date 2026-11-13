@@ -37,7 +37,7 @@ export function MenuManager({ items, categories, manager, showArchived }: { item
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <label className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
-          <input className="input h-10 ps-9 text-sm" placeholder={t("Search name or SKU")} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input h-10 ps-9" placeholder={t("Search name or SKU")} value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
         <Link href={showArchived ? "/dashboard/menu" : "/dashboard/menu?archived=1"} className="chip h-10">
           {showArchived ? t("Show active") : t("Show archived")}
@@ -184,7 +184,7 @@ function CategoryEditor({ categories }: { categories: Cat[] }) {
           <li key={c.id} className="flex items-center gap-2 py-2">
             {editing === c.id ? (
               <>
-                <input className="input h-9 flex-1 text-sm" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+                <input className="input h-9 flex-1" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
                 <Button size="sm" onClick={() => run(async () => { const r = await saveCategoryAction(c.id, editName); if (r.ok) setEditing(null); return r; })}>
                   {t("Save")}
                 </Button>
@@ -222,7 +222,7 @@ function CategoryEditor({ categories }: { categories: Cat[] }) {
           });
         }}
       >
-        <input className="input h-10 flex-1 text-sm" placeholder={t("New category name")} value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input h-10 flex-1" placeholder={t("New category name")} value={name} onChange={(e) => setName(e.target.value)} />
         <Button size="sm" type="submit" className="h-10">
           {t("Add")}
         </Button>

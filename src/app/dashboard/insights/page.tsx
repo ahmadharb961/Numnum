@@ -51,11 +51,11 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         ))}
         <label className="text-xs font-semibold text-ink-muted">
           {t("From")}
-          <input type="date" name="from" defaultValue={sp.from} className="input mt-1 h-9 w-36 text-sm" />
+          <input type="date" name="from" defaultValue={sp.from} className="input mt-1 h-9 w-36" />
         </label>
         <label className="text-xs font-semibold text-ink-muted">
           {t("To")}
-          <input type="date" name="to" defaultValue={sp.to} className="input mt-1 h-9 w-36 text-sm" />
+          <input type="date" name="to" defaultValue={sp.to} className="input mt-1 h-9 w-36" />
         </label>
         <button className="chip h-9 text-xs">{t("Apply")}</button>
       </form>

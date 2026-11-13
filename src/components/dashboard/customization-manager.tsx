@@ -168,8 +168,8 @@ function GroupEditor({ initial, currency, onSaved }: { initial: Group; currency:
             {g.options.map((o, i) => (
               <div key={i} className="rounded-xl border border-black/10 p-2">
                 <div className="flex gap-2">
-                  <input className="input h-10 flex-1 text-sm" placeholder={t("Option name")} value={o.name} onChange={(e) => setOpt(i, { name: e.target.value })} />
-                  <input className="input h-10 w-24 text-sm" inputMode="decimal" placeholder="+0.00" value={o.price} onChange={(e) => setOpt(i, { price: e.target.value })} aria-label={`Price adjustment in ${currency}`} />
+                  <input className="input h-10 flex-1" placeholder={t("Option name")} value={o.name} onChange={(e) => setOpt(i, { name: e.target.value })} />
+                  <input className="input h-10 w-24" inputMode="decimal" placeholder="+0.00" value={o.price} onChange={(e) => setOpt(i, { price: e.target.value })} aria-label={`Price adjustment in ${currency}`} />
                 </div>
                 <div className="mt-1.5 flex items-center gap-3 px-1 text-xs">
                   <label className="flex items-center gap-1.5">

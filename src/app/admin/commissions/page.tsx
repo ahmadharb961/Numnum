@@ -58,8 +58,8 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
 
       <Section title="Commission events" description={`${agg._count} entries · ${formatMoney(agg._sum.baseCents ?? 0)} subtotal · ${formatMoney(agg._sum.commissionCents ?? 0)} commission`}>
         <form className="mb-3 flex flex-wrap gap-2">
-          <input name="q" defaultValue={sp.q} className="input h-9 w-48 text-sm" placeholder="Reference / restaurant" />
-          <input name="period" defaultValue={sp.period} className="input h-9 w-32 text-sm" placeholder="YYYY-MM" pattern="\d{4}-\d{2}" />
+          <input name="q" defaultValue={sp.q} className="input h-9 w-48" placeholder="Reference / restaurant" />
+          <input name="period" defaultValue={sp.period} className="input h-9 w-32" placeholder="YYYY-MM" pattern="\d{4}-\d{2}" />
           {sp.status && <input type="hidden" name="status" value={sp.status} />}
           <button className="chip h-9 text-xs">Filter</button>
         </form>

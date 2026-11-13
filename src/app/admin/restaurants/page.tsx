@@ -40,7 +40,7 @@ export default async function AdminRestaurants({ searchParams }: { searchParams:
       }
     >
       <form className="mb-3 flex gap-2">
-        <input name="q" defaultValue={sp.q} className="input h-10 max-w-sm text-sm" placeholder="Search name or email" />
+        <input name="q" defaultValue={sp.q} className="input h-10 max-w-sm" placeholder="Search name or email" />
         <input type="hidden" name="f" value={f} />
       </form>
       <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto">
