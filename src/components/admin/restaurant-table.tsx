@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { bulkCommissionAction } from "@/actions/admin";
 import { Badge } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { useBusy } from "@/components/ui/use-busy";
 import { cn } from "@/lib/utils";
 
 type Row = { id: string; displayName: string; place: string; status: string; verificationStatus: string; commissionRateBps: number | null; items: number; reels: number; orders: number; views: string; joined: string };
@@ -15,14 +16,14 @@ type Row = { id: string; displayName: string; place: string; status: string; ver
 export function RestaurantTable({ rows, defaultRate }: { rows: Row[]; defaultRate: number }) {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [rate, setRate] = useState("");
-  const [pending, start] = useTransition();
+  const busy = useBusy();
   const router = useRouter();
   const toast = useToast();
   const all = rows.length > 0 && rows.every((r) => sel.has(r.id));
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const apply = (value: string | null) =>
-    start(async () => {
+    busy.run(value === null ? "default" : "rate", async () => {
       const r = await bulkCommissionAction([...sel], value);
       if (r.ok) {
         const n = r.data?.changed ?? 0;
@@ -41,10 +42,10 @@ export function RestaurantTable({ rows, defaultRate }: { rows: Row[]; defaultRat
           <span className="text-white/60">· Commission:</span>
           <input value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" placeholder="e.g. 10" className="h-9 w-24 rounded-lg bg-white px-3 text-ink" aria-label="Commission rate %" />
           <span>%</span>
-          <Button size="sm" loading={pending} disabled={rate.trim() === ""} onClick={() => apply(rate)}>
+          <Button size="sm" loading={busy.is("rate")} disabled={rate.trim() === "" || busy.pending} onClick={() => apply(rate)}>
             Set rate
           </Button>
-          <Button size="sm" variant="ghost" className="border border-white/30 !text-white hover:!bg-white/10" loading={pending} onClick={() => apply(null)}>
+          <Button size="sm" variant="ghost" className="border border-white/30 !text-white hover:!bg-white/10" loading={busy.is("default")} disabled={busy.pending} onClick={() => apply(null)}>
             Use default ({defaultRate}%)
           </Button>
           <button type="button" onClick={() => setSel(new Set())} className="ms-auto text-white/70 hover:text-white">

@@ -149,9 +149,14 @@ const replaceEverywhere = (oldUrl: string, newUrl: string) => [
 // Public photos served by our server that still have their stored copy (so they can be moved).
 const onServer = { kind: "IMAGE" as const, isPrivate: false, url: { startsWith: "/media/i/" }, blobs: { some: { variant: "main" } } };
 
+/** Same rules as `onServer`, in one query (shown on Admin → Settings). */
 export async function photoCounts() {
-  const [server, cloudflare] = await Promise.all([prisma.mediaAsset.count({ where: onServer }), prisma.mediaAsset.count({ where: { kind: "IMAGE", isPrivate: false, url: { startsWith: "https://imagedelivery.net/" } } })]);
-  return { server, cloudflare };
+  const [r] = await prisma.$queryRaw<{ server: number; cloudflare: number }[]>`
+    SELECT
+      count(*) FILTER (WHERE a.url LIKE '/media/i/%' AND EXISTS (SELECT 1 FROM media_blobs b WHERE b."assetId" = a.id AND b.variant = 'main'))::int AS server,
+      count(*) FILTER (WHERE a.url LIKE 'https://imagedelivery.net/%')::int AS cloudflare
+    FROM media_assets a WHERE a.kind = 'IMAGE' AND a."isPrivate" = false`;
+  return { server: r.server, cloudflare: r.cloudflare };
 }
 
 /** Moves up to `limit` photos still served by our server to Cloudflare. Safe to run again. */

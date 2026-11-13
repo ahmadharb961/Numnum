@@ -1,24 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { saveSettingsAction } from "@/actions/admin";
 import type { Settings } from "@/server/settings";
 import { Section } from "@/components/dashboard/page";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
+import { useBusy } from "@/components/ui/use-busy";
 
 export function SettingsForm({ initial }: { initial: Settings }) {
   const [s, setS] = useState<Settings>(initial);
-  const [pending, start] = useTransition();
-  const router = useRouter();
+  const busy = useBusy();
   const toast = useToast();
+  // The action refreshes this page itself (revalidatePath), so no extra router.refresh() here.
   const save = (keys: (keyof Settings)[]) =>
-    start(async () => {
+    busy.run(keys[0], async () => {
       const r = await saveSettingsAction(Object.fromEntries(keys.map((k) => [k, s[k]])) as Partial<Settings>);
       toast(r.ok ? r.message ?? "Saved" : r.error, r.ok ? "success" : "error");
-      router.refresh();
     });
   const num = (v: string) => (v === "" ? 0 : Number(v));
 
@@ -39,7 +38,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <label className="mt-4 flex items-center gap-3 text-sm font-semibold">
           <input type="checkbox" checked={s.requireRestaurantApproval} onChange={(e) => setS({ ...s, requireRestaurantApproval: e.target.checked })} className="h-5 w-5 accent-brand-500" /> New restaurants require admin approval before going live
         </label>
-        <Button className="mt-4" loading={pending} onClick={() => save(["platformName", "tagline", "supportEmail", "requireRestaurantApproval"])}>
+        <Button className="mt-4" loading={busy.is("platformName")} disabled={busy.pending} onClick={() => save(["platformName", "tagline", "supportEmail", "requireRestaurantApproval"])}>
           Save
         </Button>
       </Section>
@@ -54,7 +53,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
             <input id="app-link-android" className="input" inputMode="url" placeholder="https://play.google.com/store/apps/details?id=me.numnum.app" value={s.appLinks.android} onChange={(e) => setS({ ...s, appLinks: { ...s.appLinks, android: e.target.value } })} />
           </Field>
         </div>
-        <Button className="mt-4" loading={pending} onClick={() => save(["appLinks"])} data-testid="save-app-links">
+        <Button className="mt-4" loading={busy.is("appLinks")} disabled={busy.pending} onClick={() => save(["appLinks"])} data-testid="save-app-links">
           Save
         </Button>
       </Section>
@@ -82,7 +81,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
             <input className="input" value={Math.round(s.suspiciousRejectRate * 100)} onChange={(e) => setS({ ...s, suspiciousRejectRate: num(e.target.value) / 100 })} />
           </Field>
         </div>
-        <Button className="mt-4" loading={pending} onClick={() => save(["defaultCommissionRateBps", "billableEvent", "agreementVersion", "autoCompleteHours", "suspiciousRejectRate"])}>
+        <Button className="mt-4" loading={busy.is("defaultCommissionRateBps")} disabled={busy.pending} onClick={() => save(["defaultCommissionRateBps", "billableEvent", "agreementVersion", "autoCompleteHours", "suspiciousRejectRate"])}>
           Save commission settings
         </Button>
       </Section>
@@ -102,7 +101,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <Field label="Payment instructions">
           <textarea className="input" value={s.whish.instructions} onChange={(e) => setS({ ...s, whish: { ...s.whish, instructions: e.target.value } })} />
         </Field>
-        <Button className="mt-4" loading={pending} onClick={() => save(["whish"])}>
+        <Button className="mt-4" loading={busy.is("whish")} disabled={busy.pending} onClick={() => save(["whish"])}>
           Save payment details
         </Button>
       </Section>
@@ -150,7 +149,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
             </Field>
           </div>
         </div>
-        <Button className="mt-4" loading={pending} onClick={() => save(["invoiceDueDays", "graceDays", "disputeWindowDays", "reminders", "overduePolicy"])}>
+        <Button className="mt-4" loading={busy.is("invoiceDueDays")} disabled={busy.pending} onClick={() => save(["invoiceDueDays", "graceDays", "disputeWindowDays", "reminders", "overduePolicy"])}>
           Save billing settings
         </Button>
       </Section>
@@ -170,7 +169,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
             </div>
           </Field>
         </div>
-        <Button className="mt-4" loading={pending} onClick={() => save(["lbpPerUsd", "supportedCurrencies"])}>
+        <Button className="mt-4" loading={busy.is("lbpPerUsd")} disabled={busy.pending} onClick={() => save(["lbpPerUsd", "supportedCurrencies"])}>
           Save currency settings
         </Button>
       </Section>
@@ -195,7 +194,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
             <input className="input" type="number" value={s.feedWeights.maxConsecutiveSameRestaurant} onChange={(e) => setS({ ...s, feedWeights: { ...s.feedWeights, maxConsecutiveSameRestaurant: Math.max(1, num(e.target.value)) } })} />
           </Field>
         </div>
-        <Button className="mt-4" loading={pending} onClick={() => save(["minViewMs", "viewDedupeMinutes", "feedWeights"])}>
+        <Button className="mt-4" loading={busy.is("minViewMs")} disabled={busy.pending} onClick={() => save(["minViewMs", "viewDedupeMinutes", "feedWeights"])}>
           Save feed settings
         </Button>
       </Section>
@@ -210,7 +209,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
             </div>
           ))}
         </div>
-        <Button className="mt-4" loading={pending} onClick={() => save(["templates"])}>
+        <Button className="mt-4" loading={busy.is("templates")} disabled={busy.pending} onClick={() => save(["templates"])}>
           Save templates
         </Button>
       </Section>

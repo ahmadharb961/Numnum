@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { DEFAULT_RANK_WEIGHTS, type RankWeights } from "@/lib/ranking";
 
@@ -96,6 +97,16 @@ export const getSettings = cache(async function getSettings(): Promise<Settings>
   }
   return s;
 });
+
+/** Saves several settings in one database round trip (the settings page saves a whole section at once). */
+export async function updateSettings(patch: Partial<Settings>, userId: string) {
+  const rows = Object.entries(patch).filter(([k]) => k in DEFAULT_SETTINGS);
+  if (!rows.length) return;
+  await prisma.$executeRaw`
+    INSERT INTO platform_settings (key, value, "updatedAt", "updatedBy")
+    VALUES ${Prisma.join(rows.map(([k, v]) => Prisma.sql`(${k}, ${JSON.stringify(v)}::jsonb, now(), ${userId})`))}
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, "updatedAt" = EXCLUDED."updatedAt", "updatedBy" = EXCLUDED."updatedBy"`;
+}
 
 export async function updateSetting<K extends keyof Settings>(key: K, value: Settings[K], userId: string) {
   await prisma.platformSetting.upsert({

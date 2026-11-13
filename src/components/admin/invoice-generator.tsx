@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateInvoicesAction, previewInvoicesAction, runMaintenanceAction } from "@/actions/admin";
 import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/misc";
+import { useBusy } from "@/components/ui/use-busy";
 
 type Row = { restaurantId: string; name: string; orders: number; subtotalCents: number; commissionCents: number; adjustmentsCents: number; totalCents: number; existing: string | null };
 
@@ -13,7 +14,7 @@ export function InvoiceGenerator({ defaultPeriod }: { defaultPeriod: string }) {
   const [period, setPeriod] = useState(defaultPeriod);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [pending, start] = useTransition();
+  const busy = useBusy();
   const router = useRouter();
   return (
     <div className="space-y-3">
@@ -24,9 +25,10 @@ export function InvoiceGenerator({ defaultPeriod }: { defaultPeriod: string }) {
         </label>
         <Button
           variant="outline"
-          loading={pending}
+          loading={busy.is("preview")}
+          disabled={busy.pending}
           onClick={() =>
-            start(async () => {
+            busy.run("preview", async () => {
               const r = await previewInvoicesAction(period);
               if (r.ok) setRows(r.data ?? []);
               else setMsg({ ok: false, text: r.error });
@@ -36,10 +38,11 @@ export function InvoiceGenerator({ defaultPeriod }: { defaultPeriod: string }) {
           Preview
         </Button>
         <Button
-          loading={pending}
+          loading={busy.is("generate")}
+          disabled={busy.pending}
           onClick={() => {
             if (!confirm(`Generate and issue invoices for ${period}? Issued invoices can only be changed via adjustments.`)) return;
-            start(async () => {
+            busy.run("generate", async () => {
               const r = await generateInvoicesAction(period);
               if (r.ok) {
                 const created = (r.data ?? []).filter((x) => x.created).length;
@@ -55,9 +58,10 @@ export function InvoiceGenerator({ defaultPeriod }: { defaultPeriod: string }) {
         </Button>
         <Button
           variant="ghost"
-          loading={pending}
+          loading={busy.is("maintenance")}
+          disabled={busy.pending}
           onClick={() =>
-            start(async () => {
+            busy.run("maintenance", async () => {
               const r = await runMaintenanceAction();
               setMsg(r.ok ? { ok: true, text: `Refreshed ${r.data?.refreshed} invoices · ${r.data?.reminders} reminders sent · ${r.data?.restricted} restrictions applied` } : { ok: false, text: r.error });
               router.refresh();

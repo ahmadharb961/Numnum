@@ -55,14 +55,18 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const session = await prisma.session.findUnique({
-    where: { tokenHash: hmac(token) },
-    include: { user: { include: { roles: true } } },
-  });
-  if (!session || session.expiresAt < new Date() || session.user.disabled) return null;
-  const u = session.user;
-  return { id: u.id, email: u.email, name: u.name, phone: u.phone, roles: u.roles.map((r) => r.role) };
+  return userForSessionToken(token);
 });
+
+/** The signed-in user for a session cookie: one query (session + user + roles), as it runs on every signed-in page. */
+export async function userForSessionToken(token: string): Promise<CurrentUser | null> {
+  const [u] = await prisma.$queryRaw<{ id: string; email: string; name: string; phone: string | null; roles: Role[] }[]>`
+    SELECT u.id, u.email, u.name, u.phone,
+      COALESCE((SELECT array_agg(r.role::text) FROM user_roles r WHERE r."userId" = u.id), '{}') AS roles
+    FROM sessions s JOIN users u ON u.id = s."userId"
+    WHERE s."tokenHash" = ${hmac(token)} AND s."expiresAt" > now() AND u.disabled = false`;
+  return u ? { id: u.id, email: u.email, name: u.name, phone: u.phone, roles: u.roles } : null;
+}
 
 export function hasRole(user: CurrentUser | null, role: Role) {
   return !!user?.roles.includes(role);

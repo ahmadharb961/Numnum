@@ -7,7 +7,7 @@ import { requireAdmin } from "@/server/auth";
 import { audit } from "@/server/audit";
 import { ipHash } from "@/server/request";
 import { notifyRestaurant } from "@/server/notifications";
-import { getSettings, updateSetting, type Settings } from "@/server/settings";
+import { getSettings, updateSettings, type Settings } from "@/server/settings";
 import { adminCancelOrder } from "@/server/orders";
 import { sendBroadcast, type BroadcastInput, type BroadcastResult } from "@/server/broadcast";
 import { applyAdjustmentToInvoice, createAdjustment, decideAdjustment, generateInvoice, recordManualPayment, resolveDispute, reviewPayment, runBillingMaintenance, runMonthlyBilling, previewInvoice, refreshInvoiceStatus, type PaymentReview } from "@/server/billing";
@@ -400,10 +400,11 @@ export async function saveSettingsAction(patch: Partial<Settings>) {
       if (!ok(patch.appLinks.android.trim(), /^play\.google\.com$/)) throw new Error("The Google Play link must be an https://play.google.com/… address");
       patch = { ...patch, appLinks: { ios: patch.appLinks.ios.trim(), android: patch.appLinks.android.trim() } };
     }
-    for (const [k, v] of Object.entries(patch) as [keyof Settings, Settings[keyof Settings]][]) {
-      await updateSetting(k, v as never, user.id);
-    }
-    await audit({ actorId: user.id, action: "settings.update", entityType: "platform_settings", data: { keys: Object.keys(patch), before: Object.fromEntries(Object.keys(patch).map((k) => [k, current[k as keyof Settings]])), after: patch }, ipHash: ip });
+    // One round trip for the whole section, the audit entry alongside it.
+    await Promise.all([
+      updateSettings(patch, user.id),
+      audit({ actorId: user.id, action: "settings.update", entityType: "platform_settings", data: { keys: Object.keys(patch), before: Object.fromEntries(Object.keys(patch).map((k) => [k, current[k as keyof Settings]])), after: patch }, ipHash: ip }),
+    ]);
     revalidatePath("/admin/settings");
   }, "Settings saved");
 }

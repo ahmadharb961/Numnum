@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { reviewPaymentAction } from "@/actions/admin";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { useBusy } from "@/components/ui/use-busy";
 
 export function PaymentReviewForm({ paymentId, amountCents }: { paymentId: string; amountCents: number }) {
   const [amount, setAmount] = useState((amountCents / 100).toFixed(2));
   const [note, setNote] = useState("");
   const [confirmed, setConfirmed] = useState(false);
-  const [pending, start] = useTransition();
+  const busy = useBusy();
   const router = useRouter();
   const toast = useToast();
   const go = (action: "APPROVE" | "REJECT" | "MORE_INFO") =>
-    start(async () => {
+    busy.run(action, async () => {
       const r = await reviewPaymentAction(paymentId, action, amount, note);
       toast(r.ok ? r.message ?? "Done" : r.error, r.ok ? "success" : "error");
       router.refresh();
@@ -35,13 +36,13 @@ export function PaymentReviewForm({ paymentId, amountCents }: { paymentId: strin
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="h-5 w-5 accent-brand-500" />I confirmed the funds were received in the Whish account
       </label>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={!confirmed} loading={pending} onClick={() => go("APPROVE")}>
+        <Button size="sm" disabled={!confirmed || busy.pending} loading={busy.is("APPROVE")} onClick={() => go("APPROVE")}>
           Approve{Number(amount) * 100 < amountCents ? " partial payment" : ""}
         </Button>
-        <Button size="sm" variant="outline" loading={pending} onClick={() => go("MORE_INFO")}>
+        <Button size="sm" variant="outline" loading={busy.is("MORE_INFO")} disabled={busy.pending} onClick={() => go("MORE_INFO")}>
           Request more evidence
         </Button>
-        <Button size="sm" variant="danger" loading={pending} onClick={() => go("REJECT")}>
+        <Button size="sm" variant="danger" loading={busy.is("REJECT")} disabled={busy.pending} onClick={() => go("REJECT")}>
           Reject
         </Button>
       </div>
