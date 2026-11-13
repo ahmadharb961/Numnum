@@ -89,7 +89,9 @@ async function visit(ctx, label, path, opts = {}) {
   const where = `[${label}] ${path}`;
   let res;
   try {
-    res = await page.goto(path, { waitUntil: "networkidle", timeout: 30000 });
+    // Reel pages stream video, so the network may never go idle: wait for load, then for quiet if it comes.
+    res = await page.goto(path, { waitUntil: "load", timeout: 30000 });
+    await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
   } catch (e) {
     flag(where, `did not load: ${e.message.split("\n")[0]}`);
     await page.close();
@@ -221,7 +223,7 @@ async function visit(ctx, label, path, opts = {}) {
       for (const t of await englishLeftovers(pg)) flag(`[journey/ar] ${step}`, `English left in Arabic: "${t.slice(0, 90)}"`);
       await pg.screenshot({ path: `${SHOTS}/journey-ar-${step}.png` }).catch(() => {});
     };
-    await pg.goto(`/r/${bh.slug}`, { waitUntil: "networkidle" });
+    await pg.goto(`/r/${bh.slug}`, { waitUntil: "load" }); await pg.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
     // A delivered order may bring up the rating popup first ("how was your order?"): close it.
     const rating = pg.getByRole("dialog", { name: "كيف كان طلبك؟" });
     if (await rating.waitFor({ timeout: 2500 }).then(() => true, () => false)) {
@@ -233,9 +235,9 @@ async function visit(ctx, label, path, opts = {}) {
     await scan("1-dish");
     await pg.getByRole("button", { name: /أضف إلى السلة/ }).click();
     await pg.waitForTimeout(800);
-    await pg.goto("/cart", { waitUntil: "networkidle" });
+    await pg.goto("/cart", { waitUntil: "load" }); await pg.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
     await scan("2-cart");
-    await pg.goto("/checkout", { waitUntil: "networkidle" });
+    await pg.goto("/checkout", { waitUntil: "load" }); await pg.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
     await pg.waitForTimeout(800);
     await scan("3-method");
     await pg.locator("main button").filter({ hasText: "توصيل" }).first().click().catch(() => {});
@@ -253,7 +255,7 @@ async function visit(ctx, label, path, opts = {}) {
       await pg.getByRole("button", { name: "إلغاء الطلب" }).first().click().catch(() => {});
       await pg.getByRole("dialog").getByRole("button", { name: "إلغاء الطلب" }).click().catch(() => {});
       await pg.waitForTimeout(1500);
-      await pg.reload({ waitUntil: "networkidle" });
+      await pg.reload({ waitUntil: "load" }); await pg.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
       await scan("7-canceled");
     } else flag("[journey/ar] review", "no Place order button (checkout did not reach the review step)");
     for (const e of errs) flag("[journey/ar]", `crash: ${e}`);
@@ -281,7 +283,7 @@ async function visit(ctx, label, path, opts = {}) {
     // tracking link without its token must not reveal the order
     {
       const pg = await g.newPage();
-      await pg.goto(`/order/${custOrder.reference}`, { waitUntil: "networkidle" });
+      await pg.goto(`/order/${custOrder.reference}`, { waitUntil: "load" }); await pg.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
       const body = await pg.locator("body").innerText();
       if (!/couldn't open this order/.test(body) || body.includes(custOrder.customerName)) flag(`[guest must not see] /order/${custOrder.reference}`, "order details visible without its link");
       await pg.close();
@@ -303,7 +305,7 @@ async function visit(ctx, label, path, opts = {}) {
         if (st !== 401) flag(`[guest API] ${label}`, `HTTP ${st} — a guest must be asked to log in (401)`);
       }
       const gp = await (await phone()).newPage();
-      await gp.goto(`/reel/${reelForGate.id}`, { waitUntil: "networkidle" });
+      await gp.goto(`/reel/${reelForGate.id}`, { waitUntil: "load" }); await gp.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
       for (const [label, name] of [["like", /^(Like|Unlike)$/], ["save", /^(Save|Unsave)$/], ["report", /^Report this reel$/]]) {
         await gp.getByRole("button", { name }).first().click();
         const sheet = await gp.getByTestId("login-gate").waitFor({ timeout: 5000 }).then(() => true, () => false);
@@ -320,14 +322,14 @@ async function visit(ctx, label, path, opts = {}) {
       if ((await db.savedItem.count()) !== savesBefore) flag("[guest] save", "a guest save was stored");
       if ((await db.report.count()) !== reportsBefore) flag("[guest] report", "a guest report was stored");
       // review report link on a restaurant page
-      await gp.goto(`/r/${bh.slug}#reviews`, { waitUntil: "networkidle" });
+      await gp.goto(`/r/${bh.slug}#reviews`, { waitUntil: "load" }); await gp.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
       const rep = gp.getByRole("button", { name: /^Report$/ }).first();
       if (await rep.count()) {
         await rep.click();
         if (!(await gp.getByTestId("login-gate").waitFor({ timeout: 5000 }).then(() => true, () => false))) flag("[guest] report a review", "did not ask to log in");
         await gp.keyboard.press("Escape");
       }
-      await gp.goto("/saved", { waitUntil: "networkidle" });
+      await gp.goto("/saved", { waitUntil: "load" }); await gp.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
       if (!(await gp.getByText("Log in to see your saved food").count())) flag("[guest] /saved", "does not ask to log in");
       await gp.context().close();
     }
@@ -360,7 +362,7 @@ async function visit(ctx, label, path, opts = {}) {
       const rp = await pg.evaluate(async (id) => (await fetch("/api/reports", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ targetType: "REEL", targetId: id, reason: "Other", details: "launch-check" }) })).status, reel.id);
       if (rp !== 201 && rp !== 200) flag("[customer] report", `HTTP ${rp}`);
       // through the screen: Report on a reel → reason → submit → thank-you toast
-      await pg.goto(`/reel/${reel.id}`, { waitUntil: "networkidle" });
+      await pg.goto(`/reel/${reel.id}`, { waitUntil: "load" }); await pg.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
       await pg.getByRole("button", { name: "Report this reel" }).first().click();
       const opened = await pg.getByRole("dialog", { name: "Report content" }).waitFor({ timeout: 5000 }).then(() => true, () => false);
       if (!opened) flag("[customer] report a reel", "report form did not open");
@@ -377,7 +379,7 @@ async function visit(ctx, label, path, opts = {}) {
       await pg.goto("/");
       const s = await pg.evaluate(async (ref) => (await fetch(`/api/orders/${ref}/status`)).status, otherOrder.reference);
       if (s < 400) flag("[customer API] someone else's order status", `allowed (HTTP ${s})`);
-      await pg.goto(`/order/${otherOrder.reference}`, { waitUntil: "networkidle" });
+      await pg.goto(`/order/${otherOrder.reference}`, { waitUntil: "load" }); await pg.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
       const body = await pg.locator("body").innerText();
       if (!/couldn't open this order/.test(body) || body.includes(otherOrder.customerName)) flag("[customer] someone else's order page", "details visible");
       await pg.close();
@@ -395,7 +397,7 @@ async function visit(ctx, label, path, opts = {}) {
     }
     if (otherOrder) {
       const pg = await o.newPage();
-      await pg.goto(`/dashboard/orders?ref=${otherOrder.reference}`, { waitUntil: "networkidle" });
+      await pg.goto(`/dashboard/orders?ref=${otherOrder.reference}`, { waitUntil: "load" }); await pg.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
       if (await pg.locator(`text=${otherOrder.reference}`).locator("visible=true").count().then((n) => n > 1)) flag("[owner] another restaurant's order", "visible in Burger House dashboard");
       await pg.close();
     }
