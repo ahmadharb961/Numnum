@@ -9,7 +9,7 @@ const { PrismaClient } = require("@prisma/client");
 const SHOTS = process.env.SHOTS || require("os").tmpdir();
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 const db = new PrismaClient();
-const HAMRA = { latitude: 33.8975, longitude: 35.4815 }; // ~0.4 km from Burger House (zone: 6 km, $3.50)
+const HAMRA = { latitude: 33.8975, longitude: 35.4815 }; // ~0.4 km from Burger House (first zone: up to 3 km, $1.50)
 const TRIPOLI = { latitude: 34.4367, longitude: 35.8497 }; // ~70 km away: out of range
 
 let failures = 0;
@@ -38,6 +38,8 @@ async function login(ctx, email, pw) {
 
 async function openDish(page, name) {
   await page.getByLabel(`Add ${name}`).first().click();
+  // The previous dish's sheet may still be closing: wait until only this dish's Add button is left.
+  await page.waitForFunction(() => [...document.querySelectorAll("button")].filter((x) => /Add to cart/.test(x.textContent || "")).length === 1);
   await page.getByRole("button", { name: /Add to cart/ }).waitFor();
 }
 
@@ -188,12 +190,12 @@ async function chooseDelivery(page) {
   const fee = await rowValue(c, "Delivery fee");
   const total = await rowValue(c, "Total");
   check(sub === 26, "subtotal $26.00", sub);
-  check(fee === 3.5, "delivery fee $3.50 (within the 6 km zone)", fee);
-  check(total === 29.5, "total $29.50 = subtotal + fee", total);
+  check(fee === 1.5, "delivery fee $1.50 (within the 3 km zone)", fee);
+  check(total === 27.5, "total $27.50 = subtotal + fee", total);
   check((await c.getByText("Cash on delivery").count()) > 0, "payment: cash on delivery");
   await c.fill("input[placeholder='e.g. 50']", "50");
   const placeBtn = c.getByRole("button", { name: /Place order/ });
-  check(money(await textOf(placeBtn)) === 29.5, "Place order button shows $29.50", await textOf(placeBtn));
+  check(money(await textOf(placeBtn)) === 27.5, "Place order button shows $27.50", await textOf(placeBtn));
   await shot(c, "review");
 
   section("Place the order (double tap must create ONE order)");
@@ -207,7 +209,7 @@ async function chooseDelivery(page) {
   const count = await db.order.count({ where: { userId: user.id } });
   check(count === 1, "exactly one order in the DB despite the double tap", count);
   check(order.status === "PLACED", "DB status PLACED", order.status);
-  check(order.subtotalCents === 2600 && order.deliveryFeeCents === 350 && order.totalCents === 2950, "DB totals 2600 + 350 = 2950", [order.subtotalCents, order.deliveryFeeCents, order.totalCents]);
+  check(order.subtotalCents === 2600 && order.deliveryFeeCents === 150 && order.totalCents === 2750, "DB totals 2600 + 150 = 2750", [order.subtotalCents, order.deliveryFeeCents, order.totalCents]);
   check(order.changeForCents === 5000, "DB change for $50", order.changeForCents);
   check(order.fulfillment === "DELIVERY" && order.latitude && Math.abs(order.latitude - HAMRA.latitude) < 0.01, "DB delivery pin = customer GPS", [order.latitude, order.longitude]);
   check(order.items.length === 2 && order.items.reduce((s, i) => s + i.quantity, 0) === 3, "DB 2 lines, 3 items", order.items.map((i) => i.quantity));
@@ -224,7 +226,7 @@ async function chooseDelivery(page) {
   const card = r.locator(`text=${ref}`).first();
   check(await card.isVisible(), "restaurant sees the new order");
   const rBody = await textOf(r.locator("body"));
-  check(rBody.includes("pays with $50.00, bring $20.50 change"), "restaurant sees 'pays with $50.00, bring $20.50 change'");
+  check(rBody.includes("pays with $50.00, bring $22.50 change"), "restaurant sees 'pays with $50.00, bring $22.50 change'");
   check(rBody.includes("Bliss Street"), "restaurant sees the address");
   await shot(r, "restaurant-new");
   // One tap to reach the customer on WhatsApp (ready message with the order number) or by phone
