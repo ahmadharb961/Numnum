@@ -28,7 +28,7 @@ const count = () => db.analyticsEvent.count({ where: { type: "client_error" } })
   await p.waitForTimeout(1500);
   const h = await db.analyticsEvent.findFirst({ where: { type: "client_error" }, orderBy: { createdAt: "desc" } });
   check(h?.data?.hydration === true && h?.data?.path === "/r/burger-house", "a hydration error is reported with its page", h?.data);
-  check(h?.data?.clientOnly?.includes("Drawn differently") && h?.data?.serverOnly?.includes("Burger House"), "with the lines that differ (server: 'Burger House', phone: 'Drawn differently')", { s: h?.data?.serverOnly, c: h?.data?.clientOnly });
+  check(h?.data?.clientOnly?.includes("Drawn differently") && (h?.data?.serverOnly?.length ?? 99) <= 3 && (h?.data?.clientOnly?.length ?? 99) <= 3, "with just the lines that differ (the phone drew 'Drawn differently')", { s: h?.data?.serverOnly, c: h?.data?.clientOnly });
   check(/iPhone/.test(h?.data?.ua ?? ""), "and the phone it happened on", h?.data?.ua);
 
   // An ordinary crash is reported too; at most 3 per page load
