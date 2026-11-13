@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bookmark, ChevronLeft, Eye, Heart, Loader2, MapPin, Play, Plus, Send, Volume2, VolumeX, RotateCcw, X } from "lucide-react";
+import { Bookmark, ChevronLeft, Eye, FastForward, Heart, Loader2, MapPin, Play, Plus, Send, Volume2, VolumeX, RotateCcw, X } from "lucide-react";
 import type { PublicReel } from "@/server/feed";
 import { formatMoney } from "@/lib/money";
 import { cn, compactNumber } from "@/lib/utils";
@@ -339,6 +339,9 @@ function ReelSlide({
   const lastTick = useRef<number | null>(null);
   const viewSent = useRef(false);
   const lastTap = useRef(0);
+  // Press and hold the left or right edge of a reel: it plays at 2x until released (like Instagram).
+  const [fast, setFast] = useState(false);
+  const hold = useRef<{ timer: number | null; x: number; y: number; on: boolean; until: number }>({ timer: null, x: 0, y: 0, on: false, until: 0 });
 
   // Play / pause based on visibility
   useEffect(() => {
@@ -367,6 +370,14 @@ function ReelSlide({
   useEffect(() => {
     if (!active) setPaused(false);
   }, [active]);
+
+  // Normal speed again whenever the reel stops being the one on screen (the <video> elements are
+  // pooled and reused by other reels) or the video element changes.
+  useEffect(() => {
+    if (active) return;
+    endHold();
+    if (videoRef.current) videoRef.current.playbackRate = 1;
+  }, [active, mounted]);
 
   // Lock screen / notification "Now Playing": dish and restaurant with the full-orange numnum icon
   // (without this, phones fall back to a site icon and the page title).
@@ -403,7 +414,46 @@ function ReelSlide({
     }
   }
 
+  const HOLD_MS = 300; // a press this long on an edge = 2x
+  const EDGE = 0.25; // left and right quarter of the reel
+
+  function startHold(e: React.PointerEvent<HTMLButtonElement>) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    const rel = (e.clientX - box.left) / box.width;
+    if (rel > EDGE && rel < 1 - EDGE) return;
+    endHold();
+    hold.current.x = e.clientX;
+    hold.current.y = e.clientY;
+    hold.current.timer = window.setTimeout(() => {
+      hold.current.timer = null;
+      const v = videoRef.current;
+      if (!v || !active || paused) return;
+      hold.current.on = true;
+      v.playbackRate = 2;
+      setFast(true);
+    }, HOLD_MS);
+  }
+
+  function moveHold(e: React.PointerEvent) {
+    // A finger that moves is scrolling to the next reel, not holding.
+    if (hold.current.timer != null && Math.hypot(e.clientX - hold.current.x, e.clientY - hold.current.y) > 10) endHold();
+  }
+
+  function endHold() {
+    if (hold.current.timer != null) window.clearTimeout(hold.current.timer);
+    hold.current.timer = null;
+    if (hold.current.on) {
+      hold.current.on = false;
+      hold.current.until = Date.now() + 400; // the release isn't also a tap (pause / like)
+      if (videoRef.current) videoRef.current.playbackRate = 1;
+    }
+    setFast(false);
+  }
+
   function onTap() {
+    // Releasing a 2x hold isn't a tap.
+    if (Date.now() < hold.current.until) return;
     // The tap that just turned sound on shouldn't also pause the reel.
     if (justUnlocked()) return;
     const now = Date.now();
@@ -456,7 +506,24 @@ function ReelSlide({
           onError={() => setFailed(true)}
         />
       )}
-      <button className="absolute inset-0 z-[1] h-full w-full" onClick={onTap} aria-label={paused ? t("Play") : t("Pause")} />
+      <button
+        className="absolute inset-0 z-[1] h-full w-full select-none [-webkit-touch-callout:none]"
+        onClick={onTap}
+        onPointerDown={startHold}
+        onPointerMove={moveHold}
+        onPointerUp={endHold}
+        onPointerCancel={endHold}
+        onPointerLeave={endHold}
+        // A long press would open the phone's "save / share" menu instead of speeding up.
+        onContextMenu={(e) => e.preventDefault()}
+        aria-label={paused ? t("Play") : t("Pause")}
+      />
+      {/* Below the top bar (logo, location, sound) and the "Tap for sound" pill. */}
+      {fast && (
+        <div className="pointer-events-none absolute left-1/2 z-[3] flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/55 px-3 py-1.5 text-sm font-bold text-white backdrop-blur" style={{ top: "calc(var(--safe-top) + 112px)" }} role="status" aria-label={t("Playing at 2x speed")}>
+          2× <FastForward className="h-4 w-4 fill-white rtl:-scale-x-100" />
+        </div>
+      )}
 
       {active && buffering && !paused && (
         <div className="pointer-events-none absolute inset-0 z-[2] grid place-items-center">
