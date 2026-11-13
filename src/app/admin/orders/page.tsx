@@ -37,7 +37,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: Prom
         <input name="q" defaultValue={sp.q} className="input h-10 max-w-xs" placeholder="Reference or restaurant" />
         {sp.f && <input type="hidden" name="f" value={sp.f} />}
       </form>
-      <div className="mb-3 flex gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
         {[
           ["", "All"],
           ["suspicious", "Suspicious"],

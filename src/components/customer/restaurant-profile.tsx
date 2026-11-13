@@ -119,7 +119,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
                 </div>
                 <div className="grid gap-3 lg:grid-cols-2">
                   {items.map((i) => (
-                    <div key={i.id} data-dish={i.id} className="flex items-center gap-3 rounded-2xl bg-white p-2.5 shadow-[0_1px_2px_rgba(22,18,15,0.05),0_6px_20px_rgba(22,18,15,0.05)]">
+                    <div key={i.id} data-dish={i.id} className="flex min-w-0 items-center gap-3 rounded-2xl bg-white p-2.5 shadow-[0_1px_2px_rgba(22,18,15,0.05),0_6px_20px_rgba(22,18,15,0.05)]">
                       <button onPointerDown={() => prefetchItem(i.id)} onClick={() => setItemId(i.id)} className="relative h-[92px] w-[110px] shrink-0 overflow-hidden rounded-xl bg-black/5" aria-label={t("View {name}", { name: i.name })}>
                         {i.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -132,7 +132,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
                       <button onPointerDown={() => prefetchItem(i.id)} onClick={() => setItemId(i.id)} className="min-w-0 flex-1 text-start">
                         <div className="line-clamp-1 text-[15px] font-bold">{i.name}</div>
                         {i.description && <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-ink-muted">{i.description}</p>}
-                        <div className="mt-1 flex items-center gap-2">
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="tabular text-[15px] font-extrabold">{formatMoney(i.priceCents, i.currency)}</span>
                           {i.ratingCount > 0 && <RatingPill avg={i.ratingAvg} count={i.ratingCount} />}
                         </div>

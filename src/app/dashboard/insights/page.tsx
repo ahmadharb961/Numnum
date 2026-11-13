@@ -81,21 +81,21 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         <Section title={t("Top-selling items")} description={t("By quantity in completed orders")}>
           {ins.topItems.length ? (
             <ol className="space-y-2.5 text-sm">
-              {ins.topItems.map((t, i) => {
+              {ins.topItems.map((it, i) => {
                 const max = ins.topItems[0].quantity || 1;
                 return (
-                  <li key={t.name + i}>
+                  <li key={it.name + i}>
                     <div className="flex justify-between gap-2">
-                      <span>
+                      <span className="min-w-0 break-words">
                         <span className="me-2 text-ink-muted">{i + 1}.</span>
-                        {t.name}
+                        {it.name}
                       </span>
-                      <span className="tabular font-semibold">
-                        {t.quantity} sold · {formatMoney(t.salesCents, cur)}
+                      <span className="tabular shrink-0 font-semibold">
+                        {t("{n} sold", { n: it.quantity })} · {formatMoney(it.salesCents, cur)}
                       </span>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/5">
-                      <div className="h-full rounded-full bg-brand-500" style={{ width: `${(t.quantity / max) * 100}%` }} />
+                      <div className="h-full rounded-full bg-brand-500" style={{ width: `${(it.quantity / max) * 100}%` }} />
                     </div>
                   </li>
                 );

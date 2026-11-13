@@ -53,6 +53,7 @@ export default async function AdminOverview() {
       </div>
       <Section title="Suspicious activity" description={`Restaurants where ≥${Math.round(settings.suspiciousRejectRate * 100)}% of orders (last 30 days, min 5) were rejected or reported as not delivered, or where customers contradicted the restaurant 2+ times.`}>
         {suspicious.length ? (
+          <div className="overflow-x-auto">
           <table className="table-app">
             <thead>
               <tr>
@@ -81,6 +82,7 @@ export default async function AdminOverview() {
               ))}
             </tbody>
           </table>
+          </div>
         ) : (
           <p className="text-sm text-ink-muted">Nothing unusual detected.</p>
         )}

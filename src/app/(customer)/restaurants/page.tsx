@@ -36,8 +36,9 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
       initial={{ area: sp.area, near: sp.near === "1", category: categories.some((c) => c.slug === sp.category) ? sp.category : undefined }}
       header={
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl font-black tracking-tight">{t("Restaurants")}</h1>
-          <LocationChip label={loc?.label ?? null} />
+          <h1 className="shrink-0 text-2xl font-black tracking-tight">{t("Restaurants")}</h1>
+          {/* min-w-0: on small phones the chip shrinks (its label truncates) instead of widening the page */}
+          <LocationChip label={loc?.label ?? null} className="min-w-0" />
         </div>
       }
       footer={

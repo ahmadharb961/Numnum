@@ -20,7 +20,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   });
   return (
     <DashPage title="Whish payment verification" description="Confirm funds were actually received in the Whish account before approving. A screenshot alone is not proof of settlement.">
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         <Link href="/admin/payments" className={cn("chip h-9 text-xs", f === "pending" && "chip-active")}>
           Awaiting review
         </Link>

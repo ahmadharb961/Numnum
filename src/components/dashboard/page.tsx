@@ -23,7 +23,7 @@ export function DashPage({ title, description, actions, children }: { title: str
 export function Section({ title, description, children, actions, id }: { title: string; description?: React.ReactNode; children: React.ReactNode; actions?: React.ReactNode; id?: string }) {
   const t = useT();
   return (
-    <section id={id} className="card mb-5 scroll-mt-20 p-4 sm:p-5">
+    <section id={id} className="card mb-5 min-w-0 scroll-mt-20 p-4 sm:p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-base font-extrabold">{t(title)}</h2>
