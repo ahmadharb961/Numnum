@@ -75,7 +75,7 @@ export async function processImage(
   await putBlob(asset.id, "thumb", thumb);
   // Public photos are delivered by Cloudflare Images when it's set up (the database copy stays as a
   // backup and keeps working through /media/i if Cloudflare is unavailable).
-  const cf = isPrivate || kind !== "IMAGE" ? null : await pushToCloudflare(asset.id, main.data, thumb);
+  const cf = isPrivate || kind !== "IMAGE" ? null : await pushToCloudflare(asset.id, main.data, thumb, { deadlineMs: 12_000 });
   const url = isPrivate ? `/api/private-media/${asset.id}` : (cf?.url ?? publicImageUrl(asset.id, "main"));
   const thumbUrl = isPrivate ? `/api/private-media/${asset.id}?thumb=1` : (cf?.thumbUrl ?? publicImageUrl(asset.id, "thumb"));
   return prisma.mediaAsset.update({ where: { id: asset.id }, data: { url, thumbUrl, ...(cf ? { storageKey: "cf" } : {}) } });

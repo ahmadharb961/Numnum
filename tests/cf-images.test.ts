@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/server/db";
 import { processImage } from "@/server/media";
 import { getBlob } from "@/server/storage";
-import { movePhotosToCloudflare, photoCounts } from "@/server/cf-images";
+import { movePhotosToCloudflare, photoCounts, resetCloudflareImagesState } from "@/server/cf-images";
 import { makeRestaurant, resetDb } from "./helpers";
 
 const HASH = "AbCdEf123";
 type Call = { method: string; path: string; id?: string | null };
 
 /** A stand-in for Cloudflare's Images API: records calls, stores uploaded ids, can refuse. */
-function fakeCloudflare(opts: { deny?: boolean } = {}) {
+function fakeCloudflare(opts: { deny?: boolean; slowMs?: number; variantCreateFails?: boolean } = {}) {
   const calls: Call[] = [];
   const stored = new Set<string>();
   let variant = false;
@@ -23,10 +23,12 @@ function fakeCloudflare(opts: { deny?: boolean } = {}) {
       const method = init.method ?? "GET";
       const id = init.body instanceof FormData ? (init.body.get("id") as string) : null;
       calls.push({ method, path, id });
+      if (opts.slowMs) await new Promise((r) => setTimeout(r, opts.slowMs));
       if (opts.deny) return json(403, { success: false, errors: [{ code: 10000, message: "Authentication error" }] });
       if (path === "/v1/variants/orig") return variant ? json(200, { success: true, result: {} }) : json(404, { success: false, errors: [{ code: 5404, message: "not found" }] });
       if (path === "/v1/variants" && method === "POST") {
-        variant = true;
+        variant = true; // with variantCreateFails: another process made it a moment earlier, so this create errors
+        if (opts.variantCreateFails) return json(400, { success: false, errors: [{ code: 5400, message: "variant already exists" }] });
         return json(200, { success: true, result: {} });
       }
       if (path === "/v1" && method === "POST") {
@@ -46,6 +48,7 @@ const photo = () => sharp({ create: { width: 1600, height: 1200, channels: 3, ba
 
 beforeEach(async () => {
   await resetDb();
+  resetCloudflareImagesState();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -145,5 +148,49 @@ describe("Cloudflare Images", () => {
     cf.stored.add(`${a.id}_t`);
     expect(await movePhotosToCloudflare(10)).toMatchObject({ moved: 1, remaining: 0, error: null });
     expect((await prisma.mediaAsset.findUniqueOrThrow({ where: { id: a.id } })).url).toBe(`https://imagedelivery.net/${HASH}/${a.id}/orig`);
+  });
+
+  it("two uploads at the same moment: the variant is set up once and both photos go to Cloudflare", async () => {
+    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", "acc1");
+    vi.stubEnv("CLOUDFLARE_STREAM_API_TOKEN", "tok");
+    const cf = fakeCloudflare();
+    const f = await makeRestaurant();
+    const [a, b] = await Promise.all([processImage(await photo(), { restaurantId: f.restaurant.id, originalName: "a.jpg" }), processImage(await sharp({ create: { width: 800, height: 800, channels: 3, background: "#0a0" } }).jpeg().toBuffer(), { restaurantId: f.restaurant.id, originalName: "b.jpg" })]);
+    expect(a.url).toMatch(/^https:\/\/imagedelivery\.net\//);
+    expect(b.url).toMatch(/^https:\/\/imagedelivery\.net\//);
+    expect(cf.calls.filter((c) => c.path === "/v1/variants" && c.method === "POST")).toHaveLength(1);
+  });
+
+  it("if creating the variant errors because it already exists, uploads still go ahead", async () => {
+    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", "acc1");
+    vi.stubEnv("CLOUDFLARE_STREAM_API_TOKEN", "tok");
+    fakeCloudflare({ variantCreateFails: true });
+    const f = await makeRestaurant();
+    const a = await processImage(await photo(), { restaurantId: f.restaurant.id, originalName: "x.jpg" });
+    expect(a.url).toMatch(/^https:\/\/imagedelivery\.net\//);
+  });
+
+  it("a slow Cloudflare doesn't hold up a restaurant's upload: past the deadline it's served by our server", async () => {
+    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", "acc1");
+    vi.stubEnv("CLOUDFLARE_STREAM_API_TOKEN", "tok");
+    fakeCloudflare({ slowMs: 15_000 });
+    const f = await makeRestaurant();
+    const t0 = Date.now();
+    const a = await processImage(await photo(), { restaurantId: f.restaurant.id, originalName: "x.jpg" });
+    expect(Date.now() - t0).toBeLessThan(13_500);
+    expect(a.url).toBe(`/media/i/${a.id}.webp`);
+  }, 20_000);
+
+  it("photos without a stored copy are skipped, so they can't block the move", async () => {
+    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", "");
+    const f = await makeRestaurant();
+    const broken = await prisma.mediaAsset.create({ data: { restaurantId: f.restaurant.id, kind: "IMAGE", storageKey: "db", url: "/media/i/gone.webp", mimeType: "image/webp", sizeBytes: 1 } });
+    await processImage(await photo(), { restaurantId: f.restaurant.id, originalName: "x.jpg" });
+    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", "acc1");
+    vi.stubEnv("CLOUDFLARE_STREAM_API_TOKEN", "tok");
+    fakeCloudflare();
+    expect(await photoCounts()).toEqual({ server: 1, cloudflare: 0 });
+    expect(await movePhotosToCloudflare(1)).toMatchObject({ moved: 1, remaining: 0, error: null });
+    expect((await prisma.mediaAsset.findUniqueOrThrow({ where: { id: broken.id } })).url).toBe("/media/i/gone.webp");
   });
 });
