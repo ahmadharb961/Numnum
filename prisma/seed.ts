@@ -4,6 +4,7 @@
 // through the real order/commission/billing services, reviews and invoices.
 // Demo content is for development and demo environments only.
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -106,13 +107,22 @@ async function demoImage(rel: string, label: string, emoji: string, idx: number)
   return existsSync(file) ? readFileSync(file) : foodImage(label, emoji, idx);
 }
 
+/** File name a demo reel's video is stored under: the SKU plus a fingerprint of the file, so a
+ *  deploy can tell when prisma/demo/reels/<slug>-<sku>.mp4 was replaced and swap just that reel. */
+function demoReelName(d: Demo, sku: string): string | null {
+  const file = path.join(DEMO_DIR, "reels", `${d.slug}-${sku}.mp4`);
+  if (!existsSync(file)) return null;
+  return `${sku}-${createHash("sha1").update(readFileSync(file)).digest("hex").slice(0, 8)}.mp4`;
+}
+
 /**
  * Adds a demo reel from prisma/demo/reels. With Cloudflare Stream it is uploaded there and
  * published once Stream finishes processing; otherwise it is transcoded locally with ffmpeg.
  */
 async function addDemoReel(d: Demo, restaurantId: string, menuItemId: string, sku: string, vi: number, tmp: string, replace?: { id: string; storageKey: string }) {
   const file = path.join(DEMO_DIR, "reels", `${d.slug}-${sku}.mp4`);
-  if (!existsSync(file)) return false;
+  const originalName = demoReelName(d, sku);
+  if (!originalName) return false;
   const it = d.items.find((x) => x.sku === sku)!;
   const caption = vi === 0 ? `${it.name} — made fresh, order in one tap 🔥` : null;
   const featured = d.slug === "burger-house" && vi === 0;
@@ -121,7 +131,7 @@ async function addDemoReel(d: Demo, restaurantId: string, menuItemId: string, sk
   if (streamConfigured()) {
     const video = readFileSync(file);
     const uid = await uploadVideoToStream(video, `${d.slug}-${sku}.mp4`);
-    const asset = await prisma.mediaAsset.create({ data: { restaurantId, kind: "VIDEO", isPrivate: false, storageKey: `stream:${uid}`, url: "", mimeType: "video/mp4", sizeBytes: video.length, originalName: `${sku}.mp4` } });
+    const asset = await prisma.mediaAsset.create({ data: { restaurantId, kind: "VIDEO", isPrivate: false, storageKey: `stream:${uid}`, url: "", mimeType: "video/mp4", sizeBytes: video.length, originalName } });
     if (replace) {
       // Keep the reel (views, likes, stats); swap in the new video once Stream has processed it.
       await prisma.reel.update({ where: { id: replace.id }, data: { videoAssetId: asset.id, posterUrl: poster?.url ?? null, status: "PROCESSING" } });
@@ -135,7 +145,7 @@ async function addDemoReel(d: Demo, restaurantId: string, menuItemId: string, sk
   if (spawnSync("ffmpeg", ["-version"]).status !== 0) return false;
   const raw = path.join(tmp, `${d.slug}-${sku}.mp4`);
   copyFileSync(file, raw);
-  const asset = await storeRawVideo(raw, { restaurantId, originalName: `${sku}.mp4` });
+  const asset = await storeRawVideo(raw, { restaurantId, originalName });
   const out = await processVideoAsset(asset.id);
   if (replace) {
     await prisma.reel.update({ where: { id: replace.id }, data: { videoAssetId: asset.id, videoUrl: out.videoUrl, posterUrl: poster?.url ?? out.posterUrl, durationSec: out.durationSec, status: "READY" } });
@@ -227,8 +237,9 @@ async function ensureDemoRestaurant(d: Demo, ri: number, opts: { pw: string; ref
 
   let reels = 0;
   for (const [vi, sku] of d.reels.entries()) {
-    const existing = await prisma.reel.findFirst({ where: { restaurantId: r.id, menuItemId: items[sku], status: { not: "FAILED" } }, include: { videoAsset: { select: { storageKey: true } } } });
-    if (existing && !opts.refreshMedia) continue;
+    const existing = await prisma.reel.findFirst({ where: { restaurantId: r.id, menuItemId: items[sku], status: { not: "FAILED" } }, include: { videoAsset: { select: { storageKey: true, originalName: true } } } });
+    // Up to date unless media is being refreshed or the video file in prisma/demo/reels changed.
+    if (existing && !opts.refreshMedia && existing.videoAsset.originalName === demoReelName(d, sku)) continue;
     if (await addDemoReel(d, r.id, items[sku], sku, vi, opts.tmp, existing ? { id: existing.id, storageKey: existing.videoAsset.storageKey } : undefined)) reels++;
   }
   console.log(`Restaurant: ${d.name} (${d.owner} / demo1234)${isNew ? "" : opts.refreshMedia ? " — images refreshed" : " — up to date"}${reels ? `, ${reels} reel(s) ${isNew ? "added" : "added/updated"}` : ""}`);
