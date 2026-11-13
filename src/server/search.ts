@@ -160,6 +160,29 @@ export async function searchRestaurants(p: SearchParams) {
   });
 }
 
+/**
+ * Every active restaurant for the Restaurants tab, with the food categories it serves, so the
+ * category, area and "delivers to me" filters run instantly on the phone instead of reloading.
+ */
+export async function browseRestaurants(blockedIds: string[]) {
+  const [rows, served] = await Promise.all([
+    prisma.restaurant.findMany({
+      where: restaurantWhere({ blockedIds }),
+      select: { id: true, slug: true, displayName: true, logoUrl: true, coverUrl: true, cuisine: true, area: true, city: true, verificationStatus: true, ratingAvg: true, ratingCount: true, deliveryEnabled: true, pickupEnabled: true, openingHours: true, avgPrepMinutes: true, latitude: true, longitude: true, deliveryZones: true, _count: { select: { menuItems: { where: { archived: false } } } } },
+      orderBy: [{ verificationStatus: "asc" }, { ratingCount: "desc" }, { totalReelViews: "desc" }],
+      take: 500,
+    }),
+    prisma.menuItem.findMany({
+      where: { archived: false, foodCategoryId: { not: null }, restaurant: { status: "ACTIVE" } },
+      select: { restaurantId: true, foodCategory: { select: { slug: true } } },
+      distinct: ["restaurantId", "foodCategoryId"],
+    }),
+  ]);
+  const cats = new Map<string, string[]>();
+  for (const m of served) if (m.foodCategory) cats.set(m.restaurantId, [...(cats.get(m.restaurantId) ?? []), m.foodCategory.slug]);
+  return rows.map((r) => ({ ...r, categories: cats.get(r.id) ?? [] }));
+}
+
 /** Categories, areas and cuisines change rarely: cached for a minute so each search does less work. */
 export const facets = unstable_cache(loadFacets, ["search-facets"], { revalidate: 60 });
 

@@ -43,7 +43,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
         <section>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-lg font-extrabold">{t("Dishes")}</h2>
-            <Link href={`/explore?category=${slug}`} className="text-sm font-semibold text-brand-600">
+            <Link prefetch href={`/explore?category=${slug}`} className="text-sm font-semibold text-brand-600">
               {t("Filter")}
             </Link>
           </div>

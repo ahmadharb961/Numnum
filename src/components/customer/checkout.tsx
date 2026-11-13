@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { loadCheckoutInfo } from "./checkout-data";
 import { Banknote, Bike, Check, Clock, Loader2, MapPin, Plus, ShoppingBag, AlertTriangle } from "lucide-react";
 import { MapPicker, type Pin } from "@/components/map-picker";
 import { distanceKm, formatKm, type DeliveryZone } from "@/lib/geo";
@@ -88,7 +89,7 @@ export function Checkout() {
   useEffect(() => {
     if (!cart) return;
     track("checkout_started", { restaurantId: cart.restaurantId });
-    fetch(`/api/restaurants/${cart.restaurantId}/checkout`)
+    loadCheckoutInfo(cart.restaurantId)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((i: Info) => {
         setInfo(i);

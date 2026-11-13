@@ -119,7 +119,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
       </div>
 
       <div className="px-5 pt-4">
-        <Link href={`/r/${item.restaurant.slug}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+        <Link prefetch href={`/r/${item.restaurant.slug}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
           {item.restaurant.logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={item.restaurant.logoUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
@@ -165,7 +165,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
             <h3 className="mb-2 text-sm font-bold">{t("Reels")}</h3>
             <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible px-5">
               {item.reels.map((r) => (
-                <Link key={r.id} href={`/reel/${r.id}`} className="relative aspect-[9/16] w-24 shrink-0 overflow-hidden rounded-xl bg-black">
+                <Link prefetch key={r.id} href={`/reel/${r.id}`} className="relative aspect-[9/16] w-24 shrink-0 overflow-hidden rounded-xl bg-black">
                   {r.posterUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={r.posterUrl} alt="" className="h-full w-full object-cover" loading="lazy" />

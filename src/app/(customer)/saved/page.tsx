@@ -67,7 +67,7 @@ export default async function SavedPage() {
         {user && (
           <p className="mt-1 text-sm text-ink-muted">
             {t("Signed in as {name}", { name: user.name })} ·{" "}
-            <Link href="/account" className="font-semibold text-brand-600">
+            <Link prefetch href="/account" className="font-semibold text-brand-600">
               {t("Account")}
             </Link>
           </p>
@@ -81,7 +81,7 @@ export default async function SavedPage() {
               { href: "/account/addresses", icon: MapPin, label: "Addresses" },
               { href: "/account", icon: UserRound, label: "Account" },
             ].map((l) => (
-              <Link key={l.href} href={l.href} className="card flex flex-col items-center gap-1 py-3 text-xs font-semibold">
+              <Link prefetch key={l.href} href={l.href} className="card flex flex-col items-center gap-1 py-3 text-xs font-semibold">
                 <l.icon className="h-5 w-5 text-brand-600" />
                 {t(l.label)}
               </Link>
@@ -93,7 +93,7 @@ export default async function SavedPage() {
             <h2 className="mb-2 font-extrabold">{user ? t("Recent orders") : t("Your orders on this device")}</h2>
             <div className="space-y-2">
               {recentOrders.map((o) => (
-                <Link key={o.id} href={`/order/${o.reference}`} className="card flex items-center justify-between gap-3 p-3.5 text-sm">
+                <Link prefetch key={o.id} href={`/order/${o.reference}`} className="card flex items-center justify-between gap-3 p-3.5 text-sm">
                   <span className="min-w-0">
                     <span className="block truncate font-bold">{o.restaurantName}</span>
                     <Badge tone={STATUS_META[o.status].tone}>{STATUS_META[o.status].label}</Badge>

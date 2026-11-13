@@ -38,7 +38,7 @@ export default async function AccountPage() {
       <PageHeader title={t("Hi, {name}", { name: user.name.split(" ")[0] })} back={false} />
       <div className="container-app space-y-5 pt-4">
         {active.map((o) => (
-          <Link key={o.id} href={`/order/${o.reference}`} className="card flex items-center gap-3 p-4">
+          <Link prefetch key={o.id} href={`/order/${o.reference}`} className="card flex items-center gap-3 p-4">
             <span className="relative flex h-3 w-3"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" /><span className="relative inline-flex h-3 w-3 rounded-full bg-brand-500" /></span>
             <div className="min-w-0 flex-1">
               <div className="truncate font-bold">{o.restaurantName}</div>
@@ -64,7 +64,7 @@ export default async function AccountPage() {
             { href: "/account/blocked", icon: EyeOff, label: "Blocked", sub: "Restaurants and people you hid" },
             { href: "/support", icon: LifeBuoy, label: "Help & support", sub: "Contact us, terms and privacy" },
           ].map((l) => (
-            <Link key={l.href} href={l.href} className="flex items-center gap-3 p-4">
+            <Link prefetch key={l.href} href={l.href} className="flex items-center gap-3 p-4">
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
                 <l.icon className="h-5 w-5" />
               </span>

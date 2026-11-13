@@ -51,7 +51,7 @@ export function DesktopSidebar({ categories, locationLabel }: { categories: Cate
   return (
     <aside className="fixed inset-y-0 start-0 z-40 hidden w-64 flex-col border-e border-black/5 bg-white lg:flex">
       <div className="px-6 pb-4 pt-6">
-        <Link href="/" className="inline-block text-brand-600" aria-label={t("numnum home")}>
+        <Link prefetch href="/" className="inline-block text-brand-600" aria-label={t("numnum home")}>
           <Logo className="h-12" />
         </Link>
         <div className="mt-4">
@@ -62,7 +62,7 @@ export function DesktopSidebar({ categories, locationLabel }: { categories: Cate
         {NAV.map(({ href, label, icon: Icon, match }) => {
           const active = match(pathname);
           return (
-            <Link key={href} href={href} className={cn("flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-semibold transition", active ? "bg-brand-50 text-brand-600" : "text-ink-soft hover:bg-black/5")} aria-current={active ? "page" : undefined}>
+            <Link prefetch key={href} href={href} className={cn("flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-semibold transition", active ? "bg-brand-50 text-brand-600" : "text-ink-soft hover:bg-black/5")} aria-current={active ? "page" : undefined}>
               <Icon className={cn("h-5 w-5", active && "stroke-[2.4]")} />
               {t(label)}
               {href === "/cart" && count > 0 && <span className="ms-auto grid h-5 min-w-5 place-items-center rounded-full bg-brand-500 px-1.5 text-[11px] font-bold text-white">{count > 99 ? "99+" : count}</span>}

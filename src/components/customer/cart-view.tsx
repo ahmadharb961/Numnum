@@ -8,6 +8,7 @@ import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Spinner } from "@/components/ui/misc";
 import { track } from "./track";
+import { preloadCheckout } from "./checkout-data";
 import { useEffect } from "react";
 import { useT } from "@/i18n/client";
 
@@ -19,6 +20,12 @@ export function CartView() {
     if (cart?.lines.length) track("cart_reviewed", { restaurantId: cart.restaurantId });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Checkout opens ready: its page and the answers it needs load while the cart is on screen.
+  useEffect(() => {
+    if (!cart?.lines.length) return;
+    router.prefetch("/checkout");
+    preloadCheckout(cart.restaurantId);
+  }, [cart?.restaurantId, cart?.lines.length, router]);
 
   return (
     <main className="pb-nav">
@@ -26,7 +33,7 @@ export function CartView() {
         <div>
           <h1 className="text-2xl font-black tracking-tight">{t("Your cart")}</h1>
           {cart && (
-            <Link href={`/r/${cart.restaurantSlug}`} className="text-sm font-semibold text-brand-600">
+            <Link prefetch href={`/r/${cart.restaurantSlug}`} className="text-sm font-semibold text-brand-600">
               {cart.restaurantName}
             </Link>
           )}
@@ -58,7 +65,7 @@ export function CartView() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={`/item/${l.menuItemId}`} className="font-bold leading-tight">
+                    <Link prefetch href={`/item/${l.menuItemId}`} className="font-bold leading-tight">
                       {l.name}
                     </Link>
                     <span className="tabular shrink-0 font-bold">{formatMoney(lineTotal(l), cart.currency)}</span>
@@ -76,7 +83,7 @@ export function CartView() {
                       </button>
                     </div>
                     <div className="flex gap-3 text-xs font-semibold">
-                      <Link href={`/item/${l.menuItemId}`} className="text-brand-600">
+                      <Link prefetch href={`/item/${l.menuItemId}`} className="text-brand-600">
                         {t("Edit")}
                       </Link>
                       <button onClick={() => remove(l.key)} className="text-ink-muted">
@@ -88,7 +95,7 @@ export function CartView() {
               </li>
             ))}
           </ul>
-          <Link href={`/r/${cart.restaurantSlug}`} className="mt-3 flex h-12 items-center justify-center rounded-2xl border border-dashed border-black/15 text-sm font-semibold text-ink-soft">
+          <Link prefetch href={`/r/${cart.restaurantSlug}`} className="mt-3 flex h-12 items-center justify-center rounded-2xl border border-dashed border-black/15 text-sm font-semibold text-ink-soft">
             + {t("Add more from {name}", { name: cart.restaurantName })}
           </Link>
           <div className="card mt-4 space-y-1.5 p-4 text-sm">

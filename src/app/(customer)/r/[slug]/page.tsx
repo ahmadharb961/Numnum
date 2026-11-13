@@ -232,7 +232,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           )}
         </div>
         <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4" style={{ paddingTop: "calc(var(--safe-top) + 10px)" }}>
-          <Link href="/restaurants" className="grid h-11 w-11 place-items-center rounded-full bg-white/95 text-ink shadow-md backdrop-blur" aria-label={t("Back")}>
+          <Link prefetch href="/restaurants" className="grid h-11 w-11 place-items-center rounded-full bg-white/95 text-ink shadow-md backdrop-blur" aria-label={t("Back")}>
             <ChevronLeft className="h-6 w-6 rtl:-scale-x-100" />
           </Link>
           <div className="flex gap-2.5">

@@ -245,7 +245,7 @@ export function OrderTracker({ order: o, token, placed, loggedIn }: { order: Ord
               <RotateCcw className="h-4 w-4" /> {t("Order again")}
             </Button>
           )}
-          <Link href={`/r/${o.restaurantSlug}`} className="chip flex-1 justify-center">
+          <Link prefetch href={`/r/${o.restaurantSlug}`} className="chip flex-1 justify-center">
             {o.restaurantName}
           </Link>
         </div>

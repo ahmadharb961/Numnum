@@ -27,7 +27,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams: Pro
       <div className="container-app space-y-2.5 pt-4">
         {!orders.length && <EmptyState icon={<Receipt />} title={t("No orders yet")} body={t("Your orders will appear here.")} action={<Link href="/" className="chip chip-active">{t("Find something tasty")}</Link>} />}
         {orders.slice(0, 20).map((o) => (
-          <Link key={o.id} href={`/order/${o.reference}`} className="card flex gap-3 p-3.5">
+          <Link prefetch key={o.id} href={`/order/${o.reference}`} className="card flex gap-3 p-3.5">
             <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-brand-50">
               {o.restaurant.logoUrl && (
                 // eslint-disable-next-line @next/next/no-img-element

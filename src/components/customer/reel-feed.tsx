@@ -275,7 +275,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
               <div className="text-5xl">🍔</div>
               <h2 className="mt-4 text-xl font-bold">{t("No reels yet")}</h2>
               <p className="mt-1 text-sm text-white/70">{t("Restaurants are cooking up their first videos. Explore menus in the meantime.")}</p>
-              <Link href="/restaurants" className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-500 px-5 font-semibold">
+              <Link prefetch href="/restaurants" className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-500 px-5 font-semibold">
                 {t("Browse restaurants")}
               </Link>
             </div>
@@ -493,7 +493,7 @@ function ReelSlide({
 
       {/* Right action rail */}
       <div className="absolute bottom-6 end-2 z-10 flex flex-col items-center gap-4">
-        <Link href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="relative mb-1" aria-label={t("Open {name}", { name: reel.restaurant.name })}>
+        <Link prefetch href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="relative mb-1" aria-label={t("Open {name}", { name: reel.restaurant.name })}>
           <span className="block h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-white">
             {reel.restaurant.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -522,7 +522,7 @@ function ReelSlide({
       {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pe-20 *:pointer-events-auto">
         {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">{t("Sponsored")}</span>}
-        <Link href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
+        <Link prefetch href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
           {reel.restaurant.name}
           {reel.restaurant.verified && <VerifiedBadge />}
         </Link>
@@ -684,7 +684,7 @@ function RestaurantPanel({ reel, onClose, onItem }: { reel: FeedReel; onClose: (
             {r.avgPrepMinutes > 0 && <span className="text-ink-muted">{t("{a}–{b} mins", { a: r.avgPrepMinutes, b: r.avgPrepMinutes + 15 })}</span>}
           </div>
           {menu?.description && <p className="mt-3 text-sm text-ink-soft">{menu.description}</p>}
-          <Link href={`/r/${r.slug}`} className="mt-4 flex h-10 items-center justify-center rounded-xl border border-black/10 text-sm font-bold hover:bg-black/5">
+          <Link prefetch href={`/r/${r.slug}`} className="mt-4 flex h-10 items-center justify-center rounded-xl border border-black/10 text-sm font-bold hover:bg-black/5">
             {t("Open restaurant page")}
           </Link>
         </div>

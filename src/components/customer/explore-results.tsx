@@ -46,14 +46,26 @@ function requestKey(sp: URLSearchParams, q: string, type: Tab, page = 1) {
   return u.toString();
 }
 
+// Background loads in flight: a tap on something already loading waits for it instead of asking twice.
+const inflight = new Map<string, Promise<ExploreResult>>();
+
 async function fetchResult(key: string, signal?: AbortSignal) {
   const hit = cached(key);
   if (hit) return hit;
-  const r = await fetch(`/api/search?${key}`, { signal });
-  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? "Search failed");
-  const v = (await r.json()) as ExploreResult;
-  remember(key, v);
-  return v;
+  const pending = inflight.get(key);
+  if (pending) return pending;
+  const p = (async () => {
+    const r = await fetch(`/api/search?${key}`, { signal });
+    if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? "Search failed");
+    const v = (await r.json()) as ExploreResult;
+    remember(key, v);
+    return v;
+  })();
+  if (!signal) {
+    inflight.set(key, p);
+    p.catch(() => {}).finally(() => inflight.delete(key));
+  }
+  return p;
 }
 
 function useDebounced<T>(v: T, ms: number) {
@@ -102,6 +114,7 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
     setLoading(true);
     fetchResult(key, ctl.signal)
       .then((v) => {
+        if (ctl.signal.aborted) return; // (a shared background load can finish after this was left)
         setData(v);
         setLoading(false);
         // Warm the other tabs so switching is instant.
@@ -118,6 +131,22 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
     return () => ctl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  // Every category's results load quietly in the background (current tab and filters), so tapping a
+  // category chip shows them at once instead of waiting for the server.
+  const filters = requestKey(sp, "", type);
+  useEffect(() => {
+    if (q) return;
+    const timer = setTimeout(() => {
+      for (const slug of [null, ...categories.map((c) => c.slug)]) {
+        const next = new URLSearchParams(filters);
+        if (slug) next.set("category", slug);
+        else next.delete("category");
+        void fetchResult(requestKey(next, "", type)).catch(() => {});
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [filters, q, type, categories]);
 
   // "Busy" covers typing that hasn't been sent yet, so the spinner shows from the first letter.
   const busy = loading || live !== q;
