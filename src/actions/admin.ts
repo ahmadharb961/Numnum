@@ -13,6 +13,7 @@ import { sendBroadcast, type BroadcastInput, type BroadcastResult } from "@/serv
 import { applyAdjustmentToInvoice, createAdjustment, decideAdjustment, generateInvoice, recordManualPayment, resolveDispute, reviewPayment, runBillingMaintenance, runMonthlyBilling, previewInvoice, refreshInvoiceStatus, type PaymentReview } from "@/server/billing";
 import { recomputeItemRating, recomputeRestaurantRating } from "@/server/reviews";
 import { sendVerifyEmail } from "@/server/restaurant-emails";
+import { movePhotosToCloudflare, photoCounts } from "@/server/cf-images";
 import { parseAmount } from "@/lib/money";
 import { slugify } from "@/lib/slug";
 import type { ActionResult } from "./menu";
@@ -343,7 +344,7 @@ export async function saveFoodCategoryAction(input: { id?: string; name: string;
     const name = input.name.trim();
     if (!name) throw new Error("Name is required");
     const imageUrl = input.imageUrl?.trim() || null;
-    if (imageUrl && !/^\/(categories|media)\//.test(imageUrl)) throw new Error("Upload the image here");
+    if (imageUrl && !/^\/(categories|media)\//.test(imageUrl) && !imageUrl.startsWith("https://imagedelivery.net/")) throw new Error("Upload the image here");
     const data = { name, nameAr: input.nameAr?.trim() || null, emoji: input.emoji?.trim() || null, imageUrl, sortOrder: input.sortOrder ?? 0, active: input.active ?? true };
     if (input.id) await prisma.foodCategory.update({ where: { id: input.id }, data });
     else await prisma.foodCategory.create({ data: { ...data, slug: slugify(name) } });
@@ -374,6 +375,16 @@ export async function deleteFoodCategoryAction(id: string) {
 }
 
 // ───── Settings ─────
+
+/** Moves one batch of photos to Cloudflare Images (the page calls it until none are left). */
+export async function movePhotosAction() {
+  const { user, ip } = await admin();
+  return wrap(async () => {
+    const r = await movePhotosToCloudflare(8); // small batches: each request stays well under hosting time limits
+    if (r.moved) await audit({ actorId: user.id, action: "media.move_to_cloudflare", entityType: "media_asset", data: { moved: r.moved, remaining: r.remaining }, ipHash: ip });
+    return { ...r, cloudflare: (await photoCounts()).cloudflare };
+  });
+}
 
 export async function saveSettingsAction(patch: Partial<Settings>) {
   const { user, ip } = await admin();

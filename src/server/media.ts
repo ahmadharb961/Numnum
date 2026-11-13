@@ -8,6 +8,7 @@ import type { MediaKind } from "@prisma/client";
 import { prisma } from "./db";
 import { randomToken, sha256 } from "./crypto";
 import { moveLocal, putLocal, localPath, putBlob, publicImageUrl } from "./storage";
+import { pushToCloudflare } from "./cf-images";
 
 // Shared hosting has little RAM: one image at a time, no libvips cache.
 sharp.concurrency(1);
@@ -72,9 +73,12 @@ export async function processImage(
   });
   await putBlob(asset.id, "main", main.data);
   await putBlob(asset.id, "thumb", thumb);
-  const url = isPrivate ? `/api/private-media/${asset.id}` : publicImageUrl(asset.id, "main");
-  const thumbUrl = isPrivate ? `/api/private-media/${asset.id}?thumb=1` : publicImageUrl(asset.id, "thumb");
-  return prisma.mediaAsset.update({ where: { id: asset.id }, data: { url, thumbUrl } });
+  // Public photos are delivered by Cloudflare Images when it's set up (the database copy stays as a
+  // backup and keeps working through /media/i if Cloudflare is unavailable).
+  const cf = isPrivate || kind !== "IMAGE" ? null : await pushToCloudflare(asset.id, main.data, thumb);
+  const url = isPrivate ? `/api/private-media/${asset.id}` : (cf?.url ?? publicImageUrl(asset.id, "main"));
+  const thumbUrl = isPrivate ? `/api/private-media/${asset.id}?thumb=1` : (cf?.thumbUrl ?? publicImageUrl(asset.id, "thumb"));
+  return prisma.mediaAsset.update({ where: { id: asset.id }, data: { url, thumbUrl, ...(cf ? { storageKey: "cf" } : {}) } });
 }
 
 /** Private documents (receipts, verification docs). Images are normalized; PDFs are stored as-is after a magic-byte check. */

@@ -10,6 +10,7 @@ import { audit } from "@/server/audit";
 import { parseAmount } from "@/lib/money";
 import type { ColumnMapping } from "@/lib/csv-import";
 import type { FormState } from "./auth";
+import { deleteFromCloudflare } from "@/server/cf-images";
 
 export type ActionResult<T = undefined> = { ok: true; data?: T; message?: string } | { ok: false; error: string };
 
@@ -280,7 +281,8 @@ export async function deleteLibraryPhotoAction(assetId: string): Promise<ActionR
   const ctx = await requireRestaurant("MANAGER");
   const inUse = await prisma.menuItemImage.count({ where: { assetId } });
   if (inUse) return { ok: false, error: "Remove this photo from its menu items first" };
-  await prisma.mediaAsset.delete({ where: { id: assetId, restaurantId: ctx.restaurant.id, kind: "IMAGE" } });
+  const removed = await prisma.mediaAsset.delete({ where: { id: assetId, restaurantId: ctx.restaurant.id, kind: "IMAGE" } });
+  if (removed.storageKey === "cf") void deleteFromCloudflare(assetId);
   await audit({ actorId: ctx.user.id, action: "media.delete", entityType: "media_asset", entityId: assetId });
   revalidatePath("/dashboard/menu/photos");
   return { ok: true };
