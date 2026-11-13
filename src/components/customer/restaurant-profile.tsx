@@ -56,6 +56,23 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
     window.addEventListener("hashchange", fromHash);
     return () => window.removeEventListener("hashchange", fromHash);
   }, []);
+  // Each dish loads in the background as it scrolls into view, so its sheet opens at once when tapped.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          prefetchItem((e.target as HTMLElement).dataset.dish);
+          io.unobserve(e.target);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    root.querySelectorAll("[data-dish]").forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [tab, expanded, sections]);
 
   return (
     <div ref={rootRef} id="menu" className="scroll-mt-2">
@@ -102,7 +119,7 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
                 </div>
                 <div className="grid gap-3 lg:grid-cols-2">
                   {items.map((i) => (
-                    <div key={i.id} className="flex items-center gap-3 rounded-2xl bg-white p-2.5 shadow-[0_1px_2px_rgba(22,18,15,0.05),0_6px_20px_rgba(22,18,15,0.05)]">
+                    <div key={i.id} data-dish={i.id} className="flex items-center gap-3 rounded-2xl bg-white p-2.5 shadow-[0_1px_2px_rgba(22,18,15,0.05),0_6px_20px_rgba(22,18,15,0.05)]">
                       <button onPointerDown={() => prefetchItem(i.id)} onClick={() => setItemId(i.id)} className="relative h-[92px] w-[110px] shrink-0 overflow-hidden rounded-xl bg-black/5" aria-label={t("View {name}", { name: i.name })}>
                         {i.image ? (
                           // eslint-disable-next-line @next/next/no-img-element

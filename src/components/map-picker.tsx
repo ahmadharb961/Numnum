@@ -55,6 +55,7 @@ export function MapPicker({ value, onChange, radiusKm, rings = [], height = 260,
     })();
     return () => {
       cancelled = true;
+      map.current?.stop();
       map.current?.remove();
       map.current = null;
     };
@@ -70,7 +71,8 @@ export function MapPicker({ value, onChange, radiusKm, rings = [], height = 260,
         const cur = marker.current.getLatLng();
         if (Math.abs(cur.lat - value.lat) > 1e-6 || Math.abs(cur.lng - value.lng) > 1e-6) {
           marker.current.setLatLng([value.lat, value.lng]);
-          map.current.setView([value.lat, value.lng], Math.max(map.current.getZoom(), 15));
+          // No animation: an animation still running when the page leaves the map makes Leaflet throw.
+          map.current.setView([value.lat, value.lng], Math.max(map.current.getZoom(), 15), { animate: false });
         }
       }
       circle.current?.remove();
