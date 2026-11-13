@@ -51,11 +51,19 @@ export type CurrentUser = {
   roles: Role[];
 };
 
+// React's cache() only works while rendering a page; API routes call getCurrentUser() from several
+// helpers too, so the answer is also kept per request (keyed on that request's cookie store).
+const perRequest = new WeakMap<object, { token: string; user: Promise<CurrentUser | null> }>();
+
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  return userForSessionToken(token);
+  const known = perRequest.get(jar);
+  if (known?.token === token) return known.user; // (a new sign-in in the same request has a new token)
+  const user = userForSessionToken(token);
+  perRequest.set(jar, { token, user });
+  return user;
 });
 
 /** The signed-in user for a session cookie: one query (session + user + roles), as it runs on every signed-in page. */

@@ -1,29 +1,33 @@
 import "server-only";
 import { placeLabel } from "@/lib/utils";
-import { getBlocks } from "./blocks";
+import { getCurrentUser } from "./auth";
 import { prisma } from "./db";
 
 export async function getPublicItem(id: string) {
-  const item = await prisma.menuItem.findFirst({
-    where: { id, archived: false, restaurant: { status: "ACTIVE" } },
-    include: {
-      restaurant: { select: { id: true, slug: true, displayName: true, logoUrl: true, currency: true, verificationStatus: true, orderingEnabled: true, area: true, city: true } },
-      images: { orderBy: [{ isMain: "desc" }, { sortOrder: "asc" }], include: { asset: { select: { url: true, thumbUrl: true, width: true, height: true } } } },
-      customizations: { orderBy: { sortOrder: "asc" }, include: { group: { include: { options: { orderBy: { sortOrder: "asc" } } } } } },
-      reels: { where: { visibility: "PUBLISHED", status: "READY" }, select: { id: true, posterUrl: true, viewCount: true }, take: 6, orderBy: { publishedAt: "desc" } },
-      foodCategory: { select: { name: true, slug: true } },
-      menuCategory: { select: { name: true } },
-    },
-  });
+  // Everything at once: the dish, its reviews (leaving out people the visitor blocked) and the star counts.
+  const [item, reviews, dist] = await Promise.all([
+    prisma.menuItem.findFirst({
+      where: { id, archived: false, restaurant: { status: "ACTIVE" } },
+      include: {
+        restaurant: { select: { id: true, slug: true, displayName: true, logoUrl: true, currency: true, verificationStatus: true, orderingEnabled: true, area: true, city: true } },
+        images: { orderBy: [{ isMain: "desc" }, { sortOrder: "asc" }], include: { asset: { select: { url: true, thumbUrl: true, width: true, height: true } } } },
+        customizations: { orderBy: { sortOrder: "asc" }, include: { group: { include: { options: { orderBy: { sortOrder: "asc" } } } } } },
+        reels: { where: { visibility: "PUBLISHED", status: "READY" }, select: { id: true, posterUrl: true, viewCount: true }, take: 6, orderBy: { publishedAt: "desc" } },
+        foodCategory: { select: { name: true, slug: true } },
+        menuCategory: { select: { name: true } },
+      },
+    }),
+    getCurrentUser().then((me) =>
+      prisma.itemReview.findMany({
+        where: { menuItemId: id, status: "VISIBLE", ...(me ? { user: { blockedBy: { none: { userId: me.id } } } } : {}) },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { id: true, rating: true, body: true, photoUrl: true, evidence: true, reply: true, createdAt: true, user: { select: { name: true } } },
+      }),
+    ),
+    prisma.itemReview.groupBy({ by: ["rating"], where: { menuItemId: id, status: "VISIBLE" }, _count: true }),
+  ]);
   if (!item) return null;
-  const hidden = (await getBlocks()).userIds; // reviewers the visitor blocked
-  const reviews = await prisma.itemReview.findMany({
-    where: { menuItemId: id, status: "VISIBLE", ...(hidden.length ? { userId: { notIn: hidden } } : {}) },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-    select: { id: true, rating: true, body: true, photoUrl: true, evidence: true, reply: true, createdAt: true, user: { select: { name: true } } },
-  });
-  const dist = await prisma.itemReview.groupBy({ by: ["rating"], where: { menuItemId: id, status: "VISIBLE" }, _count: true });
   return {
     id: item.id,
     sku: item.sku,

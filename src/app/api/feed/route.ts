@@ -1,5 +1,5 @@
 import { getFeed } from "@/server/feed";
-import { getBlocks } from "@/server/blocks";
+import { getCurrentUser } from "@/server/auth";
 import { likedAndSaved } from "@/server/engagement";
 import { errorResponse, json, limit } from "@/server/http";
 import { customerLocation } from "@/server/location";
@@ -10,7 +10,8 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const cursor = Math.max(0, Number(url.searchParams.get("cursor") || 0) || 0);
     const exclude = (url.searchParams.get("exclude") || "").split(",").filter(Boolean).slice(0, 20);
-    const feed = await getFeed({ cursor, location: await customerLocation(), excludeIds: exclude, blockedRestaurantIds: (await getBlocks()).restaurantIds });
+    const [location, me] = await Promise.all([customerLocation(), getCurrentUser()]);
+    const feed = await getFeed({ cursor, location, excludeIds: exclude, viewerId: me?.id });
     const { liked, saved } = await likedAndSaved(feed.reels.map((r) => r.id));
     return json({ reels: feed.reels.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id) })), nextCursor: feed.nextCursor });
   } catch (e) {

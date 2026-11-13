@@ -94,6 +94,28 @@ describe("cash-on-delivery checkout", () => {
     expect(second.order.suspicious).toBe(true); // same phone + subtotal within minutes → flagged, not blocked
   });
 
+  it("after saving: credits the reel, records the order, flags only real duplicates, survives a double tap", async () => {
+    const f = await makeRestaurant();
+    const video = await prisma.mediaAsset.create({ data: { kind: "VIDEO", storageKey: "db", url: "https://example.test/v.m3u8", mimeType: "video/mp4", sizeBytes: 1, restaurantId: f.restaurant.id } });
+    const reel = await prisma.reel.create({ data: { restaurantId: f.restaurant.id, menuItemId: f.burger.id, videoAssetId: video.id, videoUrl: video.url, visibility: "PUBLISHED", status: "READY", publishedAt: new Date() } });
+    const p = orderPayload(f, key("r1"));
+    const first = await createOrder({ ...p, items: p.items.map((i) => ({ ...i, reelId: reel.id })) }, meta);
+    expect((await prisma.reel.findUniqueOrThrow({ where: { id: reel.id } })).orderInits).toBe(1);
+    expect(await prisma.analyticsEvent.count({ where: { type: "order_placed", restaurantId: f.restaurant.id } })).toBe(1);
+    // same phone and device, different total → not a duplicate
+    const p2 = orderPayload(f, key("r2"));
+    const other = await createOrder({ ...p2, items: [p2.items[1]] }, meta);
+    expect((await prisma.order.findUniqueOrThrow({ where: { reference: other.reference } })).suspicious).toBe(false);
+    // another customer with the same total → not a duplicate either
+    const stranger = await createOrder({ ...orderPayload(f, key("r3")), customer: { ...p.customer, phone: "71 999 888" } }, { ...meta, deviceKey: "device-bbbbbbbbbbbbbbbb", userId: (await makeCustomer()).id });
+    expect((await prisma.order.findUniqueOrThrow({ where: { reference: stranger.reference } })).suspicious).toBe(false);
+    // a double tap sends the same submission twice at the same moment: one order
+    const [x, y] = await Promise.all([createOrder(orderPayload(f, key("r4")), meta), createOrder(orderPayload(f, key("r4")), meta)]);
+    expect(x.reference).toBe(y.reference);
+    expect(await prisma.order.count({ where: { idempotencyKey: key("r4") } })).toBe(1);
+    expect(first.reference).not.toBe(x.reference);
+  });
+
   it("saves the address for logged-in customers and reuses it by id", async () => {
     const f = await makeRestaurant();
     const user = await makeCustomer();

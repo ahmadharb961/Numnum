@@ -1,6 +1,6 @@
 import type { Viewport } from "next";
 import { preconnect, preload } from "react-dom";
-import { getBlocks } from "@/server/blocks";
+import { getCurrentUser } from "@/server/auth";
 import { ReelFeed } from "@/components/customer/reel-feed";
 import { getFeed } from "@/server/feed";
 import { likedAndSaved } from "@/server/engagement";
@@ -14,8 +14,8 @@ export const viewport: Viewport = { themeColor: "#000000" };
 
 export default async function HomePage() {
   // Independent lookups together (settings are cached per request, so getFeed reuses them).
-  const [t, loc, blocks, settings] = await Promise.all([getT(), customerLocation(), getBlocks(), getSettings()]);
-  const feed = await getFeed({ cursor: 0, limit: 6, location: loc, blockedRestaurantIds: blocks.restaurantIds });
+  const [t, loc, me, settings] = await Promise.all([getT(), customerLocation(), getCurrentUser(), getSettings()]);
+  const feed = await getFeed({ cursor: 0, limit: 6, location: loc, viewerId: me?.id });
   // Open the connection to the video server and fetch the first cover while the page is still loading.
   const first = feed.reels[0];
   const videoOrigin = first?.videoUrl?.match(/^https:\/\/[^/]+/)?.[0];

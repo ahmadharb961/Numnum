@@ -145,6 +145,13 @@ export async function priceCart(restaurantId: string, items: OrderInput["items"]
 
 export type CreatedOrder = { reference: string; trackingToken: string; totalCents: number; currency: string; duplicate: boolean };
 
+/** Saves a customer's delivery address after an order (at most 20; the first one is the default). */
+async function saveAddress(userId: string, c: { addressLabel?: string | null; area?: string | null; address?: string | null; building?: string | null; notes?: string | null; latitude?: number | null; longitude?: number | null }, mapsUrl: string | null) {
+  const count = await prisma.customerAddress.count({ where: { userId } });
+  if (count >= 20 || !c.address) return;
+  await prisma.customerAddress.create({ data: { userId, label: c.addressLabel?.trim() || (count === 0 ? "Home" : `Address ${count + 1}`), area: c.area || null, address: c.address, building: c.building || null, notes: c.notes || null, latitude: c.latitude ?? null, longitude: c.longitude ?? null, mapsUrl, isDefault: count === 0 } });
+}
+
 export async function createOrder(raw: unknown, meta: { deviceKey: string | null; ipHash: string | null; userId: string | null }): Promise<CreatedOrder> {
   if (!meta.userId) {
     const e = new OrderError("Please log in to place your order");
@@ -159,15 +166,28 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   }
   const input = parsed.data;
 
+  // Everything the order needs is read at once (one database round trip instead of one after another):
+  // an earlier submission with the same key, the restaurant, the priced cart, the saved address, and this
+  // phone's or device's orders of the last 3 minutes (duplicate check).
+  const early = normalizeMobile(input.customer.phone);
+  const sameSender = [...(early.ok ? [{ customerPhone: early.e164 }] : []), ...(meta.deviceKey ? [{ deviceKey: meta.deviceKey }] : [])];
+  const [existing, settings, restaurant, priced, saved, recent] = await Promise.all([
+    prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey } }),
+    getSettings(),
+    prisma.restaurant.findUnique({ where: { id: input.restaurantId } }),
+    priceCart(input.restaurantId, input.items),
+    input.customer.addressId && meta.userId ? prisma.customerAddress.findFirst({ where: { id: input.customer.addressId, userId: meta.userId } }) : null,
+    sameSender.length
+      ? prisma.order.findMany({ where: { restaurantId: input.restaurantId, createdAt: { gte: new Date(Date.now() - 3 * 60_000) }, OR: sameSender }, select: { reference: true, subtotalCents: true } })
+      : [],
+  ]);
+
   // Idempotency: the same submission (double tap / refresh / retry) returns the same order.
-  const existing = await prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
   if (existing) {
     if (existing.restaurantId !== input.restaurantId) throw new OrderError("Invalid order submission");
     return { reference: existing.reference, trackingToken: existing.trackingToken, totalCents: existing.totalCents, currency: existing.currency, duplicate: true };
   }
 
-  const settings = await getSettings();
-  const restaurant = await prisma.restaurant.findUnique({ where: { id: input.restaurantId } });
   if (!restaurant || restaurant.status !== "ACTIVE") throw new OrderError("This restaurant is not accepting orders right now");
   if (!restaurant.orderingEnabled || !restaurant.agreementAcceptedAt) throw new OrderError("This restaurant isn't taking online orders right now");
   if (isOpenAt(restaurant.openingHours as OpeningHours) === false) throw new OrderError(`${restaurant.displayName} is closed right now`);
@@ -178,7 +198,6 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   const c = { ...input.customer };
   if (c.addressId) {
     if (!meta.userId) throw new OrderError("Please log in to use a saved address");
-    const saved = await prisma.customerAddress.findFirst({ where: { id: c.addressId, userId: meta.userId } });
     if (!saved) throw new OrderError("Saved address not found", { "customer.addressId": "Choose another address" });
     Object.assign(c, { address: saved.address, building: saved.building, area: saved.area, mapsUrl: saved.mapsUrl, latitude: saved.latitude, longitude: saved.longitude, notes: c.notes || saved.notes });
   }
@@ -210,7 +229,6 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
     }
   }
 
-  const priced = await priceCart(restaurant.id, input.items);
   Object.assign(fieldErrors, priced.fieldErrors);
   if (Object.keys(fieldErrors).length) throw new OrderError("Please check your order details", fieldErrors, texts);
   if (restaurant.minOrderCents && priced.subtotalCents < restaurant.minOrderCents) {
@@ -230,22 +248,16 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   const e164 = (phone as { e164: string }).e164;
 
   try {
+    // Duplicate heuristic: same device/phone, same restaurant & subtotal within 3 minutes → flag for review (not blocked).
+    const dup = recent.find((o) => o.subtotalCents === priced.subtotalCents);
+    const suspicious = !!dup;
+    const suspiciousReason = dup ? `Possible duplicate of ${dup.reference}` : null;
+
+    // The transaction only holds what must be saved together: the order number and the order itself.
     const order = await prisma.$transaction(async (tx) => {
       const year = new Date().getUTCFullYear();
       const seq = await nextCounter(tx, `order:${year}`);
       const reference = `NN-${year}-${String(seq).padStart(6, "0")}`;
-
-      // Duplicate heuristic: same device/phone, same restaurant & subtotal within 3 minutes → flag for review (not blocked).
-      let suspicious = false;
-      let suspiciousReason: string | null = null;
-      const dup = await tx.order.findFirst({
-        where: { restaurantId: restaurant.id, subtotalCents: priced.subtotalCents, createdAt: { gte: new Date(Date.now() - 3 * 60_000) }, OR: [{ customerPhone: e164 }, ...(meta.deviceKey ? [{ deviceKey: meta.deviceKey }] : [])] },
-        select: { reference: true },
-      });
-      if (dup) {
-        suspicious = true;
-        suspiciousReason = `Possible duplicate of ${dup.reference}`;
-      }
 
       const created = await tx.order.create({
         data: {
@@ -297,27 +309,26 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
         },
       });
 
-      if (meta.userId) {
-        // Remember the delivery address and phone for next time.
-        if (input.fulfillment === "DELIVERY" && c.saveAddress && !c.addressId && c.address) {
-          const count = await tx.customerAddress.count({ where: { userId: meta.userId } });
-          if (count < 20) {
-            await tx.customerAddress.create({ data: { userId: meta.userId, label: c.addressLabel?.trim() || (count === 0 ? "Home" : `Address ${count + 1}`), area: c.area || null, address: c.address, building: c.building || null, notes: c.notes || null, latitude: c.latitude ?? null, longitude: c.longitude ?? null, mapsUrl, isDefault: count === 0 } });
-          }
-        }
-        await tx.user.updateMany({ where: { id: meta.userId, phone: null }, data: { phone: e164 } });
-      }
-
-      const reelIds = Array.from(new Set(input.items.map((i) => i.reelId).filter(Boolean))) as string[];
-      await tx.analyticsEvent.create({ data: { type: "order_placed", restaurantId: restaurant.id, orderId: created.id, deviceKey: meta.deviceKey, data: { reelIds } } });
-      if (reelIds.length) await tx.reel.updateMany({ where: { id: { in: reelIds }, restaurantId: restaurant.id }, data: { orderInits: { increment: 1 } } });
-      await notifyRestaurant(
-        restaurant.id,
-        { type: "NEW_ORDER", title: { k: "New order {ref} · {total}", v: { ref: reference, total: formatMoney(totalCents, currency) } }, body: { k: input.fulfillment === "DELIVERY" ? "{name} · Delivery · cash on delivery" : "{name} · Pickup · cash on delivery", v: { name: c.name } }, link: `/dashboard/orders?ref=${reference}` },
-        tx,
-      );
       return created;
     });
+
+    // The rest runs together once the order is saved. None of it may fail the order the customer placed.
+    const reference = order.reference;
+    const reelIds = Array.from(new Set(input.items.map((i) => i.reelId).filter(Boolean))) as string[];
+    const after = await Promise.allSettled([
+      notifyRestaurant(restaurant.id, {
+        type: "NEW_ORDER",
+        title: { k: "New order {ref} · {total}", v: { ref: reference, total: formatMoney(totalCents, currency) } },
+        body: { k: input.fulfillment === "DELIVERY" ? "{name} · Delivery · cash on delivery" : "{name} · Pickup · cash on delivery", v: { name: c.name } },
+        link: `/dashboard/orders?ref=${reference}`,
+      }),
+      prisma.analyticsEvent.create({ data: { type: "order_placed", restaurantId: restaurant.id, orderId: order.id, deviceKey: meta.deviceKey, data: { reelIds } } }),
+      reelIds.length ? prisma.reel.updateMany({ where: { id: { in: reelIds }, restaurantId: restaurant.id }, data: { orderInits: { increment: 1 } } }) : null,
+      // Remember the phone and the delivery address for next time.
+      meta.userId ? prisma.user.updateMany({ where: { id: meta.userId, phone: null }, data: { phone: e164 } }) : null,
+      meta.userId && input.fulfillment === "DELIVERY" && c.saveAddress && !c.addressId && c.address ? saveAddress(meta.userId, c, mapsUrl) : null,
+    ]);
+    for (const r of after) if (r.status === "rejected") console.error("After placing order", reference, r.reason);
     // Phone notification to every staff device (never blocks the order).
     void pushToRestaurantStaff(restaurant.id, (t) => ({
       title: `🔔 ${t("New order · {total}", { total: formatMoney(totalCents, currency) })}`,

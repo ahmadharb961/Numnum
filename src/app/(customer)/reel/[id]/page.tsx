@@ -1,7 +1,7 @@
 import type { Viewport } from "next";
 import { BlockedNotice } from "@/components/customer/blocked-notice";
 import { restaurantBlockFor } from "@/server/blocks";
-import { getBlocks } from "@/server/blocks";
+import { getCurrentUser } from "@/server/auth";
 import { getT } from "@/i18n/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -42,7 +42,7 @@ export default async function ReelPage({ params }: { params: Promise<{ id: strin
   const blocked = await restaurantBlockFor(reel.restaurant.id);
   if (blocked) return <BlockedNotice blockId={blocked.id} name={reel.restaurant.name} />;
   const loc = await customerLocation();
-  const [feed, settings] = await Promise.all([getFeed({ cursor: 0, limit: 5, excludeIds: [id], location: loc, blockedRestaurantIds: (await getBlocks()).restaurantIds }), getSettings()]);
+  const [feed, settings] = await Promise.all([getFeed({ cursor: 0, limit: 5, excludeIds: [id], location: loc, viewerId: (await getCurrentUser())?.id }), getSettings()]);
   const all = [reel, ...feed.reels];
   const { liked, saved } = await likedAndSaved(all.map((r) => r.id));
   const jsonLd = {

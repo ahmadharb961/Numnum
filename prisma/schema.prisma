@@ -8,6 +8,8 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Linked records (include/select) are fetched in the same query instead of one query after another.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

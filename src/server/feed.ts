@@ -35,12 +35,17 @@ export const publicReelWhere: Prisma.ReelWhereInput = {
  * Ranked, paginated feed. Ranks a recent candidate window (cheap and
  * configurable), then pages through the ranked list with an offset cursor.
  */
-export async function getFeed(opts: { cursor?: number; limit?: number; location?: LatLng | null; categories?: string[]; excludeIds?: string[]; blockedRestaurantIds?: string[] }) {
+export async function getFeed(opts: { cursor?: number; limit?: number; location?: LatLng | null; categories?: string[]; excludeIds?: string[]; viewerId?: string | null }) {
   const settings = await getSettings();
   const limit = Math.min(opts.limit ?? 6, 12);
   const offset = opts.cursor ?? 0;
   const candidates = await prisma.reel.findMany({
-    where: { ...publicReelWhere, id: opts.excludeIds?.length ? { notIn: opts.excludeIds } : undefined, restaurantId: opts.blockedRestaurantIds?.length ? { notIn: opts.blockedRestaurantIds } : undefined },
+    where: {
+      ...publicReelWhere,
+      id: opts.excludeIds?.length ? { notIn: opts.excludeIds } : undefined,
+      // Restaurants the viewer blocked are left out in the same query.
+      ...(opts.viewerId ? { restaurant: { status: "ACTIVE", blockedBy: { none: { userId: opts.viewerId } } } } : {}),
+    },
     select: { ...reelCardSelect, saveCount: true, orderInits: true },
     orderBy: { publishedAt: "desc" },
     take: 400,

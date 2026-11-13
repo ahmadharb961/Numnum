@@ -88,8 +88,12 @@ async function gate(b, device, extraUA = "") {
   } else console.log("· (no active demo order: customer sheet not checked)");
   await cctx.close();
 
-  // ── Clearing the links brings back the home-screen guide
-  await db.platformSetting.deleteMany({ where: { key: "appLinks" } });
+  // ── Clearing the links (in Admin → Settings) brings back the home-screen guide
+  await a.goto("/admin/settings", { waitUntil: "networkidle" });
+  await a.locator("#app-link-android").fill("");
+  await a.locator("#app-link-ios").fill("");
+  await a.getByTestId("save-app-links").click();
+  await a.getByText("Settings saved").first().waitFor({ timeout: 8000 });
   g = await gate(b, "Pixel 7");
   check(!g.store && g.text.includes("Add numnum to your home screen"), "links cleared: back to 'add to home screen'");
   await g.ctx.close();

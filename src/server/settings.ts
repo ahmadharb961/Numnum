@@ -88,15 +88,35 @@ function merge<T>(base: T, override: unknown): T {
   return out as T;
 }
 
-/** Loaded once per request (layout, page and metadata share it). */
-export const getSettings = cache(async function getSettings(): Promise<Settings> {
+// Settings change rarely, yet nearly every request reads them: keep them in memory for a short while.
+// Saving here clears it at once; another server process picks a change up within SETTINGS_TTL_MS.
+// Kept on globalThis: Next.js may load this module more than once (pages, actions, API routes), and a
+// save must clear the copy every one of them reads. (Off in tests, which change the database directly.)
+const SETTINGS_TTL_MS = process.env.NODE_ENV === "test" ? 0 : 30_000;
+const shared = globalThis as typeof globalThis & { __nnSettings?: { at: number; value: Promise<Settings> } | null };
+
+async function loadSettings(): Promise<Settings> {
   const rows = await prisma.platformSetting.findMany();
   let s: Settings = DEFAULT_SETTINGS;
   for (const r of rows) {
     if (r.key in DEFAULT_SETTINGS) s = { ...s, [r.key]: merge((DEFAULT_SETTINGS as Record<string, unknown>)[r.key], r.value) };
   }
   return s;
+}
+
+/** Platform settings: shared by layout, page and metadata, and kept in memory for 30 s. */
+export const getSettings = cache(function getSettings(): Promise<Settings> {
+  const memo = shared.__nnSettings;
+  if (memo && Date.now() - memo.at < SETTINGS_TTL_MS) return memo.value;
+  const value = loadSettings();
+  shared.__nnSettings = { at: Date.now(), value };
+  value.catch(() => (shared.__nnSettings = null)); // a failed read is not kept
+  return value;
 });
+
+function forgetSettings() {
+  shared.__nnSettings = null;
+}
 
 /** Saves several settings in one database round trip (the settings page saves a whole section at once). */
 export async function updateSettings(patch: Partial<Settings>, userId: string) {
@@ -106,6 +126,7 @@ export async function updateSettings(patch: Partial<Settings>, userId: string) {
     INSERT INTO platform_settings (key, value, "updatedAt", "updatedBy")
     VALUES ${Prisma.join(rows.map(([k, v]) => Prisma.sql`(${k}, ${JSON.stringify(v)}::jsonb, now(), ${userId})`))}
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, "updatedAt" = EXCLUDED."updatedAt", "updatedBy" = EXCLUDED."updatedBy"`;
+  forgetSettings();
 }
 
 export async function updateSetting<K extends keyof Settings>(key: K, value: Settings[K], userId: string) {
@@ -114,6 +135,7 @@ export async function updateSetting<K extends keyof Settings>(key: K, value: Set
     create: { key, value: value as object, updatedBy: userId },
     update: { value: value as object, updatedBy: userId },
   });
+  forgetSettings();
 }
 
 /**
