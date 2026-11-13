@@ -18,8 +18,8 @@ const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
 export async function restaurantInsights(restaurantId: string, range: InsightsRange) {
   const created = { gte: range.from, lt: range.to };
-  const [restaurant, events, visitors, reelViews, byStatus, completed, commission, topItemsRaw, reelViewsByReel, orders] = await Promise.all([
-    prisma.restaurant.findUniqueOrThrow({ where: { id: restaurantId }, select: { displayName: true, currency: true, ratingAvg: true, ratingCount: true } }),
+  const [restaurantRow, events, visitors, reelViews, byStatus, completed, commission, topItemsRaw, reelViewsByReel, orders] = await Promise.all([
+    prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { displayName: true, currency: true, ratingAvg: true, ratingCount: true } }),
     prisma.analyticsEvent.groupBy({ by: ["type"], where: { restaurantId, createdAt: created }, _count: true }),
     prisma.analyticsEvent.findMany({ where: { restaurantId, type: "restaurant_opened", createdAt: created, deviceKey: { not: null } }, select: { deviceKey: true }, distinct: ["deviceKey"] }),
     prisma.reelView.count({ where: { reel: { restaurantId }, createdAt: created } }),
@@ -30,6 +30,8 @@ export async function restaurantInsights(restaurantId: string, range: InsightsRa
     prisma.reelView.groupBy({ by: ["reelId"], where: { reel: { restaurantId }, createdAt: created }, _count: true, orderBy: { _count: { reelId: "desc" } }, take: 5 }),
     prisma.order.findMany({ where: { restaurantId, createdAt: created }, orderBy: { createdAt: "desc" }, take: 1000, select: { reference: true, createdAt: true, status: true, fulfillment: true, customerName: true, totalCents: true, subtotalCents: true, deliveryFeeCents: true, items: { select: { quantity: true } } } }),
   ]);
+  // A restaurant deleted while the page loads shows empty numbers instead of an error page.
+  const restaurant = restaurantRow ?? { displayName: "", currency: "USD", ratingAvg: 0, ratingCount: 0 };
   const ev = (t: string) => events.find((e) => e.type === t)?._count ?? 0;
   const st = (s: string) => byStatus.find((b) => b.status === s)?._count ?? 0;
   const placed = byStatus.reduce((n, b) => n + b._count, 0);

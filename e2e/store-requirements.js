@@ -94,6 +94,8 @@ async function register(ctx, email) {
   await p.fill("#del-password", "storepass1");
   await p.check('input[name="confirm"]');
   await Promise.all([p.waitForURL((u) => u.pathname === "/", { timeout: 20000 }), p.getByRole("button", { name: "Delete my account permanently" }).click()]);
+  // The message appears once the home page has hydrated (the video feed can take a moment).
+  await p.getByText("Your account was deleted").first().waitFor({ timeout: 8000 }).catch(() => {});
   check((await p.getByText("Your account was deleted").count()) > 0, "home page confirms the account was deleted");
   check(!(await db.user.findUnique({ where: { email } })), "the account is gone from the database");
   check((await db.userBlock.count({ where: { userId: user.id } })) === 0, "its blocks are gone too");
