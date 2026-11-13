@@ -240,13 +240,13 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
           <p className="mb-2 text-xs text-ink-muted">{t("Distance is measured in a straight line from your pin. Customers farther than your last zone can't order delivery (they can still pick up).")}</p>
           <div className="space-y-2">
             {zones.map((z, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm">
-                <span className="w-14 shrink-0 text-ink-muted">{t("Up to")}</span>
-                <input className="input h-10 w-20" inputMode="decimal" value={z.maxKm} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, maxKm: e.target.value } : x)))} aria-label={t("Distance in km")} />
-                <span className="text-ink-muted">{t("km →")}</span>
-                <input className="input h-10 w-24" inputMode="decimal" value={z.fee} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, fee: e.target.value } : x)))} aria-label={`Fee in ${r.currency}`} />
-                <span className="text-ink-muted">{r.currency}</span>
-                <button type="button" onClick={() => setZones(zones.filter((_, j) => j !== i))} className="ms-auto grid h-9 w-9 place-items-center text-ink-muted" aria-label={t("Remove zone")}>
+              <div key={i} className="flex items-center gap-1.5 text-sm">
+                <span className="shrink-0 text-ink-muted">{t("Up to")}</span>
+                <input className="input h-10 w-0 min-w-0 flex-1 px-2.5" inputMode="decimal" value={z.maxKm} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, maxKm: e.target.value } : x)))} aria-label={t("Distance in km")} />
+                <span className="shrink-0 whitespace-nowrap text-ink-muted">{t("km →")}</span>
+                <input className="input h-10 w-0 min-w-0 flex-1 px-2.5" inputMode="decimal" value={z.fee} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, fee: e.target.value } : x)))} aria-label={`Fee in ${r.currency}`} />
+                <span className="shrink-0 text-ink-muted">{r.currency}</span>
+                <button type="button" onClick={() => setZones(zones.filter((_, j) => j !== i))} className="grid h-9 w-9 shrink-0 place-items-center text-ink-muted" aria-label={t("Remove zone")}>
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>

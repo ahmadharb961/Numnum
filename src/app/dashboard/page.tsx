@@ -87,13 +87,13 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <Section title={t("Top dishes")} description={t("By quantity in completed orders, last {n} days", { n: days })}>
           {o.topItems.length ? (
             <ol className="space-y-2 text-sm">
-              {o.topItems.map((t, i) => (
-                <li key={t.menuItemId ?? i} className="flex justify-between">
-                  <span>
+              {o.topItems.map((it, i) => (
+                <li key={it.menuItemId ?? i} className="flex justify-between gap-2">
+                  <span className="min-w-0 break-words">
                     <span className="me-2 text-ink-muted">{i + 1}.</span>
-                    {t.name}
+                    {it.name}
                   </span>
-                  <span className="tabular font-semibold">{t._sum.quantity} sold</span>
+                  <span className="tabular shrink-0 font-semibold">{t("{n} sold", { n: it._sum.quantity ?? 0 })}</span>
                 </li>
               ))}
             </ol>
@@ -117,7 +117,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                         <img src={rl.posterUrl} alt="" className="h-full w-full object-cover" />
                       )}
                     </div>
-                    <span className="flex-1 truncate font-semibold">{rl.menuItem.name}</span>
+                    <span className="min-w-0 flex-1 truncate font-semibold">{rl.menuItem.name}</span>
                     <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
                       <Eye className="h-3.5 w-3.5" />
                       {compactNumber(rl.viewCount)}

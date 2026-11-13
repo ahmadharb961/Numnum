@@ -140,6 +140,7 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
       </div>
       <Section title="Invoices">
         {invoices.length ? (
+          <div className="overflow-x-auto">
           <table className="table-app">
             <thead>
               <tr>
@@ -168,6 +169,7 @@ export default async function AdminRestaurant({ params }: { params: Promise<{ id
               ))}
             </tbody>
           </table>
+          </div>
         ) : (
           <p className="text-sm text-ink-muted">No invoices.</p>
         )}

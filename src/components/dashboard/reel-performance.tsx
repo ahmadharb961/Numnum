@@ -34,7 +34,7 @@ export async function ReelPerformance({ reelId, currency, rangeLabel, days, data
       title={t("Performance")}
       description={rangeLabel}
       actions={
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {([7, 30, 90, "all"] as const).map((d) => (
             <Link key={d} href={`/dashboard/reels/${reelId}?days=${d}`} className={cn("chip h-8 text-xs", days === d && "chip-active")}>
               {d === "all" ? t("All time") : t("{n} days", { n: d })}

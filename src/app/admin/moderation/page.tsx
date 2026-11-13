@@ -18,7 +18,7 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
   ];
   return (
     <DashPage title="Content moderation">
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         {tabs.map(([k, l]) => (
           <Link key={k} href={`/admin/moderation?tab=${k}`} className={cn("chip h-9 text-xs", tab === k && "chip-active")}>
             {l}

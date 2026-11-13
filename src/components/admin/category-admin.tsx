@@ -53,6 +53,7 @@ export function CategoryAdmin({ categories }: { categories: Cat[] }) {
           else setUploadFor(null);
         }}
       />
+      <div className="overflow-x-auto">
       <table className="table-app">
         <thead>
           <tr>
@@ -148,6 +149,7 @@ export function CategoryAdmin({ categories }: { categories: Cat[] }) {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

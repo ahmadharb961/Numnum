@@ -19,7 +19,7 @@ export default async function DisputesPage({ searchParams }: { searchParams: Pro
   });
   return (
     <DashPage title="Commission disputes">
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         <Link href="/admin/disputes" className={cn("chip h-9 text-xs", f === "open" && "chip-active")}>
           Open
         </Link>

@@ -3,7 +3,7 @@ import { prisma } from "./db";
 
 export async function restaurantOverview(restaurantId: string, days = 30) {
   const since = new Date(Date.now() - days * 86400_000);
-  const [reelAgg, itemViews, events, byStatus, sales, commission, topItems, topReels, restaurant, avgAccept] = await Promise.all([
+  const [reelAgg, itemViews, events, byStatus, sales, commission, topItems, topReels, restaurantRow, avgAccept] = await Promise.all([
     prisma.reel.aggregate({ where: { restaurantId }, _sum: { viewCount: true, likeCount: true, shareCount: true, productOpens: true, addToCarts: true, orderInits: true } }),
     prisma.menuItem.aggregate({ where: { restaurantId }, _sum: { viewCount: true } }),
     prisma.analyticsEvent.groupBy({ by: ["type"], where: { restaurantId, createdAt: { gte: since } }, _count: true }),
@@ -12,9 +12,11 @@ export async function restaurantOverview(restaurantId: string, days = 30) {
     prisma.commissionEvent.aggregate({ where: { restaurantId, createdAt: { gte: since }, status: { in: ["ACCRUED", "INVOICED", "DISPUTED"] } }, _sum: { commissionCents: true, baseCents: true }, _count: true }),
     prisma.orderItem.groupBy({ by: ["menuItemId", "name"], where: { order: { restaurantId, status: "COMPLETED", createdAt: { gte: since } } }, _sum: { quantity: true, lineTotalCents: true }, orderBy: { _sum: { quantity: "desc" } }, take: 5 }),
     prisma.reel.findMany({ where: { restaurantId, visibility: "PUBLISHED" }, orderBy: { viewCount: "desc" }, take: 5, select: { id: true, posterUrl: true, viewCount: true, likeCount: true, orderInits: true, menuItem: { select: { name: true } } } }),
-    prisma.restaurant.findUniqueOrThrow({ where: { id: restaurantId }, select: { ratingAvg: true, ratingCount: true, currency: true } }),
+    prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { ratingAvg: true, ratingCount: true, currency: true } }),
     prisma.$queryRaw<{ m: number | null }[]>`SELECT AVG(EXTRACT(EPOCH FROM ("acceptedAt" - "createdAt")) / 60)::float AS m FROM orders WHERE "restaurantId" = ${restaurantId} AND "acceptedAt" IS NOT NULL AND "createdAt" >= ${since}`,
   ]);
+  // A restaurant deleted while its dashboard loads shows empty numbers instead of an error page.
+  const restaurant = restaurantRow ?? { ratingAvg: 0, ratingCount: 0, currency: "USD" };
   const ev = (t: string) => events.find((e) => e.type === t)?._count ?? 0;
   const st = (...s: string[]) => byStatus.filter((b) => s.includes(b.status)).reduce((n, b) => n + b._count, 0);
   return {

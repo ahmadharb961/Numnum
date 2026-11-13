@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import type { Role, StaffRole } from "@prisma/client";
+import type { Restaurant, Role, StaffRole } from "@prisma/client";
 import { prisma } from "./db";
 import { hmac, randomToken } from "./crypto";
 import { ipHash } from "./request";
@@ -97,7 +97,7 @@ const STAFF_RANK: Record<StaffRole, number> = { STAFF: 1, MANAGER: 2, OWNER: 3 }
 
 export type RestaurantContext = {
   user: CurrentUser;
-  restaurant: Awaited<ReturnType<typeof loadRestaurant>>;
+  restaurant: Restaurant;
   staffRole: StaffRole;
   memberships: { id: string; displayName: string }[];
   /** A platform admin managing this restaurant from the admin panel ("Manage as admin"). */
@@ -106,12 +106,6 @@ export type RestaurantContext = {
 
 /** Set by "Manage as admin": the restaurant an admin is currently working in. */
 export const ADMIN_AS_COOKIE = "nn_admin_as";
-
-async function loadRestaurant(id: string) {
-  const r = await prisma.restaurant.findUnique({ where: { id } });
-  if (!r) throw new Error("Restaurant not found");
-  return r;
-}
 
 /** Resolves the active restaurant for the current staff user. Enforces tenant isolation. */
 export const getRestaurantContext = cache(async (): Promise<RestaurantContext | null> => {
@@ -125,7 +119,8 @@ export const getRestaurantContext = cache(async (): Promise<RestaurantContext | 
   }
   const memberships = await prisma.restaurantStaff.findMany({
     where: { userId: user.id },
-    include: { restaurant: { select: { id: true, displayName: true } } },
+    // The restaurant comes in the same query, so a restaurant deleted a moment ago can't crash the page.
+    include: { restaurant: true },
     orderBy: { createdAt: "asc" },
   });
   if (!memberships.length) return null;
@@ -134,7 +129,7 @@ export const getRestaurantContext = cache(async (): Promise<RestaurantContext | 
   const m = memberships.find((x) => x.restaurantId === chosen) ?? memberships[0];
   return {
     user,
-    restaurant: await loadRestaurant(m.restaurantId),
+    restaurant: m.restaurant,
     staffRole: m.role,
     memberships: memberships.map((x) => ({ id: x.restaurant.id, displayName: x.restaurant.displayName })),
   };
