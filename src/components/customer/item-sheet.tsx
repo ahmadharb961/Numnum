@@ -72,8 +72,9 @@ export function ItemSheet({ itemId, reelId, open, onClose }: { itemId: string | 
 
   return (
     <Sheet open={open} onClose={onClose} full>
+      {/* key: each dish starts with its own choices, quantity and note (the sheet is reused between dishes) */}
       {item ? (
-        <ItemDetail item={item} reelId={reelId} onAdded={onClose} compact />
+        <ItemDetail key={item.id} item={item} reelId={reelId} onAdded={onClose} compact />
       ) : (
         <div className="grid h-full place-items-center p-10 text-ink-muted">{error ? t(error) : <Spinner className="text-brand-500" />}</div>
       )}
