@@ -256,7 +256,7 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
 
       {/* Add bar: sticks to the bottom of the sheet when shown in one, else to the bottom of the screen. */}
       <div
-        className={cn("z-40 border-t border-black/5 bg-white/95 px-4 pt-3 backdrop-blur", compact ? "sticky bottom-0 mt-4" : "fixed inset-x-0 mx-auto max-w-screen-sm lg:start-64")}
+        className={cn("z-40 border-t border-black/5 bg-white/95 px-4 pt-3 backdrop-blur", compact ? "sticky bottom-0 mt-4" : "hide-when-typing fixed inset-x-0 mx-auto max-w-screen-sm lg:start-64")}
         style={compact ? { paddingBottom: 12 } : navOffset ? { bottom: "calc(var(--nav-h) + var(--safe-bottom))", paddingBottom: 12 } : { bottom: 0, paddingBottom: "calc(var(--safe-bottom) + 12px)" }}
       >
         {canOrder ? (

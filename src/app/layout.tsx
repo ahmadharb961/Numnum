@@ -5,6 +5,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { CartProvider } from "@/components/customer/cart";
 import { ServiceWorker } from "@/components/sw-register";
 import { NavHistory } from "@/components/back-button";
+import { TypingWatcher } from "@/components/typing-watcher";
 import { InstallPromptListener } from "@/components/install-guide";
 import { I18nProvider } from "@/i18n/client";
 import { AppLinksProvider } from "@/components/app-links";
@@ -67,6 +68,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </ToastProvider>
         <ServiceWorker />
         <NavHistory />
+        <TypingWatcher />
         <InstallPromptListener />
         </AppLinksProvider>
         </I18nProvider>
