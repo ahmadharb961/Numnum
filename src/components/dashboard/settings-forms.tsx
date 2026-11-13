@@ -216,7 +216,7 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
                       e.currentTarget.blur();
                     }
                   }}
-                  className="input h-9 w-20 text-end text-sm"
+                  className="input h-9 w-20 text-end"
                 />
                 {t("km")}
               </span>
@@ -242,9 +242,9 @@ export function OrderingForm({ r, currencies, agreementAccepted }: { r: { avgPre
             {zones.map((z, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">
                 <span className="w-14 shrink-0 text-ink-muted">{t("Up to")}</span>
-                <input className="input h-10 w-20 text-sm" inputMode="decimal" value={z.maxKm} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, maxKm: e.target.value } : x)))} aria-label={t("Distance in km")} />
+                <input className="input h-10 w-20" inputMode="decimal" value={z.maxKm} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, maxKm: e.target.value } : x)))} aria-label={t("Distance in km")} />
                 <span className="text-ink-muted">{t("km →")}</span>
-                <input className="input h-10 w-24 text-sm" inputMode="decimal" value={z.fee} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, fee: e.target.value } : x)))} aria-label={`Fee in ${r.currency}`} />
+                <input className="input h-10 w-24" inputMode="decimal" value={z.fee} onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, fee: e.target.value } : x)))} aria-label={`Fee in ${r.currency}`} />
                 <span className="text-ink-muted">{r.currency}</span>
                 <button type="button" onClick={() => setZones(zones.filter((_, j) => j !== i))} className="ms-auto grid h-9 w-9 place-items-center text-ink-muted" aria-label={t("Remove zone")}>
                   <Trash2 className="h-4 w-4" />
@@ -283,9 +283,9 @@ export function HoursEditor({ initial }: { initial: OpeningHours }) {
             {slots.length === 0 && <span className="text-sm text-ink-muted">{t("Closed")}</span>}
             {slots.map((s, i) => (
               <span key={i} className="flex items-center gap-1">
-                <input type="time" className="input h-9 w-28 text-sm" value={s.open} onChange={(e) => set(d, slots.map((x, j) => (j === i ? { ...x, open: e.target.value } : x)))} />
+                <input type="time" className="input h-9 w-28" value={s.open} onChange={(e) => set(d, slots.map((x, j) => (j === i ? { ...x, open: e.target.value } : x)))} />
                 –
-                <input type="time" className="input h-9 w-28 text-sm" value={s.close} onChange={(e) => set(d, slots.map((x, j) => (j === i ? { ...x, close: e.target.value } : x)))} />
+                <input type="time" className="input h-9 w-28" value={s.close} onChange={(e) => set(d, slots.map((x, j) => (j === i ? { ...x, close: e.target.value } : x)))} />
                 <button type="button" onClick={() => set(d, slots.filter((_, j) => j !== i))} className="grid h-9 w-9 place-items-center text-ink-muted" aria-label={t("Remove time slot")}>
                   <Trash2 className="h-4 w-4" />
                 </button>

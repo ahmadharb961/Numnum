@@ -92,14 +92,14 @@ export function CategoryAdmin({ categories }: { categories: Cat[] }) {
                 <input className="input h-9 w-14 text-center" value={c.emoji} onChange={(e) => upd(c.id, { emoji: e.target.value })} />
               </td>
               <td>
-                <input className="input h-9 w-40 text-sm" value={c.name} onChange={(e) => upd(c.id, { name: e.target.value })} />
+                <input className="input h-9 w-40" value={c.name} onChange={(e) => upd(c.id, { name: e.target.value })} />
                 <div className="text-[11px] text-ink-muted">/{c.slug}</div>
               </td>
               <td>
-                <input className="input h-9 w-32 text-sm" dir="rtl" value={c.nameAr} onChange={(e) => upd(c.id, { nameAr: e.target.value })} />
+                <input className="input h-9 w-32" dir="rtl" value={c.nameAr} onChange={(e) => upd(c.id, { nameAr: e.target.value })} />
               </td>
               <td>
-                <input className="input h-9 w-16 text-sm" type="number" value={c.sortOrder} onChange={(e) => upd(c.id, { sortOrder: Number(e.target.value) })} />
+                <input className="input h-9 w-16" type="number" value={c.sortOrder} onChange={(e) => upd(c.id, { sortOrder: Number(e.target.value) })} />
               </td>
               <td>
                 <input type="checkbox" checked={c.active} onChange={(e) => upd(c.id, { active: e.target.checked })} className="h-5 w-5 accent-brand-500" />
@@ -110,7 +110,7 @@ export function CategoryAdmin({ categories }: { categories: Cat[] }) {
                   Save
                 </Button>
                 <select
-                  className="input ml-2 inline-block h-9 w-auto text-xs"
+                  className="input ml-2 inline-block h-9 w-auto"
                   value=""
                   onChange={(e) => e.target.value && confirm(`Merge “${c.name}” into “${rows.find((r) => r.id === e.target.value)?.name}”? Items are moved and this category is deleted.`) && run(() => mergeFoodCategoryAction(c.id, e.target.value))}
                 >
@@ -135,10 +135,10 @@ export function CategoryAdmin({ categories }: { categories: Cat[] }) {
               <input className="input h-9 w-14 text-center" value={nw.emoji} onChange={(e) => setNw({ ...nw, emoji: e.target.value })} placeholder="🍕" />
             </td>
             <td>
-              <input className="input h-9 w-40 text-sm" value={nw.name} onChange={(e) => setNw({ ...nw, name: e.target.value })} placeholder="New category" />
+              <input className="input h-9 w-40" value={nw.name} onChange={(e) => setNw({ ...nw, name: e.target.value })} placeholder="New category" />
             </td>
             <td>
-              <input className="input h-9 w-32 text-sm" dir="rtl" value={nw.nameAr} onChange={(e) => setNw({ ...nw, nameAr: e.target.value })} />
+              <input className="input h-9 w-32" dir="rtl" value={nw.nameAr} onChange={(e) => setNw({ ...nw, nameAr: e.target.value })} />
             </td>
             <td colSpan={4}>
               <Button size="sm" onClick={() => run(async () => { const r = await saveFoodCategoryAction({ ...nw, sortOrder: rows.length }); if (r.ok) setNw({ name: "", nameAr: "", emoji: "" }); return r; })}>

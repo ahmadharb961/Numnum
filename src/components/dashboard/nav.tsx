@@ -50,7 +50,7 @@ export function DashboardNav({ restaurantName, slug, role, memberships, currentI
         </Link>
         {memberships.length > 1 ? (
           <form action="/dashboard/switch" method="post" className="mt-3">
-            <select name="restaurantId" defaultValue={currentId} onChange={(e) => e.currentTarget.form?.requestSubmit()} className="input h-10 text-sm">
+            <select name="restaurantId" defaultValue={currentId} onChange={(e) => e.currentTarget.form?.requestSubmit()} className="input h-10">
               {memberships.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.displayName}

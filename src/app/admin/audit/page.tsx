@@ -13,7 +13,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   return (
     <DashPage title="Audit log">
       <form className="mb-3">
-        <input name="q" defaultValue={sp.q} className="input h-10 max-w-sm text-sm" placeholder="Filter by action, entity type or id" />
+        <input name="q" defaultValue={sp.q} className="input h-10 max-w-sm" placeholder="Filter by action, entity type or id" />
       </form>
       <div className="card overflow-x-auto">
         <table className="table-app">

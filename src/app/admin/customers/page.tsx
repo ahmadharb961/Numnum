@@ -18,7 +18,7 @@ export default async function AdminCustomers({ searchParams }: { searchParams: P
       <div className="space-y-5">
         <CustomerCreateForm />
         <form className="flex gap-2">
-          <input name="q" defaultValue={q} className="input h-10 max-w-sm text-sm" placeholder="Search name, email or phone" />
+          <input name="q" defaultValue={q} className="input h-10 max-w-sm" placeholder="Search name, email or phone" />
         </form>
         <div className="card overflow-x-auto">
           <table className="table-app">
