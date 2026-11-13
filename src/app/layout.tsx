@@ -10,6 +10,7 @@ import { I18nProvider } from "@/i18n/client";
 import { AppLinksProvider } from "@/components/app-links";
 import { getSettings } from "@/server/settings";
 import { dirOf } from "@/i18n/core";
+import { ERROR_REPORTER_SCRIPT } from "@/lib/error-reporter-script";
 import { dictFor, getLocale } from "@/i18n/server";
 
 const appUrl = process.env.APP_URL || "http://localhost:3000";
@@ -51,6 +52,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const [locale, settings] = await Promise.all([getLocale(), getSettings()]);
   return (
     <html lang={locale} dir={dirOf(locale)}>
+      <head>
+        {/* Listens for page errors before anything else runs (reported to Admin → Settings → App health). */}
+        <script dangerouslySetInnerHTML={{ __html: ERROR_REPORTER_SCRIPT }} />
+      </head>
       <body>
         <I18nProvider locale={locale} dict={dictFor(locale)}>
         <AppLinksProvider links={settings.appLinks}>
