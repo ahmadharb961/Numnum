@@ -1,6 +1,7 @@
 import "server-only";
 import type { SavedType } from "@prisma/client";
 import { prisma } from "./db";
+import { countView } from "./view-counters";
 import { getSettings } from "./settings";
 import { getCurrentUser } from "./auth";
 import { deviceId } from "./request";
@@ -36,17 +37,20 @@ export async function recordView(reelId: string, watchMs: number) {
   if (!viewer) return { counted: false };
   if (!Number.isFinite(watchMs) || watchMs < settings.minViewMs) return { counted: false };
   const since = new Date(Date.now() - settings.viewDedupeMinutes * 60_000);
-  return prisma.$transaction(async (tx) => {
+  type Result = { counted: false } | { counted: true; restaurantId: string; unique: boolean };
+  return prisma.$transaction(async (tx): Promise<Result> => {
     const reel = await tx.reel.findFirst({ where: { id: reelId, visibility: "PUBLISHED", status: "READY" }, select: { id: true, restaurantId: true } });
     if (!reel) return { counted: false };
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`view:${reelId}:${viewer}`}))`;
-    const recent = await tx.reelView.findFirst({ where: { reelId, viewerKey: viewer, createdAt: { gte: since } }, select: { id: true } });
-    if (recent) return { counted: false };
-    const seenBefore = await tx.reelView.findFirst({ where: { reelId, viewerKey: viewer }, select: { id: true } });
+    // One lookup answers both questions: watched recently (don't count again) and ever (unique viewer).
+    const last = await tx.reelView.findFirst({ where: { reelId, viewerKey: viewer }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+    if (last && last.createdAt >= since) return { counted: false };
     await tx.reelView.create({ data: { reelId, viewerKey: viewer, watchMs: Math.min(Math.round(watchMs), 600_000) } });
-    await tx.reel.update({ where: { id: reelId }, data: { viewCount: { increment: 1 }, uniqueViewers: seenBefore ? undefined : { increment: 1 } } });
-    await tx.restaurant.update({ where: { id: reel.restaurantId }, data: { totalReelViews: { increment: 1 } } });
-    return { counted: true };
+    return { counted: true, restaurantId: reel.restaurantId, unique: !last };
+  }).then((r) => {
+    // Counters are added up and written every few seconds (see view-counters.ts).
+    if (r.counted) countView(reelId, r.restaurantId, r.unique);
+    return { counted: r.counted };
   });
 }
 

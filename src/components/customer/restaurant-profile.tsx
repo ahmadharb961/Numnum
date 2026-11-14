@@ -5,6 +5,7 @@ import { ChevronRight, Grid3x3, Heart, Info, PlayCircle, Plus, Star, UtensilsCro
 import { formatMoney } from "@/lib/money";
 import { afterPercent } from "@/lib/deals";
 import { ShareSheet } from "./share-sheet";
+import { setFollowing, useFollowState } from "./follow-store";
 import { cn, compactNumber } from "@/lib/utils";
 import { RatingPill, EmptyState } from "@/components/ui/misc";
 import { ReelThumb } from "./cards";
@@ -217,9 +218,9 @@ export function SaveToggle({ type, refId, initial, className, heart }: { type: "
 /** Follow / Following button with the follower count (restaurant page). */
 export function FollowButton({ restaurantId, initial, initialCount, className }: { restaurantId: string; initial: boolean; initialCount: number; className?: string }) {
   const t = useT();
-  const { requireLogin } = useLoginGate();
-  const [following, setFollowing] = useState(initial);
-  const [count, setCount] = useState(initialCount);
+  const { requireLogin, askLogin } = useLoginGate();
+  // Shared with the reels: following from a reel shows here at once, and the other way round.
+  const { following, count = initialCount } = useFollowState(restaurantId, initial, initialCount);
   const [busy, setBusy] = useState(false);
   return (
     <div className={cn("flex items-center gap-3", className)}>
@@ -230,20 +231,10 @@ export function FollowButton({ restaurantId, initial, initialCount, className }:
         className={cn("inline-flex h-10 items-center gap-1.5 rounded-full px-5 text-sm font-bold transition active:scale-95", following ? "bg-black/5 text-ink" : "bg-brand-500 text-white shadow-sm shadow-brand-500/30")}
         onClick={async () => {
           if (!requireLogin("follow")) return;
-          const next = !following;
-          setFollowing(next);
-          setCount((c) => Math.max(0, c + (next ? 1 : -1)));
           setBusy(true);
-          const res = await fetch("/api/follow", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ restaurantId, follow: next }) }).catch(() => null);
+          const r = await setFollowing(restaurantId, !following, count);
           setBusy(false);
-          if (res?.ok) {
-            const d = (await res.json()) as { following: boolean; followerCount: number };
-            setFollowing(d.following);
-            setCount(d.followerCount);
-          } else {
-            setFollowing(!next);
-            setCount((c) => Math.max(0, c + (next ? -1 : 1)));
-          }
+          if (r === "login") askLogin("follow");
         }}
       >
         {following ? <Check className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}

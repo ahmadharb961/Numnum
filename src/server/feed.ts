@@ -37,21 +37,38 @@ export const publicReelWhere: Prisma.ReelWhereInput = {
  * Ranked, paginated feed. Ranks a recent candidate window (cheap and
  * configurable), then pages through the ranked list with an offset cursor.
  */
+const POOL_MS = 30_000;
+const poolSelect = { ...reelCardSelect, saveCount: true, orderInits: true } as const;
+type PoolReel = Prisma.ReelGetPayload<{ select: typeof poolSelect }>;
+// One pool per server process (globalThis: Next gives each bundle its own module variables).
+const poolStore = globalThis as typeof globalThis & { __nnFeedPool?: { at: number; rows: Promise<PoolReel[]> } | null };
+
+/** The newest 400 public reels, shared across requests for POOL_MS (read-only: never mutated). */
+function candidatePool(): Promise<PoolReel[]> {
+  let pool = poolStore.__nnFeedPool;
+  if (!pool || Date.now() - pool.at > POOL_MS) {
+    const rows = prisma.reel.findMany({ where: publicReelWhere, select: poolSelect, orderBy: { publishedAt: "desc" }, take: 400 });
+    pool = poolStore.__nnFeedPool = { at: Date.now(), rows };
+    rows.catch(() => {
+      if (poolStore.__nnFeedPool?.rows === rows) poolStore.__nnFeedPool = null; // a failed load isn't kept
+    });
+  }
+  return pool.rows;
+}
+
 export async function getFeed(opts: { cursor?: number; limit?: number; location?: LatLng | null; categories?: string[]; excludeIds?: string[]; viewerId?: string | null }) {
   const settings = await getSettings();
   const limit = Math.min(opts.limit ?? 6, 12);
   const offset = opts.cursor ?? 0;
-  const candidates = await prisma.reel.findMany({
-    where: {
-      ...publicReelWhere,
-      id: opts.excludeIds?.length ? { notIn: opts.excludeIds } : undefined,
-      // Restaurants the viewer blocked are left out in the same query.
-      ...(opts.viewerId ? { restaurant: { status: "ACTIVE", blockedBy: { none: { userId: opts.viewerId } } } } : {}),
-    },
-    select: { ...reelCardSelect, saveCount: true, orderInits: true },
-    orderBy: { publishedAt: "desc" },
-    take: 400,
-  });
+  // The candidate pool is shared by everyone for POOL_MS (one query per 30 s instead of one per feed
+  // page per user); what's personal (blocked restaurants, reels to skip, distance) is applied here.
+  const [pool, blocked] = await Promise.all([
+    candidatePool(),
+    opts.viewerId ? prisma.userBlock.findMany({ where: { userId: opts.viewerId, restaurantId: { not: null } }, select: { restaurantId: true } }) : [],
+  ]);
+  const skip = new Set(opts.excludeIds ?? []);
+  const blockedIds = new Set(blocked.map((b) => b.restaurantId));
+  const candidates = pool.filter((c) => !skip.has(c.id) && !blockedIds.has(c.restaurant.id));
   const ranked = rankReels(
     candidates.map((c) => ({
       ...c,
@@ -117,7 +134,7 @@ export type PublicReel = ReturnType<typeof toPublicReel>;
 
 /** Adds each reel's live deal (badge + the dish's deal price): one query for the whole page. */
 export async function attachDeals<R extends PublicReel>(reels: R[]): Promise<R[]> {
-  const deals = await liveDeals(reels.map((r) => r.restaurant.id));
+  const deals = await liveDeals(reels.map((r) => r.restaurant.id), { cached: true });
   return reels.map((r) => {
     const list = deals.get(r.restaurant.id) ?? [];
     return list.length ? { ...r, deal: dealForDish(list, r.item.id), dealPriceCents: dealPrice(list, r.item.id, r.item.priceCents) } : r;

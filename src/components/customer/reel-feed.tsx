@@ -22,6 +22,7 @@ import { useLocale, useT } from "@/i18n/client";
 import { useLoginGate } from "./login-gate";
 import { ReportButton } from "./report-button";
 import { ShareSheet } from "./share-sheet";
+import { setFollowing, useFollowState } from "./follow-store";
 
 export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean; /** The viewer follows this reel's restaurant. */ following?: boolean };
 
@@ -62,8 +63,16 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   // Home feed tabs: "For you" (ranked) and "Following" (newest from followed restaurants).
   const [tab, setTab] = useState<"foryou" | "following">("foryou");
   const [tabLoading, setTabLoading] = useState(false);
-  const forYou = useRef<{ reels: FeedReel[]; cursor: number | null } | null>(null);
+  // Each tab keeps its reels and the reel you were on, so switching back and forth is instant and
+  // returns you to the same place (Following is also preloaded once the first reel plays).
+  type TabState = { reels: FeedReel[]; cursor: number | null; index: number; at: number };
+  const tabs = useRef<Record<"foryou" | "following", TabState | null>>({ foryou: null, following: null });
+  // Current tab and reel for async callbacks (a fetch finishing after the person switched again).
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
   const [active, setActive] = useState(startIndex);
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const [incoming, setIncoming] = useState<number | null>(null);
   // Until the first reel plays, it gets the whole connection: no other reel's video or cover loads.
   const [started, setStarted] = useState(false);
@@ -245,39 +254,77 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     }
   }, [cursor, loadingMore, excludeIds, toast, tab]);
 
+  async function fetchTab(which: "foryou" | "following"): Promise<TabState | null> {
+    const res = await fetch(which === "following" ? "/api/feed?tab=following" : "/api/feed").catch(() => null);
+    if (!res?.ok) return null;
+    const data = (await res.json()) as { reels: FeedReel[]; nextCursor: number | null };
+    return { reels: data.reels, cursor: data.nextCursor, index: 0, at: Date.now() };
+  }
+
+  function showTab(next: "foryou" | "following", st: TabState) {
+    setReels(st.reels);
+    setCursor(st.cursor);
+    setActive(st.index);
+    // Back to the reel you were on, without animating through the others.
+    requestAnimationFrame(() => {
+      const root = containerRef.current;
+      if (root) root.scrollTo({ top: st.index * root.clientHeight });
+    });
+  }
+
   async function switchTab(next: "foryou" | "following") {
     const root = containerRef.current;
     if (next === tab) {
       root?.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    if (tab === "foryou") forYou.current = { reels, cursor };
+    tabs.current[tab] = { reels, cursor, index: active, at: tabs.current[tab]?.at ?? Date.now() };
     setTab(next);
-    setActive(0);
     setIncoming(null);
     setBuffered(new Set());
-    root?.scrollTo({ top: 0 });
-    if (next === "foryou" && forYou.current) {
-      setReels(forYou.current.reels);
-      setCursor(forYou.current.cursor);
+    const saved = tabs.current[next];
+    if (saved) {
+      showTab(next, saved);
+      // A Following list older than a minute refreshes quietly; it replaces what's shown only if
+      // they haven't started scrolling it.
+      if (next === "following" && Date.now() - saved.at > 60_000) {
+        void fetchTab("following").then((fresh) => {
+          if (!fresh) return;
+          tabs.current.following = fresh;
+          if (tabRef.current === "following" && activeRef.current === 0) {
+            setReels(fresh.reels);
+            setCursor(fresh.cursor);
+          }
+        });
+      }
       return;
     }
+    setActive(0);
+    root?.scrollTo({ top: 0 });
     setReels([]);
     setCursor(null);
     if (next === "following" && !loggedIn) return; // the empty state asks them to log in
     setTabLoading(true);
-    try {
-      const res = await fetch(next === "following" ? "/api/feed?tab=following" : "/api/feed");
-      if (!res.ok) throw new Error();
-      const data = (await res.json()) as { reels: FeedReel[]; nextCursor: number | null };
-      setReels(data.reels);
-      setCursor(data.nextCursor);
-    } catch {
-      toast("Couldn't load more reels. Check your connection.", "error");
-    } finally {
-      setTabLoading(false);
-    }
+    const st = await fetchTab(next);
+    setTabLoading(false);
+    if (!st) return toast("Couldn't load more reels. Check your connection.", "error");
+    tabs.current[next] = st;
+    if (tabRef.current === next) showTab(next, st);
   }
+
+  // Preload Following (and its first cover) once the first reel plays, so the first switch is instant.
+  useEffect(() => {
+    if (fixed || backHref || !loggedIn) return;
+    return whenFeedReady(() => {
+      void fetchTab("following").then((st) => {
+        if (!st || tabs.current.following) return;
+        tabs.current.following = st;
+        const poster = st.reels[0]?.posterUrl;
+        if (poster) new Image().src = poster;
+      });
+    }, 4000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, fixed, backHref]);
 
   useEffect(() => {
     if (active >= reels.length - 3) void loadMore();
@@ -287,16 +334,17 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
 
   async function follow(r: FeedReel) {
     if (!requireLogin("follow", `/reel/${r.id}`)) return;
-    const rid = r.restaurant.id;
-    const set = (v: boolean) => setReels((rs) => rs.map((x) => (x.restaurant.id === rid ? { ...x, following: v } : x)));
-    set(true);
-    try {
-      await api("/api/follow", { restaurantId: rid, follow: true });
+    // Shared follow state: every reel of this restaurant and its page update at once (follow-store).
+    const res = await setFollowing(r.restaurant.id, true);
+    if (res === "ok") {
       toast(t("Following {name}", { name: r.restaurant.name }), "success");
-    } catch {
-      set(false);
-      toast("Couldn't follow. Check your connection.", "error");
-    }
+      // Their reels belong in Following now: refresh it in the background.
+      tabs.current.following = null;
+      void fetchTab("following").then((st) => {
+        if (st && !tabs.current.following) tabs.current.following = st;
+      });
+    } else if (res === "login") askLogin("follow", `/reel/${r.id}`);
+    else toast("Couldn't follow. Check your connection.", "error");
   }
 
   async function like(r: FeedReel) {
@@ -534,6 +582,7 @@ const ReelSlide = memo(function ReelSlide({
   const onRestaurant = () => actions.current.restaurant();
   const onOpen = () => actions.current.open(reel);
   const [justFollowed, setJustFollowed] = useState(false);
+  const { following } = useFollowState(reel.restaurant.id, !!reel.following);
   const onFollow = () => {
     actions.current.follow(reel);
     setJustFollowed(true);
@@ -863,7 +912,7 @@ const ReelSlide = memo(function ReelSlide({
           </span>
         </Link>
         {/* TikTok-style follow: + under the restaurant's picture; turns into a check once followed. */}
-        {!reel.following ? (
+        {!following ? (
           <button onClick={onFollow} className="-mt-4 mb-1 grid h-6 w-6 place-items-center rounded-full bg-brand-500 shadow-md ring-2 ring-black/20 active:scale-90" aria-label={t("Follow {name}", { name: reel.restaurant.name })} data-testid="follow-button">
             <Plus className="h-4 w-4" strokeWidth={3} />
           </button>

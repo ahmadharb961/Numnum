@@ -16,11 +16,15 @@ export async function uniqueSlug(name: string, excludeId?: string) {
 export type ChecklistStep = { key: string; label: string; done: boolean; href: string };
 
 export async function onboardingChecklist(restaurantId: string): Promise<ChecklistStep[]> {
-  const r = await prisma.restaurant.findUniqueOrThrow({
-    where: { id: restaurantId },
-    include: { _count: { select: { menuItems: { where: { archived: false } }, reels: true } } },
-  });
-  const withPhotos = await prisma.menuItem.count({ where: { restaurantId, archived: false, images: { some: {} } } });
+  const [r, withPhotos] = await Promise.all([
+    prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      include: { _count: { select: { menuItems: { where: { archived: false } }, reels: true } } },
+    }),
+    prisma.menuItem.count({ where: { restaurantId, archived: false, images: { some: {} } } }),
+  ]);
+  // Deleted while its dashboard was loading: no checklist rather than an error page.
+  if (!r) return [];
   return [
     { key: "info", label: "Restaurant information", done: !!(r.displayName && r.address && r.description && r.logoUrl), href: "/dashboard/settings" },
     { key: "phone", label: "Restaurant phone for order questions", done: !!r.phone, href: "/dashboard/settings" },

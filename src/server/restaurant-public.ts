@@ -42,7 +42,7 @@ export const getPublicRestaurant = cache(async function getPublicRestaurant(key:
         select: { id: true, rating: true, foodQuality: true, service: true, value: true, delivery: true, body: true, evidence: true, reply: true, createdAt: true, user: { select: { name: true } } },
       }),
     ),
-    prisma.restaurant.findFirst({ where, select: { id: true } }).then((x) => (x ? liveDeals([x.id]) : new Map<string, DealLike[]>())),
+    prisma.restaurant.findFirst({ where, select: { id: true } }).then((x) => (x ? liveDeals([x.id], { cached: true }) : new Map<string, DealLike[]>())),
   ]);
   if (!r) return null;
   const deals = dealRows.get(r.id) ?? [];

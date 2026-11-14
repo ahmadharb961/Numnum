@@ -28,7 +28,7 @@ export async function getPublicItem(id: string) {
       }),
     ),
     prisma.itemReview.groupBy({ by: ["rating"], where: { menuItemId: id, status: "VISIBLE" }, _count: true }),
-    prisma.menuItem.findUnique({ where: { id }, select: { restaurantId: true } }).then((m) => (m ? liveDeals([m.restaurantId]) : new Map())),
+    prisma.menuItem.findUnique({ where: { id }, select: { restaurantId: true } }).then((m) => (m ? liveDeals([m.restaurantId], { cached: true }) : new Map())),
   ]);
   if (!item) return null;
   return {
