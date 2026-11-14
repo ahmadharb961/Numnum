@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { api } from "./track";
 import { useT } from "@/i18n/client";
+import { whenFeedReady } from "@/lib/feed-ready";
 
 type Pending = { reference: string; fulfillment: "DELIVERY" | "PICKUP"; restaurant: { id: string; displayName: string; logoUrl: string | null }; items: { menuItemId: string; name: string; imageUrl: string | null }[] };
 
@@ -43,10 +44,13 @@ export function ReviewPrompt() {
 
   useEffect(() => {
     if (pathname.startsWith("/checkout")) return;
-    fetch("/api/account/pending-review")
-      .then((r) => r.json())
-      .then((d) => setP((cur) => (cur?.reference === d.pending?.reference ? cur : d.pending)))
-      .catch(() => {});
+    // Waits for the first reel to play (or a moment elsewhere), so it never slows the first video.
+    return whenFeedReady(() => {
+      fetch("/api/account/pending-review")
+        .then((r) => r.json())
+        .then((d) => setP((cur) => (cur?.reference === d.pending?.reference ? cur : d.pending)))
+        .catch(() => {});
+    }, 1500);
   }, [pathname]);
 
   if (!p) return null;

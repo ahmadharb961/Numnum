@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bookmark, ChevronLeft, Eye, FastForward, Heart, Loader2, MapPin, Play, Plus, Send, Volume2, VolumeX, RotateCcw, X } from "lucide-react";
@@ -13,6 +13,7 @@ import { ItemSheet, prefetchItem } from "./item-sheet";
 import { api, track } from "./track";
 import { HlsVideo } from "@/components/hls-video";
 import { pooledVideo, unlockPooledVideos } from "./video-pool";
+import { markFeedReady, registerFeed, whenFeedReady } from "@/lib/feed-ready";
 import { LocationChip } from "./location-picker";
 import { formatKm } from "@/lib/geo";
 import { Logo } from "@/components/logo";
@@ -57,18 +58,46 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   const [active, setActive] = useState(startIndex);
+  const [incoming, setIncoming] = useState<number | null>(null);
+  // Until the first reel plays, it gets the whole connection: no other reel's video or cover loads.
+  const [started, setStarted] = useState(false);
   // Reels whose first seconds are downloaded. Loading is queued like Instagram: the next reel first,
   // then the one after it, then the current reel buffers further, so on a weak connection the
   // next swipe is ready instead of three videos splitting the bandwidth.
   const [buffered, setBuffered] = useState<Set<string>>(() => new Set());
+  // One stable object for every slide's buttons, so a swipe only re-renders the reels whose own
+  // state changed (smooth on cheaper phones) instead of every reel in the list.
+  const actions = useRef<SlideActions>(null as unknown as SlideActions);
   const markBuffered = useCallback((id: string) => setBuffered((b) => (b.has(id) ? b : new Set(b).add(id))), []);
   usePreconnect(initial[startIndex]?.videoUrl ?? initial[0]?.videoUrl);
   // The dish of the reel on screen (and the next one) loads in the background: "Order" opens instantly.
   useEffect(() => {
-    prefetchItem(reels[active]?.item.id);
-    const next = setTimeout(() => prefetchItem(reels[active + 1]?.item.id), 1200);
-    return () => clearTimeout(next);
+    const cancelReady = whenFeedReady(() => prefetchItem(reels[active]?.item.id), 3000);
+    let next: ReturnType<typeof setTimeout> | undefined;
+    const cancelNext = whenFeedReady(() => (next = setTimeout(() => prefetchItem(reels[active + 1]?.item.id), 1200)), 3000);
+    return () => {
+      cancelReady();
+      cancelNext();
+      clearTimeout(next);
+    };
   }, [active, reels]);
+  // Registered before any other component's effects run, so they know to wait for the first reel.
+  useLayoutEffect(() => registerFeed(), []);
+  // The first reel playing frees the connection for everything else (tabs, dishes, prompts).
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    // "playing" fires as soon as play() is accepted, even while still waiting for data; the clock
+    // actually moving is the real signal that frames are on screen.
+    const onTime = (e: Event) => {
+      if ((e.target as HTMLVideoElement).currentTime < 0.1) return;
+      root.removeEventListener("timeupdate", onTime, { capture: true });
+      markFeedReady();
+      setStarted(true);
+    };
+    root.addEventListener("timeupdate", onTime, { capture: true });
+    return () => root.removeEventListener("timeupdate", onTime, { capture: true });
+  }, []);
   // Sound on by default. Browsers block sound until the visitor first taps the page: then the
   // reel plays muted ("soundBlocked") and the first tap turns sound on. A manual mute is remembered.
   const [muted, setMuted] = useState(false);
@@ -162,6 +191,31 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     Array.from(root.children).forEach((c) => io.observe(c));
     return () => io.disconnect();
   }, [reels.length]);
+
+  // TikTok/Instagram: the next reel starts playing (silently) on the first frame the feed moves
+  // toward it, so it's already playing when the swipe settles. Read from the scroll position, which
+  // catches a quick flick that would skip past any visibility threshold.
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const h = root.clientHeight || 1;
+        const pos = root.scrollTop / h;
+        const next = pos > active + 0.02 ? active + 1 : pos < active - 0.02 ? active - 1 : null;
+        setIncoming(next !== null && next >= 0 && next < reels.length ? next : null);
+      });
+    };
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [active, reels.length]);
+  useEffect(() => setIncoming(null), [active]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || cursor === null) return;
@@ -262,6 +316,26 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
+      {(() => {
+        actions.current = {
+          soundBlocked: () => {
+            setMuted(true);
+            // Someone who chose mute doesn't need the "Tap for sound" prompt.
+            let prefersMuted = false;
+            try {
+              prefersMuted = localStorage.getItem("nn_muted") === "1";
+            } catch {}
+            if (!prefersMuted) setSoundBlocked(true);
+          },
+          justUnlocked: () => Date.now() - unlockedAt.current < 700,
+          like,
+          save,
+          share,
+          restaurant: () => setPanel(true),
+          open: (r) => setSheet({ itemId: r.item.id, reelId: r.id }),
+        };
+        return null;
+      })()}
       <div ref={containerRef} className="h-feed snap-feed no-scrollbar overflow-y-scroll">
         {reels.map((r, i) => (
           <ReelSlide
@@ -271,27 +345,15 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
             active={i === active}
             // The previous reel and the next two have a player; the current one and the next two
             // download ahead, so a swipe (even a quick double swipe) lands on a reel that's ready.
-            near={i >= active - 1 && i <= active + 2}
-            preloadFull={i === active || i === active + 1 || (i === active + 2 && (!reels[active + 1] || buffered.has(reels[active + 1].id)))}
+            near={i === active || (started && i >= active - 1 && i <= active + 2)}
+            preloadFull={i === active || (started && (i === active + 1 || (i === active + 2 && (!reels[active + 1] || buffered.has(reels[active + 1].id)))))}
+            showImages={started || i === active}
             deepBuffer={i === active && (!reels[active + 1] || buffered.has(reels[active + 1].id))}
             onBuffered={markBuffered}
+            peek={i === incoming && i !== active}
             muted={muted}
-            onSoundBlocked={() => {
-              setMuted(true);
-              // Someone who chose mute doesn't need the "Tap for sound" prompt.
-              let prefersMuted = false;
-              try {
-                prefersMuted = localStorage.getItem("nn_muted") === "1";
-              } catch {}
-              if (!prefersMuted) setSoundBlocked(true);
-            }}
-            justUnlocked={() => Date.now() - unlockedAt.current < 700}
             minViewMs={minViewMs}
-            onLike={() => like(r)}
-            onSave={() => save(r)}
-            onShare={() => share(r)}
-            onRestaurant={() => setPanel(true)}
-            onOpen={() => setSheet({ itemId: r.item.id, reelId: r.id })}
+            actions={actions}
           />
         ))}
         {reels.length === 0 && (
@@ -318,7 +380,17 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   );
 }
 
-function ReelSlide({
+type SlideActions = {
+  soundBlocked: () => void;
+  justUnlocked: () => boolean;
+  like: (r: FeedReel) => void;
+  save: (r: FeedReel) => void;
+  share: (r: FeedReel) => void;
+  restaurant: () => void;
+  open: (r: FeedReel) => void;
+};
+
+const ReelSlide = memo(function ReelSlide({
   reel,
   index,
   active,
@@ -326,15 +398,11 @@ function ReelSlide({
   preloadFull,
   deepBuffer,
   onBuffered,
+  peek,
+  showImages,
   muted,
-  onSoundBlocked,
-  justUnlocked,
   minViewMs,
-  onLike,
-  onSave,
-  onShare,
-  onRestaurant,
-  onOpen,
+  actions,
 }: {
   reel: FeedReel;
   index: number;
@@ -344,20 +412,25 @@ function ReelSlide({
   /** The reel on screen may buffer further ahead (once the next reel has its first seconds). */
   deepBuffer: boolean;
   onBuffered: (id: string) => void;
+  /** Sliding in (20–60% on screen): plays silently so it's already moving when the swipe ends. */
+  peek: boolean;
+  /** Cover and logo load (all but the first reel wait until it plays). */
+  showImages: boolean;
   muted: boolean;
-  onSoundBlocked: () => void;
-  justUnlocked: () => boolean;
   minViewMs: number;
-  onLike: () => void;
-  onSave: () => void;
-  onShare: () => void;
-  onRestaurant: () => void;
-  onOpen: () => void;
+  actions: React.MutableRefObject<SlideActions>;
 }) {
   const t = useT();
   const { loggedIn } = useLoginGate();
   const locale = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const onSoundBlocked = () => actions.current.soundBlocked();
+  const justUnlocked = () => actions.current.justUnlocked();
+  const onLike = () => actions.current.like(reel);
+  const onSave = () => actions.current.save(reel);
+  const onShare = () => actions.current.share(reel);
+  const onRestaurant = () => actions.current.restaurant();
+  const onOpen = () => actions.current.open(reel);
   // Pooled <video> elements exist only in the browser: attach after mount (poster shows meanwhile).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -418,7 +491,7 @@ function ReelSlide({
   // first seconds, then stop it at the beginning. (Other browsers buffer it via hls.js / preload.)
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || active || !preloadFull || !reel.videoUrl) return;
+    if (!v || active || peek || !preloadFull || !reel.videoUrl) return;
     if (!/\.m3u8(\?|$)/.test(reel.videoUrl) || !v.canPlayType("application/vnd.apple.mpegurl")) return;
     let stop = false;
     const warm = () => {
@@ -438,7 +511,32 @@ function ReelSlide({
       stop = true;
       window.clearTimeout(t);
     };
-  }, [active, preloadFull, mounted, near, reel.videoUrl]);
+  }, [active, peek, preloadFull, mounted, near, reel.videoUrl]);
+
+  // Sliding in: start playing silently from the beginning, so the reel is already moving when the
+  // swipe settles (it then picks up the sound setting). Swiped back: stop and rewind.
+  const router = useRouter();
+  useEffect(() => {
+    if (active && showImages) return whenFeedReady(() => router.prefetch(`/r/${reel.restaurant.slug}`), 3000);
+  }, [active, showImages, reel.restaurant.slug, router]);
+
+  const peeked = useRef(false);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || active) {
+      peeked.current = false;
+      return;
+    }
+    if (peek && !paused) {
+      peeked.current = true;
+      v.muted = true;
+      void v.play().catch(() => {});
+    } else if (peeked.current) {
+      peeked.current = false;
+      v.pause();
+      v.currentTime = 0;
+    }
+  }, [peek, active, paused, mounted, near]);
 
   // Tell the feed once this reel has its first ~2 s, so the next one in the queue can start loading.
   useEffect(() => {
@@ -565,9 +663,9 @@ function ReelSlide({
       {/* Desktop: the video plays in a centered 9:16 column. */}
       <div className="relative h-full w-full overflow-hidden lg:aspect-[9/16] lg:h-[calc(100%-2.5rem)] lg:w-auto lg:rounded-3xl">
       {/* poster always rendered underneath to avoid black frames */}
-      {reel.posterUrl && (
+      {reel.posterUrl && showImages && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={reel.posterUrl} alt="" className="absolute inset-0 h-full w-full object-cover" loading={index < 2 ? "eager" : "lazy"} fetchPriority={index === 0 ? "high" : "auto"} />
+        <img src={reel.posterUrl} alt="" className="absolute inset-0 h-full w-full object-cover" loading={active || index < 2 ? "eager" : "lazy"} fetchPriority={active ? "high" : "low"} />
       )}
       {showVideo && (
         <HlsVideo
@@ -646,11 +744,11 @@ function ReelSlide({
 
       {/* Right action rail */}
       <div className="absolute bottom-6 end-2 z-10 flex flex-col items-center gap-4">
-        <Link prefetch href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="relative mb-1" aria-label={t("Open {name}", { name: reel.restaurant.name })}>
+        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="relative mb-1" aria-label={t("Open {name}", { name: reel.restaurant.name })}>
           <span className="block h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-white">
             {reel.restaurant.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={reel.restaurant.logoUrl} alt="" className="h-full w-full object-cover" />
+              showImages && <img src={reel.restaurant.logoUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <span className="grid h-full w-full place-items-center bg-brand-500 text-lg font-black">{reel.restaurant.name[0]}</span>
             )}
@@ -675,7 +773,7 @@ function ReelSlide({
       {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pe-20 *:pointer-events-auto">
         {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">{t("Sponsored")}</span>}
-        <Link prefetch href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
+        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
           {reel.restaurant.name}
           {reel.restaurant.verified && <VerifiedBadge />}
         </Link>
@@ -710,7 +808,7 @@ function ReelSlide({
       </div>
     </section>
   );
-}
+});
 
 /** Like Instagram: one line ending in "… more"; tap to read it all, "less" folds it back. */
 function ReelCaption({ text }: { text: string }) {

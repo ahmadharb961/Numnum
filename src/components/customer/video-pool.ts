@@ -14,10 +14,27 @@ function create(): HTMLVideoElement {
   return v;
 }
 
+type EarlyVideo = { src: string; v: HTMLVideoElement; i: number; taken: boolean };
+
 /** The pooled element for a reel; reels within four of each other never share one. */
 export function pooledVideo(index: number): HTMLVideoElement {
-  pool ??= Array.from({ length: SIZE }, create);
+  if (!pool) {
+    pool = Array.from({ length: SIZE }, create);
+    // The page already started the first reel in a <video> before the app loaded
+    // (firstReelBootScript): adopt that element, with whatever it has downloaded.
+    const early = (window as Window & { __nnFirst?: EarlyVideo }).__nnFirst;
+    if (early?.v.isConnected) {
+      early.v.style.cssText = "";
+      pool[early.i % SIZE] = early.v;
+    }
+  }
   return pool[index % SIZE];
+}
+
+/** The page's early <video> is now driven by the feed (it stops pausing itself at 0:00). */
+export function claimEarlyVideo(v: HTMLVideoElement) {
+  const early = (window as Window & { __nnFirst?: EarlyVideo }).__nnFirst;
+  if (early && early.v === v) early.taken = true;
 }
 
 /**
