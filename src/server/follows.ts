@@ -11,6 +11,7 @@ import { attachDeals, publicReelWhere, reelCardSelect, toPublicReel } from "./fe
 // can't flood anyone.
 
 const NOTIFY_GAP_MS = 20 * 3600_000;
+const BATCH = 500;
 
 /** Follow or unfollow; keeps the restaurant's follower count in step. Returns the new state. */
 export async function setFollow(userId: string, restaurantId: string, follow: boolean): Promise<{ following: boolean; followerCount: number }> {
@@ -77,19 +78,30 @@ export async function notifyFollowers(restaurantId: string, ev: Event) {
       link = `/r/${r.slug}`;
     }
     const since = new Date(Date.now() - NOTIFY_GAP_MS);
-    const followers = await prisma.restaurantFollow.findMany({
-      where: { restaurantId, OR: [{ lastNotifiedAt: null }, { lastNotifiedAt: { lt: since } }], user: { disabled: false } },
-      select: { userId: true, user: { select: { locale: true } } },
-    });
-    if (!followers.length) return 0;
-    const ids = followers.map((f) => f.userId);
-    await prisma.restaurantFollow.updateMany({ where: { restaurantId, userId: { in: ids } }, data: { lastNotifiedAt: new Date() } });
-    await prisma.notification.createMany({ data: ids.map((userId) => ({ audience: "USER", userId, type: `follow_${ev.kind}`, title: encodeText(title), body: body ? encodeText(body) : null, link, imageUrl: image ?? null })) });
-    await pushInLanguages(
-      followers.map((f) => ({ id: f.userId, locale: f.user.locale })),
-      (t) => ({ title: t(title.k, title.v), body: body ? t(body.k, body.v) : "", url: link, tag: `follow-${restaurantId}`, image }),
-    );
-    return ids.length;
+    // In batches (by user id), so a restaurant with 100,000 followers never loads or pushes to them
+    // all at once: each batch is marked, gets its in-app notifications, then its pushes.
+    let total = 0;
+    let after: string | undefined;
+    for (;;) {
+      const followers = await prisma.restaurantFollow.findMany({
+        where: { restaurantId, OR: [{ lastNotifiedAt: null }, { lastNotifiedAt: { lt: since } }], user: { disabled: false }, ...(after ? { userId: { gt: after } } : {}) },
+        select: { userId: true, user: { select: { locale: true } } },
+        orderBy: { userId: "asc" },
+        take: BATCH,
+      });
+      if (!followers.length) break;
+      after = followers[followers.length - 1].userId;
+      const ids = followers.map((f) => f.userId);
+      await prisma.restaurantFollow.updateMany({ where: { restaurantId, userId: { in: ids } }, data: { lastNotifiedAt: new Date() } });
+      await prisma.notification.createMany({ data: ids.map((userId) => ({ audience: "USER", userId, type: `follow_${ev.kind}`, title: encodeText(title), body: body ? encodeText(body) : null, link, imageUrl: image ?? null })) });
+      await pushInLanguages(
+        followers.map((f) => ({ id: f.userId, locale: f.user.locale })),
+        (t) => ({ title: t(title.k, title.v), body: body ? t(body.k, body.v) : "", url: link, tag: `follow-${restaurantId}`, image }),
+      );
+      total += ids.length;
+      if (followers.length < BATCH) break;
+    }
+    return total;
   } catch (e) {
     console.error("notifyFollowers", e);
     return 0;

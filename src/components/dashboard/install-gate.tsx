@@ -61,11 +61,11 @@ export function InstallGate({ children, bypass }: { children: React.ReactNode; b
   // In the store app the name on the phone is "numnum", and there's nothing to add to the home screen.
   const native = isNativeApp();
   const APP = native ? "numnum" : WEB_APP;
-  if (step === "loading") return <>{children}</>;
-  if (step === "ok")
-    return (
-      <>
-        {!mobile && push !== "on" && push !== "unsupported" && (
+  // The dashboard (children) always sits at the same place in the tree, whatever the step: the
+  // banner goes in a slot above it and the phone setup screens cover it. Swapping the tree around
+  // children after start-up made React discard the page while it was still hydrating (#418).
+  const banner =
+    step === "ok" && !mobile && push !== "on" && push !== "unsupported" ? (
           <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-900 lg:ms-[18rem] lg:me-8">
             <span className="inline-flex items-center gap-2 font-semibold">
               <BellRing className="h-4 w-4" /> {push === "blocked" ? t("Notifications are blocked in this browser — allow them in the site settings to hear about new orders.") : t("Turn on notifications to be alerted about new orders even when this tab is in the background.")}
@@ -76,12 +76,13 @@ export function InstallGate({ children, bypass }: { children: React.ReactNode; b
               </Button>
             )}
           </div>
-        )}
-        {children}
-      </>
-    );
-
+    ) : null;
+  const gate = step === "install" || step === "notify" || step === "blocked";
   return (
+    <>
+      {banner}
+      {children}
+      {gate && (
     <div className="fixed inset-0 z-[90] overflow-y-auto bg-cream" style={{ paddingTop: "calc(var(--safe-top) + 24px)", paddingBottom: "calc(var(--safe-bottom) + 24px)" }}>
       <div className="mx-auto max-w-md px-6">
         <Logo className="h-12 text-brand-600" />
@@ -128,5 +129,7 @@ export function InstallGate({ children, bypass }: { children: React.ReactNode; b
         )}
       </div>
     </div>
+      )}
+    </>
   );
 }

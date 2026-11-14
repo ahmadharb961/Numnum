@@ -6,13 +6,44 @@ import { applyDeals, type DealLike, type DealResult } from "@/lib/deals";
 
 const dealSelect = { id: true, kind: true, percent: true, amountCents: true, minSubtotalCents: true, menuItemId: true, startsAt: true, endsAt: true, endedAt: true } as const;
 
+// Badges on reels read deals often (every feed page): a short shared cache, cleared at once when a
+// deal is created or ended here. Pricing (quote and order) always reads fresh: { cached: false }.
+const CACHE_MS = 15_000;
+// Kept on globalThis: Next bundles server actions (the dashboard's "Start deal") and pages
+// separately, each with its own copy of module variables, so a module-level cache cleared by the
+// action would stay stale for the pages.
+type DealCache = { at: number; byRestaurant: Promise<Map<string, DealLike[]>> } | null;
+const store = globalThis as typeof globalThis & { __nnDealCache?: DealCache };
+export function clearDealCache() {
+  store.__nnDealCache = null;
+}
+
 /** Live deals per restaurant (restaurants restricted for an overdue invoice run none). */
-export async function liveDeals(restaurantIds: string[]): Promise<Map<string, DealLike[]>> {
+export async function liveDeals(restaurantIds: string[], opts: { cached?: boolean } = {}): Promise<Map<string, DealLike[]>> {
   const out = new Map<string, DealLike[]>();
   if (!restaurantIds.length) return out;
+  if (opts.cached) {
+    let cache = store.__nnDealCache;
+    if (!cache || Date.now() - cache.at > CACHE_MS) {
+      const byRestaurant = loadLive();
+      cache = store.__nnDealCache = { at: Date.now(), byRestaurant };
+      byRestaurant.catch(() => {
+        if (store.__nnDealCache?.byRestaurant === byRestaurant) store.__nnDealCache = null;
+      });
+    }
+    const all = await cache.byRestaurant;
+    for (const id of new Set(restaurantIds)) if (all.has(id)) out.set(id, all.get(id)!);
+    return out;
+  }
+  return loadLive(restaurantIds);
+}
+
+/** All live deals (or those of the given restaurants), grouped by restaurant. */
+async function loadLive(restaurantIds?: string[]): Promise<Map<string, DealLike[]>> {
+  const out = new Map<string, DealLike[]>();
   const now = new Date();
   const rows = await prisma.deal.findMany({
-    where: { restaurantId: { in: [...new Set(restaurantIds)] }, endedAt: null, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }], restaurant: { restrictPromotion: false } },
+    where: { ...(restaurantIds ? { restaurantId: { in: [...new Set(restaurantIds)] } } : {}), endedAt: null, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }], restaurant: { restrictPromotion: false } },
     select: { ...dealSelect, restaurantId: true },
     orderBy: { createdAt: "desc" },
   });
@@ -78,13 +109,16 @@ export async function createDeal(restaurantId: string, userId: string, raw: unkn
     if (!item) throw new DealError("Choose a dish from your menu", "menuItemId");
     menuItemId = item.id;
   }
-  return prisma.deal.create({
+  const deal = await prisma.deal.create({
     data: { restaurantId, kind: input.kind, percent: input.kind === "PERCENT_OFF" ? input.percent : null, amountCents, minSubtotalCents, menuItemId, endsAt: endsAt(input.endsIn), createdById: userId },
   });
+  clearDealCache(); // after saving, so no request can cache the old state in between
+  return deal;
 }
 
 export async function endDeal(restaurantId: string, dealId: string) {
   const res = await prisma.deal.updateMany({ where: { id: dealId, restaurantId, endedAt: null }, data: { endedAt: new Date() } });
+  clearDealCache();
   return res.count > 0;
 }
 
