@@ -2,7 +2,7 @@
 // element, after a play() inside a user gesture. Fresh elements per reel would each start muted,
 // so the feed recycles these: once unlocked by the first tap, every later reel plays with sound.
 
-const SIZE = 3; // previous, current, next reel
+const SIZE = 5; // previous, current and the next two reels (+1 spare so they never collide)
 let pool: HTMLVideoElement[] | null = null;
 
 function create(): HTMLVideoElement {
@@ -14,7 +14,7 @@ function create(): HTMLVideoElement {
   return v;
 }
 
-/** The pooled element for a reel; reels i, i+1, i+2 never share one. */
+/** The pooled element for a reel; reels within four of each other never share one. */
 export function pooledVideo(index: number): HTMLVideoElement {
   pool ??= Array.from({ length: SIZE }, create);
   return pool[index % SIZE];

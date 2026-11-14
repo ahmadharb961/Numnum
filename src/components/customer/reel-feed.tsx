@@ -34,6 +34,21 @@ type Props = {
   locationLabel?: string | null;
 };
 
+/** Opens the connection to the video host (Cloudflare) while the page loads: saves several round
+ *  trips on 4G before the first reel's first frame. */
+function usePreconnect(url: string | null | undefined) {
+  useEffect(() => {
+    if (!url || !/^https?:\/\//.test(url)) return;
+    const origin = new URL(url).origin;
+    if (document.head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) return;
+    const l = document.createElement("link");
+    l.rel = "preconnect";
+    l.href = origin;
+    l.crossOrigin = "anonymous";
+    document.head.appendChild(l);
+  }, [url]);
+}
+
 export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref, locationLabel = null }: Props) {
   const t = useT();
   const { requireLogin, askLogin } = useLoginGate();
@@ -42,6 +57,12 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   const [active, setActive] = useState(startIndex);
+  // Reels whose first seconds are downloaded. Loading is queued like Instagram: the next reel first,
+  // then the one after it, then the current reel buffers further, so on a weak connection the
+  // next swipe is ready instead of three videos splitting the bandwidth.
+  const [buffered, setBuffered] = useState<Set<string>>(() => new Set());
+  const markBuffered = useCallback((id: string) => setBuffered((b) => (b.has(id) ? b : new Set(b).add(id))), []);
+  usePreconnect(initial[startIndex]?.videoUrl ?? initial[0]?.videoUrl);
   // The dish of the reel on screen (and the next one) loads in the background: "Order" opens instantly.
   useEffect(() => {
     prefetchItem(reels[active]?.item.id);
@@ -248,8 +269,12 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
             reel={r}
             index={i}
             active={i === active}
-            near={Math.abs(i - active) <= 1}
-            preloadFull={i === active || i === active + 1}
+            // The previous reel and the next two have a player; the current one and the next two
+            // download ahead, so a swipe (even a quick double swipe) lands on a reel that's ready.
+            near={i >= active - 1 && i <= active + 2}
+            preloadFull={i === active || i === active + 1 || (i === active + 2 && (!reels[active + 1] || buffered.has(reels[active + 1].id)))}
+            deepBuffer={i === active && (!reels[active + 1] || buffered.has(reels[active + 1].id))}
+            onBuffered={markBuffered}
             muted={muted}
             onSoundBlocked={() => {
               setMuted(true);
@@ -299,6 +324,8 @@ function ReelSlide({
   active,
   near,
   preloadFull,
+  deepBuffer,
+  onBuffered,
   muted,
   onSoundBlocked,
   justUnlocked,
@@ -314,6 +341,9 @@ function ReelSlide({
   active: boolean;
   near: boolean;
   preloadFull: boolean;
+  /** The reel on screen may buffer further ahead (once the next reel has its first seconds). */
+  deepBuffer: boolean;
+  onBuffered: (id: string) => void;
   muted: boolean;
   onSoundBlocked: () => void;
   justUnlocked: () => boolean;
@@ -333,6 +363,17 @@ function ReelSlide({
   useEffect(() => setMounted(true), []);
   const [paused, setPaused] = useState(false);
   const [buffering, setBuffering] = useState(false);
+  // The loading circle only shows for a real wait, not a split-second one while a reel starts.
+  const spinTimer = useRef<number | null>(null);
+  const waiting = (on: boolean) => {
+    if (spinTimer.current != null) window.clearTimeout(spinTimer.current);
+    spinTimer.current = null;
+    if (on) spinTimer.current = window.setTimeout(() => setBuffering(true), 450);
+    else setBuffering(false);
+  };
+  useEffect(() => () => {
+    if (spinTimer.current != null) window.clearTimeout(spinTimer.current);
+  }, []);
   const [failed, setFailed] = useState(false);
   const [likeAnim, setLikeAnim] = useState(false);
   const watched = useRef(0);
@@ -348,6 +389,7 @@ function ReelSlide({
     const v = videoRef.current;
     if (!v) return;
     if (active && !paused) {
+      v.muted = muted; // a reel warmed up in advance was started muted
       v.play().catch((e: Error) => {
         // Sound before any tap is blocked: play muted instead and let the feed offer sound.
         if (e.name === "NotAllowedError" && !v.muted) {
@@ -370,6 +412,49 @@ function ReelSlide({
   useEffect(() => {
     if (!active) setPaused(false);
   }, [active]);
+
+  // iPhone/Safari ignore preload for a video that isn't playing, so the next reels would start
+  // from nothing on every swipe. Start each upcoming reel muted for a moment so Safari fetches its
+  // first seconds, then stop it at the beginning. (Other browsers buffer it via hls.js / preload.)
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || active || !preloadFull || !reel.videoUrl) return;
+    if (!/\.m3u8(\?|$)/.test(reel.videoUrl) || !v.canPlayType("application/vnd.apple.mpegurl")) return;
+    let stop = false;
+    const warm = () => {
+      if (stop || v.readyState >= 3) return; // already has the next frames
+      v.muted = true;
+      const back = () => {
+        v.removeEventListener("timeupdate", back);
+        if (stop) return;
+        v.pause();
+        v.currentTime = 0;
+      };
+      v.addEventListener("timeupdate", back);
+      void v.play().catch(() => v.removeEventListener("timeupdate", back));
+    };
+    const t = window.setTimeout(warm, 250); // after the reel on screen has started
+    return () => {
+      stop = true;
+      window.clearTimeout(t);
+    };
+  }, [active, preloadFull, mounted, near, reel.videoUrl]);
+
+  // Tell the feed once this reel has its first ~2 s, so the next one in the queue can start loading.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !near) return;
+    const check = () => {
+      for (let i = 0; i < v.buffered.length; i++) if (v.buffered.start(i) <= 0.5 && v.buffered.end(i) >= Math.min(2, (v.duration || 2) - 0.1)) return onBuffered(reel.id);
+    };
+    check();
+    v.addEventListener("progress", check);
+    v.addEventListener("canplaythrough", check);
+    return () => {
+      v.removeEventListener("progress", check);
+      v.removeEventListener("canplaythrough", check);
+    };
+  }, [near, mounted, reel.id, onBuffered]);
 
   // Normal speed again whenever the reel stops being the one on screen (the <video> elements are
   // pooled and reused by other reels) or the video element changes.
@@ -496,10 +581,11 @@ function ReelSlide({
           loop
           playsInline
           preload={preloadFull ? "auto" : "metadata"}
+          deepBuffer={deepBuffer}
           onTimeUpdate={onTimeUpdate}
-          onWaiting={() => setBuffering(true)}
+          onWaiting={() => waiting(true)}
           onPlaying={() => {
-            setBuffering(false);
+            waiting(false);
             lastTick.current = performance.now();
           }}
           onPause={() => (lastTick.current = null)}
@@ -541,7 +627,7 @@ function ReelSlide({
             className="flex flex-col items-center gap-2 text-sm font-semibold"
             onClick={() => {
               setFailed(false);
-              setBuffering(false);
+              waiting(false);
             }}
           >
             <RotateCcw className="h-8 w-8" />
