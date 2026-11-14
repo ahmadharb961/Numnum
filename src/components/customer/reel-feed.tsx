@@ -345,9 +345,10 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
       )}
       {!fixed && !backHref && (
         // One row, like TikTok: logo · For you / Following · location pin · sound (sound button below).
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent pb-8 pe-[60px] ps-3 lg:hidden" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent pb-8 pe-[60px] ps-3 max-[359px]:pe-[56px] lg:hidden" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
           <Logo className="h-7 shrink-0 text-white drop-shadow" />
-          <div className="pointer-events-auto flex flex-1 items-center justify-center gap-4 text-[15px] font-extrabold text-shadow" role="tablist" aria-label={t("Feed")}>
+          {/* Centred on the screen itself, not between the logo and the pin. */}
+          <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-4 text-[15px] font-extrabold text-shadow max-[359px]:gap-2.5 max-[359px]:text-[13px]" role="tablist" aria-label={t("Feed")}>
             {(["foryou", "following"] as const).map((k) => (
               <button key={k} role="tab" aria-selected={tab === k} onClick={() => switchTab(k)} className={cn("relative whitespace-nowrap py-1.5 transition", tab === k ? "text-white" : "text-white/60")} data-testid={`tab-${k}`}>
                 {k === "foryou" ? t("For you") : t("Following")}
@@ -355,7 +356,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
               </button>
             ))}
           </div>
-          <span className="pointer-events-auto shrink-0">
+          <span className="pointer-events-auto ms-auto shrink-0">
             <LocationChip label={locationLabel} dark compact />
           </span>
         </div>
