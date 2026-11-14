@@ -5,11 +5,5 @@
 	<!-- Push notifications (App Store / TestFlight builds use Apple's production service) -->
 	<key>aps-environment</key>
 	<string>production</string>
-	<!-- Universal links: numnum.me links (shared reels, dishes, restaurants, orders) open in the app -->
-	<key>com.apple.developer.associated-domains</key>
-	<array>
-		<string>applinks:numnum.me</string>
-		<string>applinks:www.numnum.me</string>
-	</array>
 </dict>
 </plist>
