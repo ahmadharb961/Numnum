@@ -1,5 +1,5 @@
 import type { Viewport } from "next";
-import { warmUpFirstReel } from "@/lib/reel-warmup";
+import { firstReelBootScript, warmUpFirstReel } from "@/lib/reel-warmup";
 import { getCurrentUser } from "@/server/auth";
 import { ReelFeed } from "@/components/customer/reel-feed";
 import { getFeed } from "@/server/feed";
@@ -21,6 +21,11 @@ export default async function HomePage() {
   return (
     <main>
       <h1 className="sr-only">{t("numnum — food reels from Lebanese restaurants")}</h1>
+      {/* Starts the first reel before the app loads; the feed adopts this video. */}
+      {(() => {
+        const boot = firstReelBootScript(feed.reels[0], 0);
+        return boot ? <script dangerouslySetInnerHTML={{ __html: boot }} /> : null;
+      })()}
       <ReelFeed locationLabel={loc?.label ?? null} initial={feed.reels.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id) }))} initialCursor={feed.nextCursor} minViewMs={settings.minViewMs} />
     </main>
   );

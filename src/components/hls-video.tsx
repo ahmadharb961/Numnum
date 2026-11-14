@@ -2,6 +2,17 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import type Hls from "hls.js";
+import { playableSrc, reportedDownlink } from "@/lib/video-src";
+import { claimEarlyVideo } from "@/components/customer/video-pool";
+
+// Browsers without built-in HLS (Android/Chrome) need hls.js: start downloading it as soon as this
+// module loads (during app start-up) instead of when the first reel mounts.
+let hlsModule: Promise<typeof import("hls.js")> | null = null;
+function loadHls() {
+  hlsModule ??= import("hls.js");
+  return hlsModule;
+}
+if (typeof window !== "undefined" && !document.createElement("video").canPlayType("application/vnd.apple.mpegurl")) void loadHls();
 
 type Props = Omit<React.VideoHTMLAttributes<HTMLVideoElement>, "src"> & {
   src: string;
@@ -21,16 +32,6 @@ type EventProp = keyof typeof EVENTS;
  * Safari/iOS play HLS natively; other browsers load hls.js on demand.
  * Buffering follows `preload`: "auto" buffers ahead, anything else stays light.
  */
-/**
- * iPhones choose their own first quality for HLS and often start high, which is slow on 4G.
- * Cloudflare Stream takes a bandwidth hint (Mbps) for the first rendition; quality then rises
- * as the connection allows.
- */
-function withStartHint(src: string) {
-  if (!/\.cloudflarestream\.com\//.test(src) || /[?&]clientBandwidthHint=/.test(src)) return src;
-  return `${src}${src.includes("?") ? "&" : "?"}clientBandwidthHint=1.8`;
-}
-
 /** The browser reports a slow connection (Android Chrome/WebView do; iPhones don't report it). */
 function weakConnection() {
   const conn = (navigator as Navigator & { connection?: { downlink?: number; effectiveType?: string } }).connection;
@@ -53,6 +54,7 @@ export const HlsVideo = forwardRef<HTMLVideoElement, Props>(function HlsVideo({ 
   useLayoutEffect(() => {
     if (!element || !hostRef.current) return;
     const v = element;
+    claimEarlyVideo(v);
     v.className = rest.className ?? "";
     if (rest.poster) v.poster = rest.poster;
     else v.removeAttribute("poster");
@@ -83,7 +85,9 @@ export const HlsVideo = forwardRef<HTMLVideoElement, Props>(function HlsVideo({ 
     if (!v) return;
     const isHls = /\.m3u8(\?|$)/.test(src);
     if (!isHls || v.canPlayType("application/vnd.apple.mpegurl")) {
-      v.src = isHls ? withStartHint(src) : src;
+      // The page's early <video> may already be loading this exact URL: don't restart it.
+      const want = playableSrc(src, reportedDownlink());
+      if (v.src !== new URL(want, location.href).href) v.src = want;
       return () => {
         v.pause();
         v.removeAttribute("src");
@@ -92,7 +96,7 @@ export const HlsVideo = forwardRef<HTMLVideoElement, Props>(function HlsVideo({ 
     }
     let cancelled = false;
     const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-    import("hls.js").then(({ default: HlsLib }) => {
+    loadHls().then(({ default: HlsLib }) => {
       if (cancelled) return;
       if (!HlsLib.isSupported()) {
         fatalRef.current?.();
@@ -108,8 +112,11 @@ export const HlsVideo = forwardRef<HTMLVideoElement, Props>(function HlsVideo({ 
       // connection allows (what TikTok/Instagram do). iPhones choose their own start level.
       hls.on(HlsLib.Events.MANIFEST_PARSED, (_e, d) => {
         // On a weak connection (the phone reports it) start lower still, so the first frame comes fast.
-        const cap = weakConnection() || saveData ? 360 : 540;
-        const light = d.levels.map((l, i) => ({ h: l.height || 0, i })).filter((l) => l.h && l.h <= cap).sort((a, b) => b.h - a.h)[0];
+        const conn = (navigator as Navigator & { connection?: { downlink?: number } }).connection;
+        const levels = d.levels.map((l, i) => ({ h: l.height || 0, i })).filter((l) => l.h);
+        // 3G-class connections start at the lightest rendition; quality rises from there.
+        const cap = conn?.downlink != null && conn.downlink < 2 ? Math.min(...levels.map((l) => l.h)) : weakConnection() || saveData ? 360 : 540;
+        const light = levels.filter((l) => l.h <= cap).sort((a, b) => b.h - a.h)[0];
         if (light) hls.startLevel = light.i;
       });
       hls.loadSource(src);

@@ -6,7 +6,7 @@ import { getT } from "@/i18n/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ReelFeed } from "@/components/customer/reel-feed";
-import { warmUpFirstReel } from "@/lib/reel-warmup";
+import { firstReelBootScript, warmUpFirstReel } from "@/lib/reel-warmup";
 import { prisma } from "@/server/db";
 import { getFeed, publicReelWhere, reelCardSelect, toPublicReel } from "@/server/feed";
 import { likedAndSaved } from "@/server/engagement";
@@ -62,6 +62,11 @@ export default async function ReelPage({ params }: { params: Promise<{ id: strin
       <h1 className="sr-only">
         {reel.item.name} at {reel.restaurant.name}
       </h1>
+      {/* Starts the first reel before the app loads; the feed adopts this video. */}
+      {(() => {
+        const boot = firstReelBootScript(reel, 0);
+        return boot ? <script dangerouslySetInnerHTML={{ __html: boot }} /> : null;
+      })()}
       <ReelFeed locationLabel={loc?.label ?? null} initial={all.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id) }))} initialCursor={feed.nextCursor} excludeIds={[id]} minViewMs={settings.minViewMs} />
     </main>
   );

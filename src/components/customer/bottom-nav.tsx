@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { whenFeedReady } from "@/lib/feed-ready";
 import { Compass, Home, ShoppingBag, Store, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "./cart";
@@ -20,6 +21,10 @@ const items = [
 export function BottomNav() {
   const t = useT();
   const pathname = usePathname();
+  const router = useRouter();
+  // Each tab's screen loads in the background so tapping it is instant, but only once the first
+  // reel is playing (or after a moment on other pages), so it never slows the first video down.
+  useEffect(() => whenFeedReady(() => items.forEach(({ href }) => router.prefetch(href)), 1500), [router]);
   const { count } = useCart();
   const dark = pathname === "/" || pathname.startsWith("/reel/") || /^\/r\/[^/]+\/reels/.test(pathname);
   // The page background also colors any area iOS leaves around the app (e.g. below the nav).
@@ -40,8 +45,7 @@ export function BottomNav() {
           const active = match(pathname);
           return (
             <li key={href}>
-              {/* prefetch: the tab's whole screen loads in the background, so tapping it is instant */}
-              <Link href={href} prefetch className={cn("relative flex h-full flex-col items-center justify-center gap-1 text-[11px] font-semibold transition", active ? (dark ? "text-white" : "text-brand-600") : dark ? "text-white/55" : "text-ink-muted")} aria-current={active ? "page" : undefined}>
+              <Link href={href} prefetch={false} className={cn("relative flex h-full flex-col items-center justify-center gap-1 text-[11px] font-semibold transition", active ? (dark ? "text-white" : "text-brand-600") : dark ? "text-white/55" : "text-ink-muted")} aria-current={active ? "page" : undefined}>
                 <span className="relative">
                   <Icon className={cn("h-6 w-6", active && "stroke-[2.4]")} />
                   {href === "/cart" && count > 0 && (
