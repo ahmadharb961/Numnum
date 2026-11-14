@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { loadCheckoutInfo } from "./checkout-data";
-import { Banknote, Bike, Check, Clock, Loader2, MapPin, Plus, ShoppingBag, AlertTriangle } from "lucide-react";
+import { BadgePercent, Banknote, Bike, Check, Clock, Loader2, MapPin, Plus, ShoppingBag, AlertTriangle } from "lucide-react";
 import { MapPicker, type Pin } from "@/components/map-picker";
 import { distanceKm, formatKm, type DeliveryZone } from "@/lib/geo";
 import { writeLocation } from "./location-picker";
@@ -36,7 +36,7 @@ type Info = {
   address: string | null;
 };
 
-type Quote = { subtotalCents: number; deliveryFeeCents: number | null; distanceKm: number | null; deliveryError: string | null; totalCents: number | null; currency: string; errors: Record<string, string>; lines: { lineTotalCents: number }[] };
+type Quote = { subtotalCents: number; discountCents: number; deliveryFeeWaivedCents: number; dealLabel: string | null; deliveryFeeCents: number | null; distanceKm: number | null; deliveryError: string | null; totalCents: number | null; currency: string; errors: Record<string, string>; lines: { lineTotalCents: number }[] };
 type SavedAddress = { id: string; label: string; area: string | null; address: string; building: string | null; notes: string | null; latitude: number | null; longitude: number | null; hasLocation: boolean; isDefault: boolean };
 type Profile = { user: { name: string; phone: string | null } | null; addresses: SavedAddress[] };
 type Details = { name: string; phone: string; address: string; building: string; area: string; notes: string };
@@ -216,7 +216,9 @@ export function Checkout() {
 
   const subtotal = quote?.subtotalCents ?? localSubtotal;
   const fee = method === "DELIVERY" ? (quote ? quote.deliveryFeeCents : estimate(point)?.feeCents ?? null) : 0;
-  const total = fee == null ? null : subtotal + fee;
+  const discount = quote?.discountCents ?? 0;
+  const waived = method === "DELIVERY" ? quote?.deliveryFeeWaivedCents ?? 0 : 0;
+  const total = fee == null ? null : subtotal - discount + fee;
   const quoteChanged = quote && quote.subtotalCents !== localSubtotal;
   const below = info?.minOrderCents && subtotal < info.minOrderCents;
   const unitLabel = currency === "LBP" ? "LBP" : "$";
@@ -401,8 +403,26 @@ export function Checkout() {
                 ))}
               </div>
               <div className="mt-2 space-y-1.5 border-t border-black/10 pt-3 text-sm">
+                {quote?.dealLabel && (discount > 0 || waived > 0) && (
+                  <div className="mb-1 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800" data-testid="deal-applied">
+                    <BadgePercent className="h-4 w-4 shrink-0" /> {t("Deal applied: {deal}", { deal: quote.dealLabel })}
+                  </div>
+                )}
                 <Row label={t("Subtotal")} value={quote ? formatMoney(subtotal, currency) : <Loader2 className="h-4 w-4 animate-spin" />} />
-                {method === "DELIVERY" && <Row label={t("Delivery fee")} value={fee == null ? "—" : fee === 0 ? t("Free") : formatMoney(fee, currency)} />}
+                {discount > 0 && <Row label={t("Deal discount")} value={<span className="text-emerald-700">−{formatMoney(discount, currency)}</span>} />}
+                {method === "DELIVERY" && (
+                  <Row
+                    label={t("Delivery fee")}
+                    value={
+                      fee == null ? "—" : waived > 0 ? (
+                        <span>
+                          <s className="me-1.5 text-ink-muted">{formatMoney(waived, currency)}</s>
+                          <span className="text-emerald-700">{t("Free")}</span>
+                        </span>
+                      ) : fee === 0 ? t("Free") : formatMoney(fee, currency)
+                    }
+                  />
+                )}
                 <Row label={t("Total")} value={total == null ? "—" : formatMoney(total, currency)} bold />
               </div>
             </div>

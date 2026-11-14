@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/server/auth";
 import { ReelFeed } from "@/components/customer/reel-feed";
 import { getFeed } from "@/server/feed";
 import { likedAndSaved } from "@/server/engagement";
+import { followedRestaurantIds } from "@/server/follows";
 import { getSettings } from "@/server/settings";
 import { customerLocation } from "@/server/location";
 import { getT } from "@/i18n/server";
@@ -17,7 +18,7 @@ export default async function HomePage() {
   const [t, loc, me, settings] = await Promise.all([getT(), customerLocation(), getCurrentUser(), getSettings()]);
   const feed = await getFeed({ cursor: 0, limit: 6, location: loc, viewerId: me?.id });
   warmUpFirstReel(feed.reels[0]);
-  const { liked, saved } = await likedAndSaved(feed.reels.map((r) => r.id));
+  const [{ liked, saved }, followed] = await Promise.all([likedAndSaved(feed.reels.map((r) => r.id)), followedRestaurantIds(me?.id, feed.reels.map((r) => r.restaurant.id))]);
   return (
     <main>
       <h1 className="sr-only">{t("numnum — food reels from Lebanese restaurants")}</h1>
@@ -26,7 +27,7 @@ export default async function HomePage() {
         const boot = firstReelBootScript(feed.reels[0], 0);
         return <script dangerouslySetInnerHTML={{ __html: boot }} />;
       })()}
-      <ReelFeed locationLabel={loc?.label ?? null} initial={feed.reels.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id) }))} initialCursor={feed.nextCursor} minViewMs={settings.minViewMs} />
+      <ReelFeed locationLabel={loc?.label ?? null} initial={feed.reels.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id), following: followed.has(r.restaurant.id) }))} initialCursor={feed.nextCursor} minViewMs={settings.minViewMs} />
     </main>
   );
 }

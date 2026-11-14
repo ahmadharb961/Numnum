@@ -3,10 +3,11 @@
 import { useMemo, useRef, useState } from "react";
 import { ReportButton } from "./report-button";
 import Link from "next/link";
-import { Check, Clock, Minus, Plus, Play } from "lucide-react";
+import { BadgePercent, Check, Clock, Minus, Plus, Play } from "lucide-react";
 import type { PublicItem } from "@/server/items";
 import { validateSelections, unitPrice, effectiveBounds, type Selections } from "@/lib/customization";
 import { formatMoney } from "@/lib/money";
+import { afterPercent, dealText } from "@/lib/deals";
 import { cn, compactNumber, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RatingPill, Stars, VerifiedBadge, Badge } from "@/components/ui/misc";
@@ -43,6 +44,8 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
   const v = useMemo(() => validateSelections(item.groups, selections), [item.groups, selections]);
   const unit = unitPrice(item.priceCents, v.unitOptionsCents);
   const total = unit * qty;
+  // A % deal lowers the shown price exactly as checkout will; other deals show as a badge.
+  const dealTotal = item.dealPercent ? afterPercent(total, item.dealPercent) : null;
   const canOrder = item.available && item.restaurant.orderingEnabled;
 
   function toggle(groupId: string, optionId: string, single: boolean, max: number) {
@@ -129,8 +132,20 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
         </Link>
         <div className="mt-1 flex items-start justify-between gap-3">
           <h2 className="text-2xl font-extrabold leading-tight tracking-tight">{item.name}</h2>
-          <div className="tabular shrink-0 pt-0.5 text-xl font-extrabold text-brand-600">{formatMoney(item.priceCents, item.currency)}</div>
+          <div className="shrink-0 pt-0.5 text-end">
+            <div className="tabular text-xl font-extrabold text-brand-600">{formatMoney(afterPercent(item.priceCents, item.dealPercent), item.currency)}</div>
+            {item.dealPercent ? <s className="tabular text-sm font-semibold text-ink-muted">{formatMoney(item.priceCents, item.currency)}</s> : null}
+          </div>
         </div>
+        {item.deal && (
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-800" data-testid="dish-deal">
+            <BadgePercent className="h-4 w-4 shrink-0" />
+            {(() => {
+              const d = dealText(item.deal, item.currency, item.deal.onDish ? item.name : null);
+              return t(d.k, d.v);
+            })()}
+          </div>
+        )}
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <RatingPill avg={item.ratingAvg} count={item.ratingCount} />
           {item.prepTimeMinutes ? (
@@ -272,7 +287,8 @@ export function ItemDetail({ item, reelId, onAdded, compact, navOffset }: { item
             </div>
             <Button size="lg" className="flex-1" onClick={() => doAdd(false)} aria-disabled={!v.ok}>
               <span>{t("Add to cart")}</span>
-              <span className="tabular opacity-90">· {formatMoney(total, item.currency)}</span>
+              <span className="tabular opacity-90">· {formatMoney(dealTotal ?? total, item.currency)}</span>
+              {dealTotal != null && <s className="tabular text-sm opacity-70">{formatMoney(total, item.currency)}</s>}
             </Button>
           </div>
         ) : (

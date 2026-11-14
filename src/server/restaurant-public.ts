@@ -1,4 +1,6 @@
 import "server-only";
+import { liveDeals } from "./deals";
+import { dealText, percentForDish, type DealLike } from "@/lib/deals";
 import { cache } from "react";
 import { getCurrentUser } from "./auth";
 import { prisma } from "./db";
@@ -9,7 +11,7 @@ import { prisma } from "./db";
  */
 export const getPublicRestaurant = cache(async function getPublicRestaurant(key: string, by: "slug" | "id" = "slug") {
   const where = by === "slug" ? { slug: key, status: "ACTIVE" as const } : { id: key, status: "ACTIVE" as const };
-  const [r, items, reels, sub, reviews] = await Promise.all([
+  const [r, items, reels, sub, reviews, dealRows] = await Promise.all([
     prisma.restaurant.findFirst({
       where,
       include: {
@@ -40,15 +42,18 @@ export const getPublicRestaurant = cache(async function getPublicRestaurant(key:
         select: { id: true, rating: true, foodQuality: true, service: true, value: true, delivery: true, body: true, evidence: true, reply: true, createdAt: true, user: { select: { name: true } } },
       }),
     ),
+    prisma.restaurant.findFirst({ where, select: { id: true } }).then((x) => (x ? liveDeals([x.id]) : new Map<string, DealLike[]>())),
   ]);
   if (!r) return null;
+  const deals = dealRows.get(r.id) ?? [];
 
   const sections = [
     ...r.menuCategories.map((c) => ({ id: c.id, name: c.name, items: items.filter((i) => i.menuCategoryId === c.id) })),
     { id: "other", name: "More", items: items.filter((i) => !i.menuCategoryId || !r.menuCategories.some((c) => c.id === i.menuCategoryId)) },
   ]
     .filter((s) => s.items.length)
-    .map((s) => ({ ...s, items: s.items.map(({ images, ...i }) => ({ ...i, image: images[0]?.asset ?? null })) }));
+    .map((s) => ({ ...s, items: s.items.map(({ images, ...i }) => ({ ...i, image: images[0]?.asset ?? null, dealPercent: percentForDish(deals, i.id) })) }));
+  const itemName = (id: string | null) => (id ? items.find((i) => i.id === id)?.name ?? null : null);
 
-  return { restaurant: r, sections, reels, reviews: reviews.map((x) => ({ ...x, userName: x.user.name.split(" ")[0] })), subRatings: sub._avg };
+  return { restaurant: r, sections, deals: deals.map((d) => ({ ...dealText(d, r.currency, itemName(d.menuItemId)), endsAt: d.endsAt ? new Date(d.endsAt).toISOString() : null })), reels, reviews: reviews.map((x) => ({ ...x, userName: x.user.name.split(" ")[0] })), subRatings: sub._avg };
 });

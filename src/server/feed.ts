@@ -1,4 +1,6 @@
 import "server-only";
+import { liveDeals } from "./deals";
+import { dealForDish, dealPrice, type ShownDeal } from "@/lib/deals";
 import { placeLabel } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
@@ -63,7 +65,7 @@ export async function getFeed(opts: { cursor?: number; limit?: number; location?
   );
   const page = ranked.slice(offset, offset + limit);
   return {
-    reels: page.map((r) => toPublicReel(r, opts.location)),
+    reels: await attachDeals(page.map((r) => toPublicReel(r, opts.location))),
     nextCursor: offset + limit < ranked.length ? offset + limit : null,
   };
 }
@@ -105,7 +107,19 @@ export function toPublicReel(r: ReelCard, location?: LatLng | null) {
       ratingCount: r.menuItem.ratingCount,
       available: r.menuItem.available,
     },
+    /** The restaurant's deal shown on this reel, and the dish's price after it (see attachDeals). */
+    deal: null as ShownDeal | null,
+    dealPriceCents: null as number | null,
   };
 }
 
 export type PublicReel = ReturnType<typeof toPublicReel>;
+
+/** Adds each reel's live deal (badge + the dish's deal price): one query for the whole page. */
+export async function attachDeals<R extends PublicReel>(reels: R[]): Promise<R[]> {
+  const deals = await liveDeals(reels.map((r) => r.restaurant.id));
+  return reels.map((r) => {
+    const list = deals.get(r.restaurant.id) ?? [];
+    return list.length ? { ...r, deal: dealForDish(list, r.item.id), dealPriceCents: dealPrice(list, r.item.id, r.item.priceCents) } : r;
+  });
+}

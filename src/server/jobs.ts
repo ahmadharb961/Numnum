@@ -1,4 +1,5 @@
 import "server-only";
+import { notifyFollowers } from "./follows";
 import { prisma } from "./db";
 import { processVideoAsset } from "./media";
 
@@ -63,6 +64,7 @@ async function handle(type: JobType, payload: Record<string, string>) {
         ...((payload.publish === "1" || reel.autoPublish) && reel.visibility === "DRAFT" ? { visibility: "PUBLISHED", publishedAt: new Date() } : {}),
       },
     });
+    if ((payload.publish === "1" || reel.autoPublish) && reel.visibility === "DRAFT" && !reel.publishedAt) void notifyFollowers(reel.restaurantId, { kind: "reel", reelId: reel.id });
   }
 }
 

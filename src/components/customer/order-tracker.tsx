@@ -1,5 +1,6 @@
 "use client";
 
+import { showDealSummary } from "@/lib/deals";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,7 +41,10 @@ type Order = {
   restaurantPhone: string | null;
   currency: string;
   subtotalCents: number;
+  discountCents: number;
   deliveryFeeCents: number;
+  deliveryFeeWaivedCents: number;
+  dealSummary: string | null;
   totalCents: number;
   changeForCents: number | null;
   customerName: string;
@@ -209,10 +213,16 @@ export function OrderTracker({ order: o, token, placed, loggedIn }: { order: Ord
               <span>{t("Subtotal")}</span>
               <span className="tabular">{formatMoney(o.subtotalCents, o.currency)}</span>
             </div>
+            {o.discountCents > 0 && (
+              <div className="flex justify-between text-emerald-700" data-testid="order-deal">
+                <span>{showDealSummary(t, o.dealSummary) ?? t("Deal discount")}</span>
+                <span className="tabular">−{formatMoney(o.discountCents, o.currency)}</span>
+              </div>
+            )}
             {delivery && (
               <div className="flex justify-between text-ink-muted">
                 <span>{t("Delivery fee")}</span>
-                <span className="tabular">{o.deliveryFeeCents ? formatMoney(o.deliveryFeeCents, o.currency) : t("Free")}</span>
+                <span className="tabular">{o.deliveryFeeWaivedCents > 0 ? <><s className="me-1.5">{formatMoney(o.deliveryFeeWaivedCents, o.currency)}</s><span className="text-emerald-700">{t("Free")}</span></> : o.deliveryFeeCents ? formatMoney(o.deliveryFeeCents, o.currency) : t("Free")}</span>
               </div>
             )}
             <div className="flex justify-between font-extrabold">

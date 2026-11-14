@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { unstable_cache } from "next/cache";
 import { getMainImages } from "./menu";
-import { publicReelWhere, reelCardSelect, toPublicReel } from "./feed";
+import { attachDeals, publicReelWhere, reelCardSelect, toPublicReel } from "./feed";
 
 export type SearchParams = {
   q?: string;
@@ -134,7 +134,7 @@ export async function searchReels(p: SearchParams) {
     skip: ((p.page ?? 1) - 1) * PAGE,
     take: PAGE,
   });
-  return reels.map((r) => toPublicReel(r));
+  return attachDeals(reels.map((r) => toPublicReel(r)));
 }
 
 export async function searchRestaurants(p: SearchParams) {

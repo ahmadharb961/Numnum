@@ -3,9 +3,10 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bookmark, ChevronLeft, Eye, FastForward, Heart, Loader2, MapPin, Play, Plus, Send, Volume2, VolumeX, RotateCcw, X } from "lucide-react";
+import { BadgePercent, Bookmark, Check, UserPlus, ChevronLeft, Eye, FastForward, Heart, Loader2, MapPin, Play, Plus, Send, Volume2, VolumeX, RotateCcw, X } from "lucide-react";
 import type { PublicReel } from "@/server/feed";
 import { formatMoney } from "@/lib/money";
+import { dealText } from "@/lib/deals";
 import { cn, compactNumber } from "@/lib/utils";
 import { VerifiedBadge, RatingPill } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
@@ -20,8 +21,9 @@ import { Logo } from "@/components/logo";
 import { useLocale, useT } from "@/i18n/client";
 import { useLoginGate } from "./login-gate";
 import { ReportButton } from "./report-button";
+import { ShareSheet } from "./share-sheet";
 
-export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean };
+export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean; /** The viewer follows this reel's restaurant. */ following?: boolean };
 
 type Props = {
   initial: FeedReel[];
@@ -52,11 +54,15 @@ function usePreconnect(url: string | null | undefined) {
 
 export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref, locationLabel = null }: Props) {
   const t = useT();
-  const { requireLogin, askLogin } = useLoginGate();
+  const { requireLogin, askLogin, loggedIn } = useLoginGate();
   const router = useRouter();
   const [reels, setReels] = useState<FeedReel[]>(initial);
   const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Home feed tabs: "For you" (ranked) and "Following" (newest from followed restaurants).
+  const [tab, setTab] = useState<"foryou" | "following">("foryou");
+  const [tabLoading, setTabLoading] = useState(false);
+  const forYou = useRef<{ reels: FeedReel[]; cursor: number | null } | null>(null);
   const [active, setActive] = useState(startIndex);
   const [incoming, setIncoming] = useState<number | null>(null);
   // Until the first reel plays, it gets the whole connection: no other reel's video or cover loads.
@@ -223,6 +229,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     try {
       const params = new URLSearchParams({ cursor: String(cursor) });
       if (excludeIds.length) params.set("exclude", excludeIds.join(","));
+      if (tab === "following") params.set("tab", "following");
       const res = await fetch(`/api/feed?${params}`);
       if (!res.ok) throw new Error();
       const data = (await res.json()) as { reels: FeedReel[]; nextCursor: number | null };
@@ -236,13 +243,61 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     } finally {
       setLoadingMore(false);
     }
-  }, [cursor, loadingMore, excludeIds, toast]);
+  }, [cursor, loadingMore, excludeIds, toast, tab]);
+
+  async function switchTab(next: "foryou" | "following") {
+    const root = containerRef.current;
+    if (next === tab) {
+      root?.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (tab === "foryou") forYou.current = { reels, cursor };
+    setTab(next);
+    setActive(0);
+    setIncoming(null);
+    setBuffered(new Set());
+    root?.scrollTo({ top: 0 });
+    if (next === "foryou" && forYou.current) {
+      setReels(forYou.current.reels);
+      setCursor(forYou.current.cursor);
+      return;
+    }
+    setReels([]);
+    setCursor(null);
+    if (next === "following" && !loggedIn) return; // the empty state asks them to log in
+    setTabLoading(true);
+    try {
+      const res = await fetch(next === "following" ? "/api/feed?tab=following" : "/api/feed");
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as { reels: FeedReel[]; nextCursor: number | null };
+      setReels(data.reels);
+      setCursor(data.nextCursor);
+    } catch {
+      toast("Couldn't load more reels. Check your connection.", "error");
+    } finally {
+      setTabLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (active >= reels.length - 3) void loadMore();
   }, [active, reels.length, loadMore]);
 
   const patch = (id: string, p: Partial<FeedReel>) => setReels((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)));
+
+  async function follow(r: FeedReel) {
+    if (!requireLogin("follow", `/reel/${r.id}`)) return;
+    const rid = r.restaurant.id;
+    const set = (v: boolean) => setReels((rs) => rs.map((x) => (x.restaurant.id === rid ? { ...x, following: v } : x)));
+    set(true);
+    try {
+      await api("/api/follow", { restaurantId: rid, follow: true });
+      toast(t("Following {name}", { name: r.restaurant.name }), "success");
+    } catch {
+      set(false);
+      toast("Couldn't follow. Check your connection.", "error");
+    }
+  }
 
   async function like(r: FeedReel) {
     if (!requireLogin("like", `/reel/${r.id}`)) return;
@@ -269,28 +324,17 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     }
   }
 
-  async function share(r: FeedReel) {
-    const url = `${location.origin}/reel/${r.id}`;
-    const title = t("{dish} at {restaurant}", { dish: r.item.name, restaurant: r.restaurant.name });
-    track("reel_shared", { reelId: r.id });
-    patch(r.id, { shareCount: r.shareCount + 1 });
-    try {
-      if (navigator.share) await navigator.share({ title, text: t("{title} on numnum", { title }), url });
-      else {
-        await navigator.clipboard.writeText(url);
-        toast("Link copied");
-      }
-    } catch (e) {
-      if ((e as Error).name !== "AbortError") {
-        try {
-          await navigator.clipboard.writeText(url);
-          toast("Link copied");
-        } catch {
-          prompt(t("Copy this link"), url);
-        }
-      }
-    }
+  // Share: WhatsApp first, then copy link / the phone's menu (ShareSheet).
+  const [shareFor, setShareFor] = useState<FeedReel | null>(null);
+  function share(r: FeedReel) {
+    setShareFor(r);
   }
+  const shareMessage = (r: FeedReel) => {
+    const price = formatMoney(r.dealPriceCents ?? r.item.priceCents, r.item.currency);
+    const deal = r.deal ? (() => { const d = dealText(r.deal, r.item.currency, r.deal.onDish ? r.item.name : null); return ` · ${t(d.k, d.v)}`; })() : "";
+    return `${t("{dish} at {restaurant}", { dish: r.item.name, restaurant: r.restaurant.name })} · ${price}${deal} 🔥`;
+  };
+
 
   return (
     <div className={cn("relative bg-black text-white transition-[padding] duration-300", panel && "lg:pe-[400px]")}>
@@ -307,8 +351,18 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
           </span>
         </div>
       )}
+      {!fixed && !backHref && (
+        <div className="absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-5 text-[15px] font-extrabold text-shadow lg:top-4" style={{ top: "calc(var(--safe-top) + 60px)" }} role="tablist" aria-label={t("Feed")}>
+          {(["foryou", "following"] as const).map((k) => (
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => switchTab(k)} className={cn("relative pb-1.5 transition", tab === k ? "text-white" : "text-white/60")} data-testid={`tab-${k}`}>
+              {k === "foryou" ? t("For you") : t("Following")}
+              {tab === k && <span className="absolute inset-x-1 bottom-0 h-[3px] rounded-full bg-white" />}
+            </button>
+          ))}
+        </div>
+      )}
       {soundBlocked && (
-        <button onClick={toggleMute} className={cn("absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/60 px-3.5 py-2 text-xs font-bold backdrop-blur")} style={{ top: "calc(var(--safe-top) + 64px)" }}>
+        <button onClick={toggleMute} className={cn("absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/60 px-3.5 py-2 text-xs font-bold backdrop-blur")} style={{ top: `calc(var(--safe-top) + ${!fixed && !backHref ? 104 : 64}px)` }}>
           <VolumeX className="h-4 w-4" /> {t("Tap for sound")}
         </button>
       )}
@@ -328,6 +382,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
             if (!prefersMuted) setSoundBlocked(true);
           },
           justUnlocked: () => Date.now() - unlockedAt.current < 700,
+          follow,
           like,
           save,
           share,
@@ -336,6 +391,20 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
         };
         return null;
       })()}
+      {shareFor && (
+        <ShareSheet
+          open
+          onClose={() => setShareFor(null)}
+          title={t("{dish} at {restaurant}", { dish: shareFor.item.name, restaurant: shareFor.restaurant.name })}
+          message={shareMessage(shareFor)}
+          path={`/reel/${shareFor.id}`}
+          onShared={(via) => {
+            track("reel_shared", { reelId: shareFor.id });
+            patch(shareFor.id, { shareCount: shareFor.shareCount + 1 });
+            void via;
+          }}
+        />
+      )}
       <div ref={containerRef} className="h-feed snap-feed no-scrollbar overflow-y-scroll">
         {reels.map((r, i) => (
           <ReelSlide
@@ -356,7 +425,31 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
             actions={actions}
           />
         ))}
-        {reels.length === 0 && (
+        {reels.length === 0 && tab === "following" && (
+          <div className="grid h-feed place-items-center px-8 text-center" data-testid="following-empty">
+            {tabLoading ? (
+              <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+            ) : (
+              <div>
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/10">
+                  <UserPlus className="h-8 w-8" />
+                </div>
+                <h2 className="mt-4 text-xl font-bold">{loggedIn ? t("You're not following any restaurants yet") : t("Follow your favourite restaurants")}</h2>
+                <p className="mt-1 text-sm text-white/70">{t("Tap + on a restaurant's picture in any reel. Their new reels and deals show up here, and we'll let you know.")}</p>
+                {loggedIn ? (
+                  <button onClick={() => switchTab("foryou")} className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-500 px-5 font-semibold">
+                    {t("Discover reels")}
+                  </button>
+                ) : (
+                  <button onClick={() => askLogin("follow", "/")} className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-500 px-5 font-semibold">
+                    {t("Log in")}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {reels.length === 0 && tab === "foryou" && (
           <div className="grid h-feed place-items-center px-8 text-center">
             <div>
               <div className="text-5xl">🍔</div>
@@ -382,6 +475,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
 
 type SlideActions = {
   soundBlocked: () => void;
+  follow: (r: FeedReel) => void;
   justUnlocked: () => boolean;
   like: (r: FeedReel) => void;
   save: (r: FeedReel) => void;
@@ -431,6 +525,12 @@ const ReelSlide = memo(function ReelSlide({
   const onShare = () => actions.current.share(reel);
   const onRestaurant = () => actions.current.restaurant();
   const onOpen = () => actions.current.open(reel);
+  const [justFollowed, setJustFollowed] = useState(false);
+  const onFollow = () => {
+    actions.current.follow(reel);
+    setJustFollowed(true);
+    setTimeout(() => setJustFollowed(false), 1500);
+  };
   // Pooled <video> elements exist only in the browser: attach after mount (poster shows meanwhile).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -704,7 +804,7 @@ const ReelSlide = memo(function ReelSlide({
       />
       {/* Below the top bar (logo, location, sound) and the "Tap for sound" pill. */}
       {fast && (
-        <div className="pointer-events-none absolute left-1/2 z-[3] flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/55 px-3 py-1.5 text-sm font-bold text-white backdrop-blur" style={{ top: "calc(var(--safe-top) + 112px)" }} role="status" aria-label={t("Playing at 2x speed")}>
+        <div className="pointer-events-none absolute left-1/2 z-[3] flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/55 px-3 py-1.5 text-sm font-bold text-white backdrop-blur" style={{ top: "calc(var(--safe-top) + 150px)" }} role="status" aria-label={t("Playing at 2x speed")}>
           2× <FastForward className="h-4 w-4 fill-white rtl:-scale-x-100" />
         </div>
       )}
@@ -754,6 +854,16 @@ const ReelSlide = memo(function ReelSlide({
             )}
           </span>
         </Link>
+        {/* TikTok-style follow: + under the restaurant's picture; turns into a check once followed. */}
+        {!reel.following ? (
+          <button onClick={onFollow} className="-mt-4 mb-1 grid h-6 w-6 place-items-center rounded-full bg-brand-500 shadow-md ring-2 ring-black/20 active:scale-90" aria-label={t("Follow {name}", { name: reel.restaurant.name })} data-testid="follow-button">
+            <Plus className="h-4 w-4" strokeWidth={3} />
+          </button>
+        ) : justFollowed ? (
+          <span className="-mt-4 mb-1 grid h-6 w-6 place-items-center rounded-full bg-white text-brand-600 shadow-md" aria-label={t("Following")}>
+            <Check className="h-4 w-4" strokeWidth={3} />
+          </span>
+        ) : null}
         <RailButton onClick={onLike} label={compactNumber(reel.likeCount)} aria={reel.liked ? t("Unlike") : t("Like")}>
           <Heart className={cn("h-8 w-8 drop-shadow", reel.liked ? "fill-brand-500 text-brand-500" : "fill-white/10")} />
         </RailButton>
@@ -789,15 +899,29 @@ const ReelSlide = memo(function ReelSlide({
           <div className="flex items-center gap-2">
             <span className="text-xl font-extrabold leading-tight text-shadow">{reel.item.name}</span>
           </div>
-          <div className="mt-1 flex items-center gap-2.5">
-            <span className="tabular text-lg font-extrabold text-brand-300 text-shadow">{formatMoney(reel.item.priceCents, reel.item.currency)}</span>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            {reel.dealPriceCents != null ? (
+              <>
+                <span className="tabular text-lg font-extrabold text-brand-300 text-shadow">{formatMoney(reel.dealPriceCents, reel.item.currency)}</span>
+                <s className="tabular text-sm font-semibold text-white/60">{formatMoney(reel.item.priceCents, reel.item.currency)}</s>
+              </>
+            ) : (
+              <span className="tabular text-lg font-extrabold text-brand-300 text-shadow">{formatMoney(reel.item.priceCents, reel.item.currency)}</span>
+            )}
             <RatingPill avg={reel.item.ratingAvg} count={reel.item.ratingCount} dark />
           </div>
         </button>
+        {reel.deal && (
+          // The restaurant's deal: badge, plus what it is in full ("20% off orders over $20").
+          <button onClick={onOpen} className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1 text-xs font-extrabold text-white shadow-md shadow-emerald-900/30" data-testid="reel-deal">
+            <BadgePercent className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{(() => { const d = dealText(reel.deal, reel.item.currency, reel.deal.onDish ? reel.item.name : null); return t(d.k, d.v); })()}</span>
+          </button>
+        )}
         {(reel.caption || reel.item.description) && <ReelCaption text={(reel.caption || reel.item.description)!} />}
         {reel.restaurant.orderingEnabled && reel.item.available ? (
           <button onClick={onOpen} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 text-base font-bold shadow-lg shadow-brand-500/40 active:scale-[0.98]">
-            {t("Order")} · {formatMoney(reel.item.priceCents, reel.item.currency)}
+            {t("Order")} · {formatMoney(reel.dealPriceCents ?? reel.item.priceCents, reel.item.currency)}
           </button>
         ) : (
           <button onClick={onOpen} className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-white/15 text-sm font-bold backdrop-blur">

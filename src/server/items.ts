@@ -1,11 +1,13 @@
 import "server-only";
+import { liveDeals } from "./deals";
+import { dealForDish, percentForDish } from "@/lib/deals";
 import { placeLabel } from "@/lib/utils";
 import { getCurrentUser } from "./auth";
 import { prisma } from "./db";
 
 export async function getPublicItem(id: string) {
   // Everything at once: the dish, its reviews (leaving out people the visitor blocked) and the star counts.
-  const [item, reviews, dist] = await Promise.all([
+  const [item, reviews, dist, dealMap] = await Promise.all([
     prisma.menuItem.findFirst({
       where: { id, archived: false, restaurant: { status: "ACTIVE" } },
       include: {
@@ -26,6 +28,7 @@ export async function getPublicItem(id: string) {
       }),
     ),
     prisma.itemReview.groupBy({ by: ["rating"], where: { menuItemId: id, status: "VISIBLE" }, _count: true }),
+    prisma.menuItem.findUnique({ where: { id }, select: { restaurantId: true } }).then((m) => (m ? liveDeals([m.restaurantId]) : new Map())),
   ]);
   if (!item) return null;
   return {
@@ -67,6 +70,9 @@ export async function getPublicItem(id: string) {
     reels: item.reels,
     reviews: reviews.map((r) => ({ ...r, userName: r.user.name.split(" ")[0], createdAt: r.createdAt.toISOString() })),
     distribution: [5, 4, 3, 2, 1].map((s) => ({ stars: s, count: dist.find((d) => d.rating === s)?._count ?? 0 })),
+    // The restaurant's deal on this dish (badge) and the % that lowers its shown price.
+    deal: dealForDish(dealMap.get(item.restaurant.id) ?? [], item.id),
+    dealPercent: percentForDish(dealMap.get(item.restaurant.id) ?? [], item.id),
   };
 }
 

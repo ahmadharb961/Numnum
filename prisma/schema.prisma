@@ -7,7 +7,7 @@
 //    reference mutable menu prices for financial values.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   // Linked records (include/select) are fetched in the same query instead of one query after another.
   previewFeatures = ["relationJoins"]
 }
@@ -50,6 +50,7 @@ model User {
   restReviews   RestaurantReview[]
   notifications Notification[]
   auditLogs     AuditLog[]
+  follows       RestaurantFollow[]
 
   @@map("users")
 }
@@ -200,6 +201,9 @@ model Restaurant {
   reviews           RestaurantReview[]
   notifications     Notification[]
   importJobs        MenuImport[]
+  deals             Deal[]
+  followers         RestaurantFollow[]
+  followerCount     Int                      @default(0)
   // Search: name, cuisine, area and the dishes it serves, normalized (see src/server/search-text.ts).
   searchName        String                   @default("")
   searchText        String                   @default("")
@@ -362,6 +366,7 @@ model MenuItem {
   customizations MenuItemCustomizationGroup[]
   reels          Reel[]
   reviews        ItemReview[]
+  deals          Deal[]
   orderItems     OrderItem[]
 
   // Search: normalized text kept up to date by src/server/search-text.ts (NULL searchedAt = needs refresh).
@@ -648,65 +653,71 @@ enum PaymentMethod {
 }
 
 model Order {
-  id                  String           @id @default(cuid())
-  reference           String           @unique
-  idempotencyKey      String           @unique
-  trackingToken       String           @unique // lets a guest open their order page from any device
-  restaurantId        String
-  userId              String? // set when ordered while logged in (or claimed later from the same device)
-  status              OrderStatus      @default(PLACED)
-  fulfillment         Fulfillment
-  paymentMethod       PaymentMethod    @default(CASH_ON_DELIVERY)
-  changeForCents      Int? // customer pays with a larger bill; driver brings change
-  customerName        String
-  customerPhone       String
-  address             String?
-  building            String?
-  notes               String?
-  mapsUrl             String?
-  latitude            Float?
-  longitude           Float?
-  deliveryArea        String?
-  currency            String
-  subtotalCents       Int
-  deliveryFeeCents    Int              @default(0)
-  totalCents          Int // cash to collect
+  id                     String           @id @default(cuid())
+  reference              String           @unique
+  idempotencyKey         String           @unique
+  trackingToken          String           @unique // lets a guest open their order page from any device
+  restaurantId           String
+  userId                 String? // set when ordered while logged in (or claimed later from the same device)
+  status                 OrderStatus      @default(PLACED)
+  fulfillment            Fulfillment
+  paymentMethod          PaymentMethod    @default(CASH_ON_DELIVERY)
+  changeForCents         Int? // customer pays with a larger bill; driver brings change
+  customerName           String
+  customerPhone          String
+  address                String?
+  building               String?
+  notes                  String?
+  mapsUrl                String?
+  latitude               Float?
+  longitude              Float?
+  deliveryArea           String?
+  currency               String
+  subtotalCents          Int
+  /// The restaurant's deal at order time: amount off the food (snapshot, restaurant currency).
+  discountCents          Int              @default(0)
+  deliveryFeeCents       Int              @default(0)
+  /// Delivery fee the deal waived ("free delivery"); deliveryFeeCents is then 0.
+  deliveryFeeWaivedCents Int              @default(0)
+  /// What the deal was, as shown to the customer at order time (e.g. "20% off · Free delivery").
+  dealSummary            String?
+  totalCents             Int // cash to collect
   // Commission base is always stored in USD cents
-  commissionBaseCents Int
-  exchangeRate        Float? // LBP per USD applied at order time, when currency != USD
-  restaurantName      String
-  restaurantPhone     String?
-  estimatedMinutes    Int?
-  distanceKm          Float?
-  reviewedAt          DateTime?
-  reviewDismissedAt   DateTime?
-  deviceKey           String?
-  ipHash              String?
-  acceptedAt          DateTime?
-  preparingAt         DateTime?
-  dispatchedAt        DateTime? // out for delivery / ready for pickup
-  completedAt         DateTime?
-  autoCompleted       Boolean          @default(false)
-  rejectedAt          DateTime?
-  rejectionReason     String?
-  canceledAt          DateTime?
-  canceledBy          String? // CUSTOMER | ADMIN
-  cancelReason        String?
-  failedAt            DateTime?
-  failureReason       String?
+  commissionBaseCents    Int
+  exchangeRate           Float? // LBP per USD applied at order time, when currency != USD
+  restaurantName         String
+  restaurantPhone        String?
+  estimatedMinutes       Int?
+  distanceKm             Float?
+  reviewedAt             DateTime?
+  reviewDismissedAt      DateTime?
+  deviceKey              String?
+  ipHash                 String?
+  acceptedAt             DateTime?
+  preparingAt            DateTime?
+  dispatchedAt           DateTime? // out for delivery / ready for pickup
+  completedAt            DateTime?
+  autoCompleted          Boolean          @default(false)
+  rejectedAt             DateTime?
+  rejectionReason        String?
+  canceledAt             DateTime?
+  canceledBy             String? // CUSTOMER | ADMIN
+  cancelReason           String?
+  failedAt               DateTime?
+  failureReason          String?
   // Rejected / not-delivered orders: the customer is asked to confirm the restaurant's version.
   // CONFIRMED (that's right) | RECEIVED (they got the food) | NOT_CANCELED (they didn't cancel)
-  customerVerdict     String?
-  customerVerdictAt   DateTime?
-  suspicious          Boolean          @default(false)
-  suspiciousReason    String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  restaurant          Restaurant       @relation(fields: [restaurantId], references: [id])
-  user                User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  items               OrderItem[]
-  events              OrderEvent[]
-  commission          CommissionEvent?
+  customerVerdict        String?
+  customerVerdictAt      DateTime?
+  suspicious             Boolean          @default(false)
+  suspiciousReason       String?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  restaurant             Restaurant       @relation(fields: [restaurantId], references: [id])
+  user                   User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items                  OrderItem[]
+  events                 OrderEvent[]
+  commission             CommissionEvent?
 
   @@index([restaurantId, status, createdAt])
   @@index([userId, createdAt])
@@ -1111,4 +1122,47 @@ model UserBlock {
   @@unique([userId, blockedUserId])
   @@index([userId])
   @@map("user_blocks")
+}
+
+enum DealKind {
+  PERCENT_OFF
+  AMOUNT_OFF
+  FREE_DELIVERY
+}
+
+/// A restaurant's offer: % or amount off (the whole menu or one dish), or free delivery,
+/// optionally above a minimum order and until an end date. Applied by the server when pricing.
+model Deal {
+  id               String     @id @default(cuid())
+  restaurantId     String
+  kind             DealKind
+  percent          Int? // PERCENT_OFF: 1–90
+  amountCents      Int? // AMOUNT_OFF, in the restaurant's currency
+  minSubtotalCents Int? // only above this order subtotal
+  menuItemId       String? // one dish; null = the whole menu
+  startsAt         DateTime   @default(now())
+  endsAt           DateTime?
+  endedAt          DateTime? // ended early from the dashboard
+  createdById      String?
+  createdAt        DateTime   @default(now())
+  restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItem         MenuItem?  @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, endedAt])
+  @@map("deals")
+}
+
+/// A customer following a restaurant: its new reels and deals show in their "Following" feed and
+/// reach them as notifications (at most one per restaurant per lastNotifiedAt window).
+model RestaurantFollow {
+  userId         String
+  restaurantId   String
+  createdAt      DateTime   @default(now())
+  lastNotifiedAt DateTime?
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@id([userId, restaurantId])
+  @@index([restaurantId])
+  @@map("restaurant_follows")
 }

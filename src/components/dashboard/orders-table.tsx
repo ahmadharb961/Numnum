@@ -1,5 +1,6 @@
 "use client";
 
+import { showDealSummary } from "@/lib/deals";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Banknote, Bike, Check, ChevronDown, Clock, MapPin, Phone, X } from "lucide-react";
@@ -31,7 +32,10 @@ type Order = {
   mapsUrl: string | null;
   currency: string;
   subtotalCents: number;
+  discountCents: number;
   deliveryFeeCents: number;
+  deliveryFeeWaivedCents: number;
+  dealSummary: string | null;
   totalCents: number;
   changeForCents: number | null;
   estimatedMinutes: number | null;
@@ -217,10 +221,16 @@ export function OrdersTable({ orders, defaultEta, restaurantName }: { orders: Or
                       <span>{t("Subtotal")}</span>
                       <span className="tabular">{formatMoney(o.subtotalCents, o.currency)}</span>
                     </div>
+                    {o.discountCents > 0 && (
+                      <div className="flex justify-between text-emerald-700" data-testid="order-deal">
+                        <span>{showDealSummary(t, o.dealSummary) ?? t("Deal discount")}</span>
+                        <span className="tabular">−{formatMoney(o.discountCents, o.currency)}</span>
+                      </div>
+                    )}
                     {delivery && (
                       <div className="flex justify-between text-ink-muted">
                         <span>{t("Delivery fee")}</span>
-                        <span className="tabular">{formatMoney(o.deliveryFeeCents, o.currency)}</span>
+                        <span className="tabular">{o.deliveryFeeWaivedCents > 0 ? <><s className="me-1.5">{formatMoney(o.deliveryFeeWaivedCents, o.currency)}</s><span className="text-emerald-700">{t("Free (your deal)")}</span></> : formatMoney(o.deliveryFeeCents, o.currency)}</span>
                       </div>
                     )}
                     <div className="flex justify-between font-bold">
