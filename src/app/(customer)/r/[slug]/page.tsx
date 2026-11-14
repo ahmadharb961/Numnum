@@ -3,11 +3,11 @@ import { BlockedNotice } from "@/components/customer/blocked-notice";
 import { restaurantBlockFor } from "@/server/blocks";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { BadgeCheck, Bike, ChevronLeft, ChevronRight, Clapperboard, Clock, ConciergeBell, Globe, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, UtensilsCrossed } from "lucide-react";
+import { BadgeCheck, BadgePercent, Bike, ChevronLeft, ChevronRight, Clapperboard, Clock, ConciergeBell, Globe, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, UtensilsCrossed } from "lucide-react";
 import { getPublicRestaurant } from "@/server/restaurant-public";
 import { ownerKey } from "@/server/engagement";
 import { prisma } from "@/server/db";
-import { ProfileTabs, SaveToggle, ShareButton } from "@/components/customer/restaurant-profile";
+import { FollowButton, ProfileTabs, SaveToggle, ShareButton } from "@/components/customer/restaurant-profile";
 import { VerifiedBadge, Stars, Badge, EmptyState } from "@/components/ui/misc";
 import { DAYS, DAY_LABELS, isOpenAt, type OpeningHours } from "@/lib/hours";
 import { formatPhone, isLebaneseMobile } from "@/lib/phone";
@@ -21,6 +21,8 @@ import { formatMoney } from "@/lib/money";
 import { DeliverToButton } from "@/components/customer/location-picker";
 import { RestaurantViewTracker } from "@/components/customer/item-view-tracker";
 import { getLocale, getT } from "@/i18n/server";
+import { getCurrentUser } from "@/server/auth";
+import { followedRestaurantIds } from "@/server/follows";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +35,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: `${r.displayName}${r.area ? ` · ${r.area}` : ""}`,
     description,
     alternates: { canonical: `/r/${r.slug}` },
-    openGraph: { title: r.displayName, description, images: r.coverUrl || r.logoUrl ? [{ url: (r.coverUrl || r.logoUrl)! }] : undefined },
+    openGraph: { title: r.displayName, description, siteName: "numnum", images: [{ url: `/og/restaurant/${r.slug}.jpg`, width: 1200, height: 630, alt: r.displayName }] },
+    twitter: { card: "summary_large_image", title: r.displayName, description, images: [`/og/restaurant/${r.slug}.jpg`] },
   };
 }
 
@@ -42,11 +45,12 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
   const lang = await getLocale();
   const data = await getPublicRestaurant((await params).slug);
   if (!data) notFound();
-  const { restaurant: r, sections, reels, reviews, subRatings } = data;
-  const [blocked, saved, loc] = await Promise.all([
+  const { restaurant: r, sections, reels, reviews, subRatings, deals } = data;
+  const [blocked, saved, loc, following] = await Promise.all([
     restaurantBlockFor(r.id),
     ownerKey().then((key) => (key ? prisma.savedItem.findUnique({ where: { ownerKey_type_refId: { ownerKey: key, type: "RESTAURANT", refId: r.id } } }).then(Boolean) : false)),
     customerLocation(),
+    getCurrentUser().then(async (me) => (me ? (await followedRestaurantIds(me.id, [r.id])).has(r.id) : false)),
   ]);
   if (blocked) return <BlockedNotice blockId={blocked.id} name={r.displayName} />;
   const dq = loc ? quoteDelivery(r, loc) : null;
@@ -237,7 +241,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           </Link>
           <div className="flex gap-2.5">
             <SaveToggle heart type="RESTAURANT" refId={r.id} initial={saved} className="grid h-11 w-11 place-items-center rounded-full bg-white/95 shadow-md backdrop-blur active:scale-90" />
-            <ShareButton title={r.displayName} path={`/r/${r.slug}`} className="grid h-11 w-11 place-items-center rounded-full bg-white/95 text-ink shadow-md backdrop-blur">
+            <ShareButton title={r.displayName} message={t("{name} on numnum: watch their reels and order", { name: r.displayName })} path={`/r/${r.slug}`} className="grid h-11 w-11 place-items-center rounded-full bg-white/95 text-ink shadow-md backdrop-blur">
               <Share2 className="h-5 w-5" />
             </ShareButton>
           </div>
@@ -257,6 +261,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           {r.displayName}
           {r.verificationStatus === "APPROVED" && <VerifiedBadge className="[&_svg]:h-6 [&_svg]:w-6" />}
         </h1>
+        <FollowButton restaurantId={r.id} initial={following} initialCount={r.followerCount} className="mt-2" />
         <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[15px] text-ink-muted">
           {r.cuisine && (
             <span className="inline-flex items-center gap-1.5">
@@ -330,6 +335,21 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
       </div>
 
       <div className="mt-4">
+        {deals.length > 0 && (
+          <div className="mx-4 mb-3 rounded-2xl bg-emerald-50 p-3 ring-1 ring-emerald-100 lg:mx-0" data-testid="restaurant-deals">
+            <div className="mb-1 flex items-center gap-1.5 text-sm font-extrabold text-emerald-800">
+              <BadgePercent className="h-4 w-4" /> {t("Deals")}
+            </div>
+            <ul className="space-y-0.5 text-sm text-emerald-900">
+              {deals.map((d, i) => (
+                <li key={i}>
+                  {t(d.k, d.v)}
+                  {d.endsAt && <span className="text-emerald-700/80"> · {t("until {date}", { date: formatDate(d.endsAt, { dateStyle: "medium" }, lang) })}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <ProfileTabs slug={r.slug} sections={sections} reels={reels} orderingEnabled={r.orderingEnabled} about={about} reviews={reviewsTab} />
       </div>
     </main>

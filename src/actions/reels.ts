@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/server/db";
+import { notifyFollowers } from "@/server/follows";
 import { requireRestaurant } from "@/server/auth";
 import { enqueue } from "@/server/jobs";
 import { audit } from "@/server/audit";
@@ -74,6 +75,8 @@ export async function setReelVisibilityAction(id: string, publish: boolean): Pro
       if (ctx.restaurant.restrictReels) return { ok: false, error: "Publishing reels is restricted until outstanding invoices are settled" };
     }
     await prisma.reel.update({ where: { id }, data: { visibility: publish ? "PUBLISHED" : "UNPUBLISHED", publishedAt: publish ? reel.publishedAt ?? new Date() : reel.publishedAt } });
+    // First time it goes live: followers hear about it (re-publishing doesn't notify again).
+    if (publish && !reel.publishedAt) void notifyFollowers(ctx.restaurant.id, { kind: "reel", reelId: id });
     revalidatePath("/dashboard/reels");
     revalidatePath(`/dashboard/reels/${id}`);
     return { ok: true, message: publish ? "Reel published" : "Reel unpublished" };

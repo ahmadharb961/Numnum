@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { priceCart, orderInputSchema } from "@/server/orders";
+import { dealsForCart } from "@/server/deals";
+import { dealSummaryOf, showDealSummary } from "@/lib/deals";
 import { getLocale, tFor } from "@/i18n/server";
 import { errorResponse, json, limit, readJson } from "@/server/http";
 import { prisma } from "@/server/db";
@@ -50,12 +52,19 @@ export async function POST(req: Request) {
               : t("{name} hasn't set up delivery yet", { name: r.displayName });
       }
     }
+    // Same deal logic as placing the order, so the preview equals the charge.
+    const deal = await dealsForCart(body.restaurantId, priced.lines, priced.subtotalCents, deliveryFeeCents ?? 0);
+    const fee = deliveryFeeCents == null ? null : deliveryFeeCents - deal.deliveryFeeWaivedCents;
+    const itemName = (id: string) => priced.lines.find((l) => l.menuItemId === id)?.name ?? null;
     return json({
       subtotalCents: priced.subtotalCents,
-      deliveryFeeCents,
+      discountCents: deal.discountCents,
+      deliveryFeeWaivedCents: deal.deliveryFeeWaivedCents,
+      dealLabel: showDealSummary(t, dealSummaryOf(deal, priced.currency, itemName)),
+      deliveryFeeCents: fee,
       distanceKm,
       deliveryError,
-      totalCents: deliveryFeeCents == null ? null : priced.subtotalCents + deliveryFeeCents,
+      totalCents: fee == null ? null : priced.subtotalCents - deal.discountCents + fee,
       currency: priced.currency,
       errors: priced.fieldErrors,
       lines: priced.lines.map((l) => ({ menuItemId: l.menuItemId, name: l.name, quantity: l.quantity, unitTotalCents: l.unitTotalCents, lineTotalCents: l.lineTotalCents })),

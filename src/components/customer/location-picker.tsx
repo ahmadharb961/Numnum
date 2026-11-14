@@ -39,9 +39,19 @@ export function writeLocation(l: Loc) {
 }
 
 /** "Deliver to …" chip: GPS, a saved address, or a pin on the map. Drives distance checks everywhere. */
-export function LocationChip({ label, dark, className }: { label: string | null; dark?: boolean; className?: string }) {
+export function LocationChip({ label, dark, className, compact }: { label: string | null; dark?: boolean; className?: string; compact?: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  if (compact)
+    // Reel feed top bar: just the pin (orange once a delivery location is set).
+    return (
+      <>
+        <button onClick={() => setOpen(true)} className={cn("grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur", className)} aria-label={label ? t("Delivering to {place}", { place: label }) : t("Set your delivery location")} data-testid="location-pin">
+          <MapPin className={cn("h-5 w-5", label ? "fill-brand-500/30 text-brand-400" : "text-white")} />
+        </button>
+        <LocationSheet open={open} onClose={() => setOpen(false)} />
+      </>
+    );
   return (
     <>
       <button onClick={() => setOpen(true)} className={cn("inline-flex max-w-[62vw] items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold", dark ? "bg-black/40 text-white backdrop-blur" : "bg-white text-ink shadow-sm", className)} aria-label={t("Change delivery location")}>

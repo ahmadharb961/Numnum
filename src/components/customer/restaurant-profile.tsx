@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Grid3x3, Heart, Info, PlayCircle, Plus, Star, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, Grid3x3, Heart, Info, PlayCircle, Plus, Star, UtensilsCrossed, Check, UserPlus } from "lucide-react";
 import { formatMoney } from "@/lib/money";
-import { cn } from "@/lib/utils";
+import { afterPercent } from "@/lib/deals";
+import { ShareSheet } from "./share-sheet";
+import { cn, compactNumber } from "@/lib/utils";
 import { RatingPill, EmptyState } from "@/components/ui/misc";
 import { ReelThumb } from "./cards";
 import { ItemSheet, prefetchItem } from "./item-sheet";
 import { useT } from "@/i18n/client";
 import { useLoginGate } from "./login-gate";
 
-type Item = { id: string; name: string; description: string | null; priceCents: number; currency: string; ratingAvg: number; ratingCount: number; available: boolean; dietaryLabels: string[]; image: { url: string; thumbUrl: string | null } | null };
+type Item = { id: string; name: string; description: string | null; priceCents: number; currency: string; ratingAvg: number; ratingCount: number; available: boolean; dietaryLabels: string[]; image: { url: string; thumbUrl: string | null } | null; dealPercent?: number | null };
 type Section = { id: string; name: string; items: Item[] };
 type Reel = { id: string; posterUrl: string | null; viewCount: number; menuItem: { name: string } };
 
@@ -133,7 +135,13 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
                         <div className="line-clamp-1 text-[15px] font-bold">{i.name}</div>
                         {i.description && <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-ink-muted">{i.description}</p>}
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="tabular text-[15px] font-extrabold">{formatMoney(i.priceCents, i.currency)}</span>
+                          <span className="tabular text-[15px] font-extrabold">{formatMoney(afterPercent(i.priceCents, i.dealPercent), i.currency)}</span>
+                          {i.dealPercent ? (
+                            <>
+                              <s className="tabular text-xs text-ink-muted">{formatMoney(i.priceCents, i.currency)}</s>
+                              <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[11px] font-extrabold text-emerald-700">−{i.dealPercent}%</span>
+                            </>
+                          ) : null}
                           {i.ratingCount > 0 && <RatingPill avg={i.ratingAvg} count={i.ratingCount} />}
                         </div>
                       </button>
@@ -169,24 +177,15 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
   );
 }
 
-export function ShareButton({ title, path, className, children }: { title: string; path: string; className?: string; children: React.ReactNode }) {
-  const t = useT();
+export function ShareButton({ title, path, className, children, message }: { title: string; path: string; className?: string; children: React.ReactNode; message?: string }) {
+  const [open, setOpen] = useState(false);
   return (
-    <button
-      className={className}
-      onClick={async () => {
-        const url = location.origin + path;
-        try {
-          if (navigator.share) await navigator.share({ title, url });
-          else {
-            await navigator.clipboard.writeText(url);
-            alert(t("Link copied"));
-          }
-        } catch {}
-      }}
-    >
-      {children}
-    </button>
+    <>
+      <button className={className} onClick={() => setOpen(true)} data-testid="share-open">
+        {children}
+      </button>
+      {open && <ShareSheet open onClose={() => setOpen(false)} title={title} message={message ?? title} path={path} />}
+    </>
   );
 }
 
@@ -212,5 +211,47 @@ export function SaveToggle({ type, refId, initial, className, heart }: { type: "
     >
       {heart ? <Heart className={cn("h-5 w-5 transition", saved ? "fill-brand-500 text-brand-500" : "text-ink")} /> : saved ? t("Saved") : t("Save")}
     </button>
+  );
+}
+
+/** Follow / Following button with the follower count (restaurant page). */
+export function FollowButton({ restaurantId, initial, initialCount, className }: { restaurantId: string; initial: boolean; initialCount: number; className?: string }) {
+  const t = useT();
+  const { requireLogin } = useLoginGate();
+  const [following, setFollowing] = useState(initial);
+  const [count, setCount] = useState(initialCount);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className={cn("flex items-center gap-3", className)}>
+      <button
+        disabled={busy}
+        aria-pressed={following}
+        data-testid="restaurant-follow"
+        className={cn("inline-flex h-10 items-center gap-1.5 rounded-full px-5 text-sm font-bold transition active:scale-95", following ? "bg-black/5 text-ink" : "bg-brand-500 text-white shadow-sm shadow-brand-500/30")}
+        onClick={async () => {
+          if (!requireLogin("follow")) return;
+          const next = !following;
+          setFollowing(next);
+          setCount((c) => Math.max(0, c + (next ? 1 : -1)));
+          setBusy(true);
+          const res = await fetch("/api/follow", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ restaurantId, follow: next }) }).catch(() => null);
+          setBusy(false);
+          if (res?.ok) {
+            const d = (await res.json()) as { following: boolean; followerCount: number };
+            setFollowing(d.following);
+            setCount(d.followerCount);
+          } else {
+            setFollowing(!next);
+            setCount((c) => Math.max(0, c + (next ? -1 : 1)));
+          }
+        }}
+      >
+        {following ? <Check className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+        {following ? t("Following") : t("Follow")}
+      </button>
+      <span className="text-sm text-ink-muted" data-testid="follower-count">
+        {t(count === 1 ? "{n} follower" : "{n} followers", { n: compactNumber(count) })}
+      </span>
+    </div>
   );
 }

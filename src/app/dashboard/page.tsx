@@ -67,7 +67,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       )}
 
       <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-muted">{t("Engagement (all time)")}</h2>
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatCard label="Followers" value={compactNumber(r.followerCount)} sub="told about new reels and deals" />
         <StatCard label="Reel views" value={compactNumber(o.totals.reelViews)} sub="qualified views" />
         <StatCard label="Likes" value={compactNumber(o.totals.likes)} />
         <StatCard label="Shares" value={compactNumber(o.totals.shares)} />

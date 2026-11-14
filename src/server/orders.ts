@@ -1,4 +1,6 @@
 import "server-only";
+import { liveDeals } from "./deals";
+import { applyDeals, dealSummaryOf, showDealSummary } from "@/lib/deals";
 import { z } from "zod";
 import type { Fulfillment, OrderStatus, Prisma } from "@prisma/client";
 import { prisma, type Tx } from "./db";
@@ -171,7 +173,7 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   // phone's or device's orders of the last 3 minutes (duplicate check).
   const early = normalizeMobile(input.customer.phone);
   const sameSender = [...(early.ok ? [{ customerPhone: early.e164 }] : []), ...(meta.deviceKey ? [{ deviceKey: meta.deviceKey }] : [])];
-  const [existing, settings, restaurant, priced, saved, recent] = await Promise.all([
+  const [existing, settings, restaurant, priced, saved, recent, dealMap] = await Promise.all([
     prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey } }),
     getSettings(),
     prisma.restaurant.findUnique({ where: { id: input.restaurantId } }),
@@ -180,6 +182,7 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
     sameSender.length
       ? prisma.order.findMany({ where: { restaurantId: input.restaurantId, createdAt: { gte: new Date(Date.now() - 3 * 60_000) }, OR: sameSender }, select: { reference: true, subtotalCents: true } })
       : [],
+    liveDeals([input.restaurantId]),
   ]);
 
   // Idempotency: the same submission (double tap / refresh / retry) returns the same order.
@@ -237,14 +240,20 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   }
 
   const currency = restaurant.currency;
-  const totalCents = priced.subtotalCents + deliveryFeeCents;
+  // The restaurant's deal: best amount off the food, plus free delivery if one applies.
+  const deal = applyDeals(dealMap.get(restaurant.id) ?? [], { lines: priced.lines, subtotalCents: priced.subtotalCents, deliveryFeeCents });
+  const dealSummary = dealSummaryOf(deal, currency, (id) => priced.lines.find((l) => l.menuItemId === id)?.name ?? null);
+  deliveryFeeCents -= deal.deliveryFeeWaivedCents;
+  const foodCents = priced.subtotalCents - deal.discountCents;
+  const totalCents = foodCents + deliveryFeeCents;
   let changeForCents: number | null = null;
   if (input.changeFor) {
     changeForCents = parseAmount(input.changeFor, currency);
     if (changeForCents === null || changeForCents < totalCents) throw new OrderError("Please check your order details", { changeFor: `Enter a bill amount of at least ${formatMoney(totalCents, currency)}` }, { changeFor: { k: "Enter a bill amount of at least {amount}", v: { amount: formatMoney(totalCents, currency) } } });
   }
   const exchangeRate = currency === "USD" ? null : settings.lbpPerUsd;
-  const commissionBaseCents = toUsdCents(priced.subtotalCents, currency, exchangeRate);
+  // Commission is on what the customer actually pays for the food (after the restaurant's deal).
+  const commissionBaseCents = toUsdCents(foodCents, currency, exchangeRate);
   const e164 = (phone as { e164: string }).e164;
 
   try {
@@ -280,7 +289,10 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
           longitude: input.fulfillment === "DELIVERY" ? c.longitude ?? null : null,
           currency,
           subtotalCents: priced.subtotalCents,
+          discountCents: deal.discountCents,
           deliveryFeeCents,
+          deliveryFeeWaivedCents: deal.deliveryFeeWaivedCents,
+          dealSummary,
           totalCents,
           commissionBaseCents,
           exchangeRate,
@@ -341,6 +353,7 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
       delivery: input.fulfillment === "DELIVERY" ? { km: distance != null ? formatKm(distance) : null, address: [c.area, c.address, c.building].filter(Boolean).join(", ") } : null,
       lines: priced.lines.map((l) => `${l.quantity}× ${l.name}${l.chosen.length ? ` (${l.chosen.map((x) => x.optionName).join(", ")})` : ""}${l.specialInstructions ? ` — ${l.specialInstructions}` : ""}  ${formatMoney(l.lineTotalCents, currency)}`),
       total: formatMoney(totalCents, currency),
+      deal: deal.discountCents || deal.deliveryFeeWaivedCents ? { summary: dealSummary, off: formatMoney(deal.discountCents + deal.deliveryFeeWaivedCents, currency) } : null,
       notes: c.notes || null,
     });
     return { reference: order.reference, trackingToken: order.trackingToken, totalCents: order.totalCents, currency: order.currency, duplicate: false };
@@ -354,7 +367,7 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
 }
 
 /** Email the restaurant (its contact email + owners/managers) about a new order. Never throws. */
-async function emailNewOrder(restaurantId: string, reference: string, o: { customer: string; delivery: { km: string | null; address: string } | null; lines: string[]; total: string; notes: string | null }) {
+async function emailNewOrder(restaurantId: string, reference: string, o: { customer: string; delivery: { km: string | null; address: string } | null; lines: string[]; total: string; deal: { summary: string | null; off: string } | null; notes: string | null }) {
   try {
     const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { displayName: true, email: true, staff: { where: { role: { in: ["OWNER", "MANAGER"] } }, orderBy: { role: "asc" }, select: { user: { select: { email: true, locale: true } } } } } });
     if (!r) return;
@@ -367,7 +380,7 @@ async function emailNewOrder(restaurantId: string, reference: string, o: { custo
       [...recipients].map(([addr, locale]) => {
         const t = tFor(locale);
         const how = o.delivery ? `${t("Delivery")}${o.delivery.km ? ` (${o.delivery.km})` : ""}: ${o.delivery.address}` : t("Pickup");
-        const text = [t("New order {ref} for {name}", { ref: reference, name: r.displayName }), "", `${t("Customer")}: ${o.customer}`, how, "", ...o.lines, "", `${t("Total (cash on delivery)")}: ${o.total}`, ...(o.notes ? ["", `${t("Note")}: ${o.notes}`] : []), "", `${t("Accept it in your dashboard")}: ${link}`].join("\n");
+        const text = [t("New order {ref} for {name}", { ref: reference, name: r.displayName }), "", `${t("Customer")}: ${o.customer}`, how, "", ...o.lines, "", ...(o.deal ? [`${t("Your deal")}: ${showDealSummary(t, o.deal.summary)} (−${o.deal.off})`] : []), `${t("Total (cash on delivery)")}: ${o.total}`, ...(o.notes ? ["", `${t("Note")}: ${o.notes}`] : []), "", `${t("Accept it in your dashboard")}: ${link}`].join("\n");
         return sendEmail(addr, `🔔 ${t("New order {ref} · {total}", { ref: reference, total: o.total })}`, text);
       }),
     );

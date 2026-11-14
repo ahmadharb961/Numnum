@@ -1,4 +1,5 @@
 import "server-only";
+import { notifyFollowers } from "./follows";
 import { prisma } from "./db";
 
 /**
@@ -136,6 +137,8 @@ export async function syncStreamReels(where: { restaurantId?: string; reelId?: s
         data: { status: "READY", videoUrl: urls.hls, posterUrl: r.posterUrl ?? urls.poster, durationSec: info.durationSec, processingError: null, ...(publish ? { visibility: "PUBLISHED", publishedAt: new Date() } : {}) },
       });
       await prisma.mediaAsset.update({ where: { id: r.videoAssetId }, data: { url: urls.hls, posterUrl: urls.poster, durationSec: info.durationSec, mimeType: "application/x-mpegURL" } });
+      // A reel going live for the first time: followers hear about it.
+      if (publish && !r.publishedAt) void notifyFollowers(r.restaurantId, { kind: "reel", reelId: r.id });
       changed++;
     }
   }
