@@ -24,7 +24,7 @@ export default async function HomePage() {
       {/* Starts the first reel before the app loads; the feed adopts this video. */}
       {(() => {
         const boot = firstReelBootScript(feed.reels[0], 0);
-        return boot ? <script dangerouslySetInnerHTML={{ __html: boot }} /> : null;
+        return <script dangerouslySetInnerHTML={{ __html: boot }} />;
       })()}
       <ReelFeed locationLabel={loc?.label ?? null} initial={feed.reels.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id) }))} initialCursor={feed.nextCursor} minViewMs={settings.minViewMs} />
     </main>

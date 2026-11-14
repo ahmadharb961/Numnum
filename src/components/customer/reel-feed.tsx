@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bookmark, ChevronLeft, Eye, FastForward, Heart, Loader2, MapPin, Play, Plus, Send, Volume2, VolumeX, RotateCcw, X } from "lucide-react";
@@ -13,7 +13,7 @@ import { ItemSheet, prefetchItem } from "./item-sheet";
 import { api, track } from "./track";
 import { HlsVideo } from "@/components/hls-video";
 import { pooledVideo, unlockPooledVideos } from "./video-pool";
-import { markFeedReady, whenFeedReady } from "@/lib/feed-ready";
+import { markFeedReady, registerFeed, whenFeedReady } from "@/lib/feed-ready";
 import { LocationChip } from "./location-picker";
 import { formatKm } from "@/lib/geo";
 import { Logo } from "@/components/logo";
@@ -81,16 +81,22 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
       clearTimeout(next);
     };
   }, [active, reels]);
+  // Registered before any other component's effects run, so they know to wait for the first reel.
+  useLayoutEffect(() => registerFeed(), []);
   // The first reel playing frees the connection for everything else (tabs, dishes, prompts).
   useEffect(() => {
     const root = containerRef.current;
     if (!root) return;
-    const onPlaying = () => {
+    // "playing" fires as soon as play() is accepted, even while still waiting for data; the clock
+    // actually moving is the real signal that frames are on screen.
+    const onTime = (e: Event) => {
+      if ((e.target as HTMLVideoElement).currentTime < 0.1) return;
+      root.removeEventListener("timeupdate", onTime, { capture: true });
       markFeedReady();
       setStarted(true);
     };
-    root.addEventListener("playing", onPlaying, { capture: true, once: true });
-    return () => root.removeEventListener("playing", onPlaying, { capture: true });
+    root.addEventListener("timeupdate", onTime, { capture: true });
+    return () => root.removeEventListener("timeupdate", onTime, { capture: true });
   }, []);
   // Sound on by default. Browsers block sound until the visitor first taps the page: then the
   // reel plays muted ("soundBlocked") and the first tap turns sound on. A manual mute is remembered.

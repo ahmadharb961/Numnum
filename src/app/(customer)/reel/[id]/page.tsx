@@ -65,7 +65,7 @@ export default async function ReelPage({ params }: { params: Promise<{ id: strin
       {/* Starts the first reel before the app loads; the feed adopts this video. */}
       {(() => {
         const boot = firstReelBootScript(reel, 0);
-        return boot ? <script dangerouslySetInnerHTML={{ __html: boot }} /> : null;
+        return <script dangerouslySetInnerHTML={{ __html: boot }} />;
       })()}
       <ReelFeed locationLabel={loc?.label ?? null} initial={all.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id) }))} initialCursor={feed.nextCursor} excludeIds={[id]} minViewMs={settings.minViewMs} />
     </main>

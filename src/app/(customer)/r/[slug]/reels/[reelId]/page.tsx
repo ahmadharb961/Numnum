@@ -29,7 +29,7 @@ export default async function RestaurantReelsViewer({ params }: { params: Promis
       {/* Starts the first reel before the app loads; the feed adopts this video. */}
       {(() => {
         const boot = firstReelBootScript(pub[idx], idx);
-        return boot ? <script dangerouslySetInnerHTML={{ __html: boot }} /> : null;
+        return <script dangerouslySetInnerHTML={{ __html: boot }} />;
       })()}
       <ReelFeed fixed initial={pub.map((r) => ({ ...r, liked: liked.has(r.id), saved: saved.has(r.id) }))} initialCursor={null} startIndex={idx} minViewMs={settings.minViewMs} backHref={`/r/${slug}`} />
     </main>

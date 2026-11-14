@@ -23,11 +23,14 @@ export function warmUpFirstReel(first: FirstReel) {
  * twice. Only where the browser plays the format itself (iPhone HLS, MP4); hls.js browsers get
  * the playlist preload above.
  */
-export function firstReelBootScript(first: FirstReel, index: number): string | null {
-  if (!first?.videoUrl) return null;
+export function firstReelBootScript(first: FirstReel, index: number): string {
+  // Marks the page as a reel page from its first bytes: the bottom menu and prompts render before
+  // the feed itself and must already know to wait for the first reel (see feed-ready).
+  const flag = "window.__nnFeedPage=true;";
+  if (!first?.videoUrl) return flag;
   // Same URL the player will compute (playableSrc + startHint), using this phone's reported speed.
   const base = first.videoUrl;
   const hinted = playableSrc(base) !== base;
   const hint = hinted ? `var d=navigator.connection&&navigator.connection.downlink;var h=d>0?Math.max(0.3,Math.min(1.8,Math.round(d*0.6*10)/10)):1.8;s=s+(s.indexOf("?")>=0?"&":"?")+"clientBandwidthHint="+h;` : "";
-  return `(function(){try{var s=${JSON.stringify(base)};${hint}var v=document.createElement("video");if(/\\.m3u8(\\?|$)/.test(s)&&!v.canPlayType("application/vnd.apple.mpegurl"))return;v.muted=true;v.defaultMuted=true;v.playsInline=true;v.setAttribute("playsinline","");v.setAttribute("webkit-playsinline","");v.setAttribute("muted","");v.loop=true;v.preload="auto";v.style.cssText="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none";v.src=s;document.body.appendChild(v);var w=window.__nnFirst={src:s,v:v,i:${index},taken:false};var b=function(){v.removeEventListener("timeupdate",b);if(!w.taken){v.pause();try{v.currentTime=0}catch(e){}}};v.addEventListener("timeupdate",b);var p=v.play();if(p&&p.catch)p.catch(function(){});}catch(e){}})();`;
+  return `${flag}(function(){try{var s=${JSON.stringify(base)};${hint}var v=document.createElement("video");if(/\\.m3u8(\\?|$)/.test(s)&&!v.canPlayType("application/vnd.apple.mpegurl"))return;v.muted=true;v.defaultMuted=true;v.playsInline=true;v.setAttribute("playsinline","");v.setAttribute("webkit-playsinline","");v.setAttribute("muted","");v.loop=true;v.preload="auto";v.style.cssText="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none";v.src=s;document.body.appendChild(v);var w=window.__nnFirst={src:s,v:v,i:${index},taken:false};var b=function(){v.removeEventListener("timeupdate",b);if(!w.taken){v.pause();try{v.currentTime=0}catch(e){}}};v.addEventListener("timeupdate",b);var p=v.play();if(p&&p.catch)p.catch(function(){});}catch(e){}})();`;
 }
