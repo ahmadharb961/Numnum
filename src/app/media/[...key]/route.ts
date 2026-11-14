@@ -1,4 +1,4 @@
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 import { prisma } from "@/server/db";
 import { getBlob, statLocal, streamLocal } from "@/server/storage";
 
@@ -12,6 +12,52 @@ const IMMUTABLE = "public, max-age=31536000, immutable";
  * Anything else → local video files (only used when Cloudflare Stream isn't configured),
  * with HTTP Range support (required for iOS Safari).
  */
+/**
+ * Node file stream → web stream that stops cleanly when the viewer leaves mid-download (swipes away,
+ * closes the app). Node's built-in conversion keeps pushing into the closed response there, which
+ * throws an uncaught "Controller is already closed" in the server.
+ */
+function webStream(node: Readable): ReadableStream<Uint8Array> {
+  let done = false;
+  const finish = () => {
+    done = true;
+    node.destroy();
+  };
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      node.on("data", (chunk: Buffer) => {
+        if (done) return;
+        try {
+          controller.enqueue(new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength));
+        } catch {
+          return finish(); // the response was closed
+        }
+        if ((controller.desiredSize ?? 1) <= 0) node.pause();
+      });
+      node.once("end", () => {
+        if (done) return;
+        done = true;
+        try {
+          controller.close();
+        } catch {}
+      });
+      node.once("error", (e) => {
+        if (done) return;
+        done = true;
+        try {
+          controller.error(e);
+        } catch {}
+      });
+    },
+    pull() {
+      node.resume();
+    },
+    cancel() {
+      finish();
+    },
+  });
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ key: string[] }> }) {
   const parts = (await params).key;
   if (parts[0] === "i" && parts.length === 2) {
@@ -46,7 +92,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ key: str
       end = size - 1;
     } else if (Number.isNaN(end) || end >= size) end = size - 1;
     if (start > end || start >= size) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
-    return new Response(Readable.toWeb(streamLocal(key, false, { start, end })) as ReadableStream, { status: 206, headers: { ...base, "content-range": `bytes ${start}-${end}/${size}`, "content-length": String(end - start + 1) } });
+    return new Response(webStream(streamLocal(key, false, { start, end })), { status: 206, headers: { ...base, "content-range": `bytes ${start}-${end}/${size}`, "content-length": String(end - start + 1) } });
   }
-  return new Response(Readable.toWeb(streamLocal(key, false)) as ReadableStream, { headers: { ...base, "content-length": String(size) } });
+  return new Response(webStream(streamLocal(key, false)), { headers: { ...base, "content-length": String(size) } });
 }

@@ -17,6 +17,10 @@ const text = async (loc) => ((await loc.first().textContent({ timeout: 5000 }).c
 
 async function login(ctx, email, pw) {
   const p = await ctx.newPage();
+  // The "How was your order?" prompt (for an earlier delivered order) can appear on any page: close it.
+  await p.addLocatorHandler(p.getByRole("dialog", { name: "How was your order?" }), async () => {
+    await p.getByRole("button", { name: "Not now" }).click();
+  });
   await p.goto("/login"); await settled(p);
   await p.fill("#email", email);
   await p.fill("#password", pw);
