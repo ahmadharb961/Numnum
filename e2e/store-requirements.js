@@ -39,7 +39,7 @@ async function register(ctx, email) {
   const rv = await db.restaurantReview.create({ data: { restaurantId: bh.id, userId: reviewer.id, rating: 4, body: `Great burgers, fast delivery ${tag}` }, include: { user: true } });
 
   // ── Block a restaurant from a reel's Report sheet
-  await p.goto(`/reel/${reel.id}`, { waitUntil: "networkidle" });
+  await p.goto(`/reel/${reel.id}`, { waitUntil: "load" }); await p.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
   await p.getByRole("button", { name: "Report this reel" }).first().click();
   await p.getByRole("dialog", { name: "Report content" }).waitFor();
   check(await p.getByTestId("report-also-block").isVisible(), "Report sheet offers 'Also hide content from Burger House'");
