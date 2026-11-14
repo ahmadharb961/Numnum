@@ -214,6 +214,7 @@ export const AR4: Record<string, string> = {
   "an order is completed (delivered or picked up)": "يكتمل الطلب (يُوصَل أو يُستلم)",
   "avg. watch {n}s": "متوسط المشاهدة {n} ث",
   "cash on delivery": "نقداً عند التوصيل",
+  "Delivering to {place}": "التوصيل إلى {place}",
   "Offers that show on your reels, dishes and page, and apply automatically at checkout. Your follower is told about new deals.": "عروض تظهر على فيديوهاتك وأطباقك وصفحتك، وتُطبَّق تلقائياً عند الدفع. يتم إبلاغ متابِعك بالعروض الجديدة.",
   "% off": "خصم بالنسبة",
   "3 days": "3 أيام",

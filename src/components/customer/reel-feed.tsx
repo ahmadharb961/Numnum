@@ -344,29 +344,36 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
         </button>
       )}
       {!fixed && !backHref && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-3 pb-8 lg:hidden" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
-          <Logo className="h-9 text-white drop-shadow" />
-          <span className="pointer-events-auto min-w-0">
-            <LocationChip label={locationLabel} dark />
+        // One row, like TikTok: logo · For you / Following · location pin · sound (sound button below).
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent pb-8 pe-[60px] ps-3 lg:hidden" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}>
+          <Logo className="h-7 shrink-0 text-white drop-shadow" />
+          <div className="pointer-events-auto flex flex-1 items-center justify-center gap-4 text-[15px] font-extrabold text-shadow" role="tablist" aria-label={t("Feed")}>
+            {(["foryou", "following"] as const).map((k) => (
+              <button key={k} role="tab" aria-selected={tab === k} onClick={() => switchTab(k)} className={cn("relative whitespace-nowrap py-1.5 transition", tab === k ? "text-white" : "text-white/60")} data-testid={`tab-${k}`}>
+                {k === "foryou" ? t("For you") : t("Following")}
+                {tab === k && <span className="absolute inset-x-1 -bottom-0.5 h-[3px] rounded-full bg-white" />}
+              </button>
+            ))}
+          </div>
+          <span className="pointer-events-auto shrink-0">
+            <LocationChip label={locationLabel} dark compact />
           </span>
         </div>
       )}
       {!fixed && !backHref && (
-        <div className="absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-5 text-[15px] font-extrabold text-shadow lg:top-4" style={{ top: "calc(var(--safe-top) + 60px)" }} role="tablist" aria-label={t("Feed")}>
+        // Desktop has no top bar: the tabs sit at the top of the video column.
+        <div className="absolute left-1/2 top-4 z-30 hidden -translate-x-1/2 items-center gap-5 text-[15px] font-extrabold text-shadow lg:flex" role="tablist" aria-label={t("Feed")}>
           {(["foryou", "following"] as const).map((k) => (
-            <button key={k} role="tab" aria-selected={tab === k} onClick={() => switchTab(k)} className={cn("relative pb-1.5 transition", tab === k ? "text-white" : "text-white/60")} data-testid={`tab-${k}`}>
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => switchTab(k)} className={cn("relative pb-1.5 transition", tab === k ? "text-white" : "text-white/60")}>
               {k === "foryou" ? t("For you") : t("Following")}
               {tab === k && <span className="absolute inset-x-1 bottom-0 h-[3px] rounded-full bg-white" />}
             </button>
           ))}
         </div>
       )}
-      {soundBlocked && (
-        <button onClick={toggleMute} className={cn("absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/60 px-3.5 py-2 text-xs font-bold backdrop-blur")} style={{ top: `calc(var(--safe-top) + ${!fixed && !backHref ? 104 : 64}px)` }}>
-          <VolumeX className="h-4 w-4" /> {t("Tap for sound")}
-        </button>
-      )}
-      <button onClick={toggleMute} className={cn("absolute end-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur", panel && "lg:end-[412px]")} style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={muted ? t("Unmute") : t("Mute")}>
+      {/* While the browser holds sound back (until the first tap), the sound button pulses instead of a text prompt. */}
+      <button onClick={toggleMute} className={cn("absolute end-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur", panel && "lg:end-[412px]")} style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={soundBlocked ? t("Tap for sound") : muted ? t("Unmute") : t("Mute")} data-testid="sound-button">
+        {soundBlocked && <span className="pointer-events-none absolute inset-0 animate-pulse rounded-full ring-2 ring-white/80" />}
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
@@ -802,9 +809,9 @@ const ReelSlide = memo(function ReelSlide({
         onContextMenu={(e) => e.preventDefault()}
         aria-label={paused ? t("Play") : t("Pause")}
       />
-      {/* Below the top bar (logo, location, sound) and the "Tap for sound" pill. */}
+      {/* Below the top bar (logo, tabs, location, sound). */}
       {fast && (
-        <div className="pointer-events-none absolute left-1/2 z-[3] flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/55 px-3 py-1.5 text-sm font-bold text-white backdrop-blur" style={{ top: "calc(var(--safe-top) + 150px)" }} role="status" aria-label={t("Playing at 2x speed")}>
+        <div className="pointer-events-none absolute left-1/2 z-[3] flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/55 px-3 py-1.5 text-sm font-bold text-white backdrop-blur" style={{ top: "calc(var(--safe-top) + 112px)" }} role="status" aria-label={t("Playing at 2x speed")}>
           2× <FastForward className="h-4 w-4 fill-white rtl:-scale-x-100" />
         </div>
       )}
