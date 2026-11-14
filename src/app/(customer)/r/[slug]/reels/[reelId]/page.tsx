@@ -7,6 +7,7 @@ import { publicReelWhere, reelCardSelect, toPublicReel } from "@/server/feed";
 import { likedAndSaved } from "@/server/engagement";
 import { getSettings } from "@/server/settings";
 import { ReelFeed } from "@/components/customer/reel-feed";
+import { warmUpFirstReel } from "@/lib/reel-warmup";
 
 export const dynamic = "force-dynamic";
 // Black status bar above the full-screen video feed.
@@ -21,6 +22,7 @@ export default async function RestaurantReelsViewer({ params }: { params: Promis
   if (blocked) return <BlockedNotice blockId={blocked.id} name={reels[idx].restaurant.displayName} />;
   const settings = await getSettings();
   const pub = reels.map((r) => toPublicReel(r));
+  warmUpFirstReel(pub[idx]);
   const { liked, saved } = await likedAndSaved(pub.map((r) => r.id));
   return (
     <main>

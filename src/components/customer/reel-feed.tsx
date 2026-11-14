@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bookmark, ChevronLeft, Eye, FastForward, Heart, Loader2, MapPin, Play, Plus, Send, Volume2, VolumeX, RotateCcw, X } from "lucide-react";
@@ -57,10 +57,14 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   const [active, setActive] = useState(startIndex);
+  const [incoming, setIncoming] = useState<number | null>(null);
   // Reels whose first seconds are downloaded. Loading is queued like Instagram: the next reel first,
   // then the one after it, then the current reel buffers further, so on a weak connection the
   // next swipe is ready instead of three videos splitting the bandwidth.
   const [buffered, setBuffered] = useState<Set<string>>(() => new Set());
+  // One stable object for every slide's buttons, so a swipe only re-renders the reels whose own
+  // state changed (smooth on cheaper phones) instead of every reel in the list.
+  const actions = useRef<SlideActions>(null as unknown as SlideActions);
   const markBuffered = useCallback((id: string) => setBuffered((b) => (b.has(id) ? b : new Set(b).add(id))), []);
   usePreconnect(initial[startIndex]?.videoUrl ?? initial[0]?.videoUrl);
   // The dish of the reel on screen (and the next one) loads in the background: "Order" opens instantly.
@@ -163,6 +167,31 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     return () => io.disconnect();
   }, [reels.length]);
 
+  // TikTok/Instagram: the next reel starts playing (silently) on the first frame the feed moves
+  // toward it, so it's already playing when the swipe settles. Read from the scroll position, which
+  // catches a quick flick that would skip past any visibility threshold.
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const h = root.clientHeight || 1;
+        const pos = root.scrollTop / h;
+        const next = pos > active + 0.02 ? active + 1 : pos < active - 0.02 ? active - 1 : null;
+        setIncoming(next !== null && next >= 0 && next < reels.length ? next : null);
+      });
+    };
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [active, reels.length]);
+  useEffect(() => setIncoming(null), [active]);
+
   const loadMore = useCallback(async () => {
     if (loadingMore || cursor === null) return;
     setLoadingMore(true);
@@ -262,6 +291,26 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
+      {(() => {
+        actions.current = {
+          soundBlocked: () => {
+            setMuted(true);
+            // Someone who chose mute doesn't need the "Tap for sound" prompt.
+            let prefersMuted = false;
+            try {
+              prefersMuted = localStorage.getItem("nn_muted") === "1";
+            } catch {}
+            if (!prefersMuted) setSoundBlocked(true);
+          },
+          justUnlocked: () => Date.now() - unlockedAt.current < 700,
+          like,
+          save,
+          share,
+          restaurant: () => setPanel(true),
+          open: (r) => setSheet({ itemId: r.item.id, reelId: r.id }),
+        };
+        return null;
+      })()}
       <div ref={containerRef} className="h-feed snap-feed no-scrollbar overflow-y-scroll">
         {reels.map((r, i) => (
           <ReelSlide
@@ -275,23 +324,10 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
             preloadFull={i === active || i === active + 1 || (i === active + 2 && (!reels[active + 1] || buffered.has(reels[active + 1].id)))}
             deepBuffer={i === active && (!reels[active + 1] || buffered.has(reels[active + 1].id))}
             onBuffered={markBuffered}
+            peek={i === incoming && i !== active}
             muted={muted}
-            onSoundBlocked={() => {
-              setMuted(true);
-              // Someone who chose mute doesn't need the "Tap for sound" prompt.
-              let prefersMuted = false;
-              try {
-                prefersMuted = localStorage.getItem("nn_muted") === "1";
-              } catch {}
-              if (!prefersMuted) setSoundBlocked(true);
-            }}
-            justUnlocked={() => Date.now() - unlockedAt.current < 700}
             minViewMs={minViewMs}
-            onLike={() => like(r)}
-            onSave={() => save(r)}
-            onShare={() => share(r)}
-            onRestaurant={() => setPanel(true)}
-            onOpen={() => setSheet({ itemId: r.item.id, reelId: r.id })}
+            actions={actions}
           />
         ))}
         {reels.length === 0 && (
@@ -318,7 +354,17 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   );
 }
 
-function ReelSlide({
+type SlideActions = {
+  soundBlocked: () => void;
+  justUnlocked: () => boolean;
+  like: (r: FeedReel) => void;
+  save: (r: FeedReel) => void;
+  share: (r: FeedReel) => void;
+  restaurant: () => void;
+  open: (r: FeedReel) => void;
+};
+
+const ReelSlide = memo(function ReelSlide({
   reel,
   index,
   active,
@@ -326,15 +372,10 @@ function ReelSlide({
   preloadFull,
   deepBuffer,
   onBuffered,
+  peek,
   muted,
-  onSoundBlocked,
-  justUnlocked,
   minViewMs,
-  onLike,
-  onSave,
-  onShare,
-  onRestaurant,
-  onOpen,
+  actions,
 }: {
   reel: FeedReel;
   index: number;
@@ -344,20 +385,23 @@ function ReelSlide({
   /** The reel on screen may buffer further ahead (once the next reel has its first seconds). */
   deepBuffer: boolean;
   onBuffered: (id: string) => void;
+  /** Sliding in (20–60% on screen): plays silently so it's already moving when the swipe ends. */
+  peek: boolean;
   muted: boolean;
-  onSoundBlocked: () => void;
-  justUnlocked: () => boolean;
   minViewMs: number;
-  onLike: () => void;
-  onSave: () => void;
-  onShare: () => void;
-  onRestaurant: () => void;
-  onOpen: () => void;
+  actions: React.MutableRefObject<SlideActions>;
 }) {
   const t = useT();
   const { loggedIn } = useLoginGate();
   const locale = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const onSoundBlocked = () => actions.current.soundBlocked();
+  const justUnlocked = () => actions.current.justUnlocked();
+  const onLike = () => actions.current.like(reel);
+  const onSave = () => actions.current.save(reel);
+  const onShare = () => actions.current.share(reel);
+  const onRestaurant = () => actions.current.restaurant();
+  const onOpen = () => actions.current.open(reel);
   // Pooled <video> elements exist only in the browser: attach after mount (poster shows meanwhile).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -418,7 +462,7 @@ function ReelSlide({
   // first seconds, then stop it at the beginning. (Other browsers buffer it via hls.js / preload.)
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || active || !preloadFull || !reel.videoUrl) return;
+    if (!v || active || peek || !preloadFull || !reel.videoUrl) return;
     if (!/\.m3u8(\?|$)/.test(reel.videoUrl) || !v.canPlayType("application/vnd.apple.mpegurl")) return;
     let stop = false;
     const warm = () => {
@@ -438,7 +482,27 @@ function ReelSlide({
       stop = true;
       window.clearTimeout(t);
     };
-  }, [active, preloadFull, mounted, near, reel.videoUrl]);
+  }, [active, peek, preloadFull, mounted, near, reel.videoUrl]);
+
+  // Sliding in: start playing silently from the beginning, so the reel is already moving when the
+  // swipe settles (it then picks up the sound setting). Swiped back: stop and rewind.
+  const peeked = useRef(false);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || active) {
+      peeked.current = false;
+      return;
+    }
+    if (peek && !paused) {
+      peeked.current = true;
+      v.muted = true;
+      void v.play().catch(() => {});
+    } else if (peeked.current) {
+      peeked.current = false;
+      v.pause();
+      v.currentTime = 0;
+    }
+  }, [peek, active, paused, mounted, near]);
 
   // Tell the feed once this reel has its first ~2 s, so the next one in the queue can start loading.
   useEffect(() => {
@@ -710,7 +774,7 @@ function ReelSlide({
       </div>
     </section>
   );
-}
+});
 
 /** Like Instagram: one line ending in "… more"; tap to read it all, "less" folds it back. */
 function ReelCaption({ text }: { text: string }) {

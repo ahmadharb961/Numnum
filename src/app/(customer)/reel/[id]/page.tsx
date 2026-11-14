@@ -6,6 +6,7 @@ import { getT } from "@/i18n/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ReelFeed } from "@/components/customer/reel-feed";
+import { warmUpFirstReel } from "@/lib/reel-warmup";
 import { prisma } from "@/server/db";
 import { getFeed, publicReelWhere, reelCardSelect, toPublicReel } from "@/server/feed";
 import { likedAndSaved } from "@/server/engagement";
@@ -39,6 +40,7 @@ export default async function ReelPage({ params }: { params: Promise<{ id: strin
   const id = (await params).id;
   const reel = await load(id);
   if (!reel) notFound();
+  warmUpFirstReel(reel);
   const blocked = await restaurantBlockFor(reel.restaurant.id);
   if (blocked) return <BlockedNotice blockId={blocked.id} name={reel.restaurant.name} />;
   const loc = await customerLocation();
