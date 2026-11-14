@@ -22,6 +22,7 @@ import { useLocale, useT } from "@/i18n/client";
 import { useLoginGate } from "./login-gate";
 import { ReportButton } from "./report-button";
 import { ShareSheet } from "./share-sheet";
+import { setFollowing, useFollowState } from "./follow-store";
 
 export type FeedReel = PublicReel & { liked?: boolean; saved?: boolean; /** The viewer follows this reel's restaurant. */ following?: boolean };
 
@@ -333,21 +334,17 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
 
   async function follow(r: FeedReel) {
     if (!requireLogin("follow", `/reel/${r.id}`)) return;
-    const rid = r.restaurant.id;
-    const set = (v: boolean) => setReels((rs) => rs.map((x) => (x.restaurant.id === rid ? { ...x, following: v } : x)));
-    set(true);
-    try {
-      await api("/api/follow", { restaurantId: rid, follow: true });
+    // Shared follow state: every reel of this restaurant and its page update at once (follow-store).
+    const res = await setFollowing(r.restaurant.id, true);
+    if (res === "ok") {
       toast(t("Following {name}", { name: r.restaurant.name }), "success");
       // Their reels belong in Following now: refresh it in the background.
       tabs.current.following = null;
       void fetchTab("following").then((st) => {
         if (st && !tabs.current.following) tabs.current.following = st;
       });
-    } catch {
-      set(false);
-      toast("Couldn't follow. Check your connection.", "error");
-    }
+    } else if (res === "login") askLogin("follow", `/reel/${r.id}`);
+    else toast("Couldn't follow. Check your connection.", "error");
   }
 
   async function like(r: FeedReel) {
@@ -585,6 +582,7 @@ const ReelSlide = memo(function ReelSlide({
   const onRestaurant = () => actions.current.restaurant();
   const onOpen = () => actions.current.open(reel);
   const [justFollowed, setJustFollowed] = useState(false);
+  const { following } = useFollowState(reel.restaurant.id, !!reel.following);
   const onFollow = () => {
     actions.current.follow(reel);
     setJustFollowed(true);
@@ -914,7 +912,7 @@ const ReelSlide = memo(function ReelSlide({
           </span>
         </Link>
         {/* TikTok-style follow: + under the restaurant's picture; turns into a check once followed. */}
-        {!reel.following ? (
+        {!following ? (
           <button onClick={onFollow} className="-mt-4 mb-1 grid h-6 w-6 place-items-center rounded-full bg-brand-500 shadow-md ring-2 ring-black/20 active:scale-90" aria-label={t("Follow {name}", { name: reel.restaurant.name })} data-testid="follow-button">
             <Plus className="h-4 w-4" strokeWidth={3} />
           </button>
