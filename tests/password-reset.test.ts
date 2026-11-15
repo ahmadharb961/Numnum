@@ -93,22 +93,28 @@ describe("order emails point to the apps once they're in the stores", () => {
     emails.length = 0;
   });
 
-  const flush = () => new Promise((r) => setTimeout(r, 200));
+  /** Emails go out in the background: wait (up to 5 s) until one reaches `to`. */
+  const emailTo = async (to: string) => {
+    for (let i = 0; i < 100; i++) {
+      const e = emails.find((x) => x.to === to);
+      if (e) return e;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`no email to ${to}`);
+  };
 
   it("restaurant: 'open the numnum app'; customer: app store links. Without links: the old wording", async () => {
     for (const live of [false, true]) {
       emails.length = 0;
-      await updateSetting("appLinks", live ? { ios: "https://apps.apple.com/app/id123", android: "https://play.google.com/store/apps/details?id=me.numnum" } : DEFAULT_SETTINGS.appLinks, null);
+      await updateSetting("appLinks", live ? { ios: "https://apps.apple.com/app/id123", android: "https://play.google.com/store/apps/details?id=me.numnum" } : DEFAULT_SETTINGS.appLinks, "test-admin");
       const f = await makeRestaurant();
       const c = await makeCustomer();
       const o = await createOrder(orderPayload(f, `k-${live}-${Date.now()}`), { deviceKey: "dev-pw-aaaaaaaaaaaaaaaa", ipHash: null, userId: c.id });
-      await flush();
-      const toRestaurant = emails.find((e) => e.to === f.user.email)!;
+      const toRestaurant = await emailTo(f.user.email);
       expect(toRestaurant.text).toContain(live ? "Open the numnum app to accept it." : "Accept it in your dashboard:");
       const order = await prisma.order.findUniqueOrThrow({ where: { reference: o.reference } });
       await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT", { etaMinutes: 20 });
-      await flush();
-      const toCustomer = emails.find((e) => e.to === c.email)!;
+      const toCustomer = await emailTo(c.email);
       expect(toCustomer.text.includes("App Store: https://apps.apple.com/app/id123")).toBe(live);
       expect(toCustomer.text.includes("Google Play:")).toBe(live);
       expect(toCustomer.text).toContain(`/order/${o.reference}`);
