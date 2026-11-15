@@ -33,7 +33,7 @@ async function settled(p) {
 }
 async function dismissReview(p) {
   const b = p.getByRole("button", { name: "Not now" });
-  if (await b.isVisible().catch(() => false)) await b.click();
+  if (await b.isVisible().catch(() => false)) await b.click({ timeout: 3000 }).catch(() => {}); // the dialog handler may close it first
 }
 async function openReelOf(p, restaurantId) {
   const reel = await db.reel.findFirst({ where: { restaurantId, visibility: "PUBLISHED", status: "READY" }, orderBy: { publishedAt: "desc" }, include: { menuItem: true } });
