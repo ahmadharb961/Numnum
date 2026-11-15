@@ -41,7 +41,8 @@ async function slow4g(p) {
 
   console.log("\nReel → restaurant → Back");
   await p.goto("/", { waitUntil: "load" });
-  check((await timeToPlay(p, Date.now(), 20000)) >= 0, "first reel plays");
+  const first = await timeToPlay(p, Date.now(), 20000);
+  check(first >= 0, "first reel plays", first < 0 ? await p.evaluate(() => { const s = document.querySelector("section[data-active='true']"); const v = s?.querySelector("video"); return { sections: document.querySelectorAll("section[data-index]").length, index: s?.dataset.index, video: !!v, paused: v?.paused, t: v?.currentTime, rs: v?.readyState, err: v?.error?.code, src: v?.getAttribute("src")?.slice(0, 30), playBtn: !!s?.querySelector("[aria-label='Play']") }; }) : first);
   await swipeTo(p, 2);
   await timeToPlay(p, Date.now());
   await p.waitForTimeout(1500);
@@ -75,14 +76,17 @@ async function slow4g(p) {
   await timeToPlay(p, Date.now());
   const forYou = await activeInfo(p);
   await p.waitForTimeout(9000); // Following and its first reel load in the background
-  if (!process.env.HLSJS) {
+  const folFirstLabel = await p.evaluate(async () => (await (await fetch("/api/feed?tab=following")).json()).reels[0]);
+  const sameFirst = folFirstLabel && forYou.label.startsWith(folFirstLabel.item?.name ?? "\u0000");
+  if (!process.env.HLSJS && !sameFirst) {
     const warmed = await p.evaluate(() => [...document.querySelectorAll("body > video")].filter((v) => v.readyState >= 2).length);
     check(warmed >= 1, "Following's first reel is loaded in advance", warmed);
   }
   let at = Date.now();
   await p.getByTestId("tab-following").click();
   const tf = await timeToPlay(p, at);
-  check(tf >= 0 && tf < 700, `Following's first reel plays at once (${tf} ms)`, tf);
+  const vstate = () => p.evaluate(() => { const s = document.querySelector("section[data-active='true']"); const v = s?.querySelector("video"); return { index: s?.dataset.index, label: s?.getAttribute("aria-label"), video: !!v, paused: v?.paused, t: v?.currentTime, rs: v?.readyState, err: v?.error?.code, src: v?.getAttribute("src")?.slice(-40), playBtn: !!s?.querySelector("[aria-label='Play']") }; });
+  check(tf >= 0 && tf < 700, `Following's first reel plays at once (${tf} ms${(await activeInfo(p)).label === forYou.label ? ", the same reel you were on in For you" : ""})`, tf < 0 ? await vstate() : tf);
   const fol = await activeInfo(p);
   check(/Burger House|Bean Bar/.test(fol.label), "and it's from a followed restaurant", fol.label);
   await swipeTo(p, 1);
@@ -120,8 +124,12 @@ async function slow4g(p) {
   await p.reload({ waitUntil: "load" });
   check((await timeToPlay(p, Date.now(), 20000)) >= 0 && !errors.length, "a fresh load still starts normally", errors);
   await p.waitForTimeout(6000);
+  const fyFirst = (await activeInfo(p)).label;
+  at = Date.now();
   await p.getByTestId("tab-following").click();
-  await timeToPlay(p, Date.now());
+  const tfs = await timeToPlay(p, at);
+  const folFirst = (await activeInfo(p)).label;
+  check(tfs >= 0 && tfs < 700, `Following plays at once (${tfs} ms; ${fyFirst === folFirst ? "same" : "different"} first reel than For you)`, tfs < 0 ? await vstate() : tfs);
   const counts = await p.evaluate(() => document.querySelectorAll("section[data-index]").length);
   await swipeTo(p, 1);
   const sw = await activeInfo(p);
