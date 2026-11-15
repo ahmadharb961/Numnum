@@ -200,3 +200,6 @@ ${logo ? `<tr><td style="padding:0 4px 16px"><a href="${app}"><img src="${app}/l
 </table></td></tr></table></body></html>`;
 }
 
+
+/** The same email look for other account emails (password reset). */
+export const emailParts = { layout, h1, p, small, button, esc, appUrl };

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, BellOff, CheckCircle2 } from "lucide-react";
-import { lastPushError, pushState, resyncDevice, sendTestNotification, turnOn, type PushState } from "@/lib/push-client";
+import { isIos, isNativeApp, lastPushError, pushState, resyncDevice, sendTestNotification, turnOn, type PushState } from "@/lib/push-client";
 import { Button } from "@/components/ui/button";
 import { InstallSheet } from "./install-sheet";
 import { useT } from "@/i18n/client";
@@ -88,7 +88,15 @@ export function NotifyPrompt({ compact, details }: { compact?: boolean; details?
             <InstallSheet open={guide} onClose={() => setGuide(false)} />
           </>
         )}
-        {state === "blocked" && <p className="mt-0.5 text-ink-muted">{t("Notifications are blocked for numnum. Allow them in your phone or browser settings, then reopen this page.")}</p>}
+        {/* Only known after mount (the state is read on the phone), so the app check is safe here. */}
+        {state === "blocked" &&
+          (isNativeApp() ? (
+            <p className="mt-0.5 text-ink-muted" data-testid="notify-blocked-app">
+              {t("Notifications are off for numnum. Turn them on in your phone's settings:")} <b dir="ltr">{isIos() ? "Settings → Notifications → numnum" : "Settings → Apps → numnum → Notifications"}</b>
+            </p>
+          ) : (
+            <p className="mt-0.5 text-ink-muted">{t("Notifications are blocked for numnum. Allow them in your phone or browser settings, then reopen this page.")}</p>
+          ))}
       </div>
     </div>
   );

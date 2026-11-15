@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff, LifeBuoy, Heart } from "lucide-react";
+import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff, LifeBuoy, Heart, KeyRound } from "lucide-react";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { PageHeader } from "@/components/customer/page-header";
@@ -64,6 +64,7 @@ export default async function AccountPage() {
             { href: "/account/following", icon: Heart, label: "Following", sub: t(followingCount === 1 ? "{n} restaurant" : "{n} restaurants", { n: followingCount }) },
             { href: "/saved", icon: Bookmark, label: "Saved dishes & restaurants", sub: "Reels, dishes, restaurants" },
             { href: "/account/blocked", icon: EyeOff, label: "Blocked", sub: "Restaurants and people you hid" },
+            { href: "/account/password", icon: KeyRound, label: "Change password", sub: "Keep your account secure" },
             { href: "/support", icon: LifeBuoy, label: "Help & support", sub: "Contact us, terms and privacy" },
           ].map((l) => (
             <Link prefetch key={l.href} href={l.href} className="flex items-center gap-3 p-4">

@@ -21,7 +21,7 @@ function useFormAction(serverAction: (prev: FormState, fd: FormData) => Promise<
   return [state, action, pending, values] as const;
 }
 
-export function LoginForm({ next }: { next?: string }) {
+export function LoginForm({ next, reset }: { next?: string; reset?: boolean }) {
   const t = useT();
   const [state, action, pending, v] = useFormAction(loginAction);
   const insecure = useInsecureOrigin();
@@ -36,6 +36,7 @@ export function LoginForm({ next }: { next?: string }) {
           </a>
         </Alert>
       )}
+      {reset && !state?.error && <Alert tone="green">{t("Password changed. Log in with your new password.")}</Alert>}
       {state?.error && <Alert tone="red">{state.error}</Alert>}
       <input type="hidden" name="next" value={next ?? ""} />
       <Field label="Email" htmlFor="email">
@@ -53,6 +54,11 @@ export function LoginForm({ next }: { next?: string }) {
           </button>
         </span>
       </Field>
+      <p className="-mt-2 text-end">
+        <Link href="/forgot-password" className="text-sm font-semibold text-brand-600" data-testid="forgot-link">
+          {t("Forgot password?")}
+        </Link>
+      </p>
       <Button type="submit" size="lg" block loading={pending} className="h-14 rounded-2xl text-base">
         {t("Log in")} <ArrowRight className="rtl:-scale-x-100 h-5 w-5" />
       </Button>
