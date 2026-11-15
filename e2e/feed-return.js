@@ -76,11 +76,12 @@ async function slow4g(p) {
   await timeToPlay(p, Date.now());
   const forYou = await activeInfo(p);
   await p.waitForTimeout(9000); // Following and its first reel load in the background
-  const folFirstLabel = await p.evaluate(async () => (await (await fetch("/api/feed?tab=following")).json()).reels[0]);
-  const sameFirst = folFirstLabel && forYou.label.startsWith(folFirstLabel.item?.name ?? "\u0000");
-  if (!process.env.HLSJS && !sameFirst) {
-    const warmed = await p.evaluate(() => [...document.querySelectorAll("body > video")].filter((v) => v.readyState >= 2).length);
-    check(warmed >= 1, "Following's first reel is loaded in advance", warmed);
+  if (!process.env.HLSJS) {
+    // Ready either way: loaded in advance in the background, or already loaded because it's also the
+    // reel on screen / one of the next ones in For you (then it's reused, not loaded twice).
+    const folFirst = await p.evaluate(async () => (await (await fetch("/api/feed?tab=following")).json()).reels[0]?.videoUrl);
+    const ready = await p.evaluate((src) => [...document.querySelectorAll("video")].some((v) => v.readyState >= 2 && v.getAttribute("src") && src && v.src.includes(src.split("?")[0].replace(/^\//, ""))), folFirst);
+    check(ready, "Following's first reel is already loaded before the switch", folFirst);
   }
   let at = Date.now();
   await p.getByTestId("tab-following").click();
