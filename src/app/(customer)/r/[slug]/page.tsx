@@ -3,7 +3,8 @@ import { BlockedNotice } from "@/components/customer/blocked-notice";
 import { restaurantBlockFor } from "@/server/blocks";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { BadgeCheck, BadgePercent, Bike, ChevronLeft, ChevronRight, Clapperboard, Clock, ConciergeBell, Globe, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, UtensilsCrossed } from "lucide-react";
+import { BackButton } from "@/components/back-button";
+import { BadgeCheck, BadgePercent, Bike, ChevronRight, Clapperboard, Clock, ConciergeBell, Globe, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, UtensilsCrossed } from "lucide-react";
 import { getPublicRestaurant } from "@/server/restaurant-public";
 import { ownerKey } from "@/server/engagement";
 import { prisma } from "@/server/db";
@@ -236,9 +237,8 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           )}
         </div>
         <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4" style={{ paddingTop: "calc(var(--safe-top) + 10px)" }}>
-          <Link prefetch href="/restaurants" className="grid h-11 w-11 place-items-center rounded-full bg-white/95 text-ink shadow-md backdrop-blur" aria-label={t("Back")}>
-            <ChevronLeft className="h-6 w-6 rtl:-scale-x-100" />
-          </Link>
+          {/* Back to where they came from (the reel they were watching), or Restaurants if opened directly. */}
+          <BackButton fallback="/restaurants" className="grid h-11 w-11 place-items-center rounded-full bg-white/95 text-ink shadow-md backdrop-blur active:scale-90" />
           <div className="flex gap-2.5">
             <SaveToggle heart type="RESTAURANT" refId={r.id} initial={saved} className="grid h-11 w-11 place-items-center rounded-full bg-white/95 shadow-md backdrop-blur active:scale-90" />
             <ShareButton title={r.displayName} message={t("{name} on numnum: watch their reels and order", { name: r.displayName })} path={`/r/${r.slug}`} className="grid h-11 w-11 place-items-center rounded-full bg-white/95 text-ink shadow-md backdrop-blur">

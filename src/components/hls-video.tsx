@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import type Hls from "hls.js";
 import { playableSrc, reportedDownlink } from "@/lib/video-src";
-import { claimEarlyVideo } from "@/components/customer/video-pool";
+import { claimEarlyVideo, isKept, sameVideo } from "@/components/customer/video-pool";
 
 // Browsers without built-in HLS (Android/Chrome) need hls.js: start downloading it as soon as this
 // module loads (during app start-up) instead of when the first reel mounts.
@@ -85,10 +85,12 @@ export const HlsVideo = forwardRef<HTMLVideoElement, Props>(function HlsVideo({ 
     if (!v) return;
     const isHls = /\.m3u8(\?|$)/.test(src);
     if (!isHls || v.canPlayType("application/vnd.apple.mpegurl")) {
-      // The page's early <video> may already be loading this exact URL: don't restart it.
+      // The page's early <video>, or one set aside / loaded in advance, may already hold this
+      // video: don't restart it.
       const want = playableSrc(src, reportedDownlink());
-      if (v.src !== new URL(want, location.href).href) v.src = want;
+      if (!v.getAttribute("src") || !sameVideo(v.src, new URL(want, location.href).href)) v.src = want;
       return () => {
+        if (isKept(v)) return; // set aside to come back to: keep what it downloaded
         v.pause();
         v.removeAttribute("src");
         v.load();
@@ -113,11 +115,20 @@ export const HlsVideo = forwardRef<HTMLVideoElement, Props>(function HlsVideo({ 
       hls.on(HlsLib.Events.MANIFEST_PARSED, (_e, d) => {
         // On a weak connection (the phone reports it) start lower still, so the first frame comes fast.
         const conn = (navigator as Navigator & { connection?: { downlink?: number } }).connection;
-        const levels = d.levels.map((l, i) => ({ h: l.height || 0, i })).filter((l) => l.h);
+        // "540p" is the shorter side: reels are portrait, so a 540p rendition is 540×960.
+        const levels = d.levels.map((l, i) => ({ h: Math.min(l.width || l.height || 0, l.height || l.width || 0), i })).filter((l) => l.h);
         // 3G-class connections start at the lightest rendition; quality rises from there.
         const cap = conn?.downlink != null && conn.downlink < 2 ? Math.min(...levels.map((l) => l.h)) : weakConnection() || saveData ? 360 : 540;
         const light = levels.filter((l) => l.h <= cap).sort((a, b) => b.h - a.h)[0];
-        if (light) hls.startLevel = light.i;
+        if (!light) return;
+        hls.startLevel = light.i;
+        // Held there for the first segment: hls.js would otherwise judge the connection by the
+        // segments it just got from the browser cache (instant), jump to the top quality and keep
+        // the first frame waiting for it. Automatic again once the first frame is buffered.
+        hls.loadLevel = light.i;
+        hls.once(HlsLib.Events.FRAG_BUFFERED, () => {
+          hls.loadLevel = -1;
+        });
       });
       hls.loadSource(src);
       hls.attachMedia(v);
