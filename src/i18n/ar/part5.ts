@@ -90,6 +90,8 @@ export const AR5: Record<string, string> = {
   "{n} reels": "{n} فيديو",
   "{n} restaurant": "مطعم واحد",
   "{n} restaurants": "{n} مطعم",
+  "{n} restaurants|2": "مطعمان",
+  "{n} restaurants|3-10": "{n} مطاعم",
   "active": "نشط",
   "draft": "مسودة",
   "suspended": "موقوف",

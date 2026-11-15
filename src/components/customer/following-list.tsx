@@ -71,10 +71,10 @@ function Row({ r }: { r: Item }) {
         </span>
         <span className="min-w-0">
           <span className="flex items-center gap-1 font-bold">
-            <span className="truncate">{r.name}</span>
+            <span className="truncate rtl:text-right" dir="auto">{r.name}</span>
             {r.verified && <VerifiedBadge />}
           </span>
-          {r.place && <span className="block truncate text-xs text-ink-muted">{r.place}</span>}
+          {r.place && <span className="block truncate text-xs text-ink-muted rtl:text-right" dir="auto">{r.place}</span>}
           {r.deal && (
             <span className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
               <BadgePercent className="h-3 w-3 shrink-0" />
