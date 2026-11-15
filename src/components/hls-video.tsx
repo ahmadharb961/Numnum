@@ -90,7 +90,7 @@ export const HlsVideo = forwardRef<HTMLVideoElement, Props>(function HlsVideo({ 
       const want = playableSrc(src, reportedDownlink());
       if (!v.getAttribute("src") || !sameVideo(v.src, new URL(want, location.href).href)) v.src = want;
       return () => {
-        if (isKept(v)) return; // set aside to come back to: keep what it downloaded
+        if (isKept(v)) return void v.pause(); // set aside to come back to: keep what it downloaded
         v.pause();
         v.removeAttribute("src");
         v.load();

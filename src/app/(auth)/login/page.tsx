@@ -24,9 +24,9 @@ function LinkCard({ href, icon: Icon, title, action }: { href: string; icon: typ
   );
 }
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; reset?: string }> }) {
   const t = await getT();
-  const { next } = await searchParams;
+  const { next, reset } = await searchParams;
   const q = next ? `?next=${encodeURIComponent(next)}` : "";
   return (
     <div>
@@ -42,7 +42,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <p className="mx-auto mt-1 max-w-xs text-[15px] font-medium text-ink-soft">{t("Log in to your restaurant dashboard or customer account.")}</p>
       </div>
       <div className="mt-6">
-        <LoginForm next={next} />
+        <LoginForm next={next} reset={reset === "1"} />
       </div>
       <div className="my-6 flex items-center gap-4 text-sm text-ink-muted">
         <span className="h-px flex-1 bg-black/10" />

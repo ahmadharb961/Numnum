@@ -30,18 +30,24 @@ const isHls = (src: string) => /\.m3u8(\?|$)/.test(src);
 /** Played by the <video> element itself (MP4 anywhere, HLS on iPhone), not through hls.js. */
 const plainVideo = (src: string) => !isHls(src) || nativeHls();
 
+function discard(v: HTMLVideoElement) {
+  kept.delete(v);
+  v.pause();
+  v.removeAttribute("src");
+  v.load();
+  v.remove();
+}
+
 function keep(key: string, v: HTMLVideoElement) {
+  const before = warm.get(key);
+  if (before && before !== v) discard(before); // replaced by the one that played it for real
   warm.delete(key);
   warm.set(key, v);
   kept.add(v);
   while (warm.size > WARM_MAX) {
     const [oldKey, old] = warm.entries().next().value as [string, HTMLVideoElement];
     warm.delete(oldKey);
-    kept.delete(old);
-    old.pause();
-    old.removeAttribute("src");
-    old.load();
-    old.remove();
+    discard(old);
   }
 }
 
@@ -52,17 +58,20 @@ export const isKept = (v: HTMLVideoElement) => kept.has(v);
 export const sameVideo = (a: string, b: string) => a.replace(/[?&]clientBandwidthHint=[^&]*/, "") === b.replace(/[?&]clientBandwidthHint=[^&]*/, "");
 
 /**
- * Keeps the element playing reel `index` aside, with what it has downloaded, instead of letting
- * the player discard it; its slot gets a fresh element. Coming back to that reel adopts it again.
+ * Keeps the pooled element that holds this reel's video aside, with what it has downloaded, instead
+ * of letting the player discard it when its slide goes away; its slot gets a fresh element. The reel
+ * shown again (Back, switching tab) adopts it, so it plays at once.
  */
-export function stashVideo(index: number, key: string | null | undefined) {
+export function stashVideo(key: string | null | undefined) {
   if (!pool || !key || !plainVideo(key)) return;
-  const v = pool[index % SIZE];
-  if (!v.getAttribute("src") || !sameVideo(v.src, new URL(playableSrc(key, reportedDownlink()), location.href).href)) return;
-  v.pause();
-  keep(key, v);
-  pool[index % SIZE] = create();
-  if (unlocked) prime(pool[index % SIZE]);
+  const want = new URL(playableSrc(key, reportedDownlink()), location.href).href;
+  const i = pool.findIndex((v) => !!v.getAttribute("src") && sameVideo(v.src, want));
+  if (i < 0) return;
+  // Not paused here: if the same reel stays on screen (it's also first in the other tab), it just
+  // keeps playing. The player pauses it when it actually leaves the screen.
+  keep(key, pool[i]);
+  pool[i] = create();
+  if (unlocked) prime(pool[i]);
 }
 
 /**
@@ -149,6 +158,9 @@ export function claimEarlyVideo(v: HTMLVideoElement) {
  */
 let unlocked = false;
 function prime(v: HTMLVideoElement) {
+  // Already playing (e.g. the reel on screen, set aside but staying): it's allowed already, and a
+  // play-then-pause here would stop it.
+  if (!v.paused) return;
   const wasMuted = v.muted;
   v.muted = false;
   const p = v.play();

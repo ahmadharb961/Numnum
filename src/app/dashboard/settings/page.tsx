@@ -52,6 +52,11 @@ export default async function SettingsPage() {
       <Section title={t("Opening hours")} description={t("Times are in Beirut time. Use a closing time after midnight (e.g. 02:00) for late nights.")}>
         <HoursEditor initial={(r.openingHours ?? {}) as OpeningHours} />
       </Section>
+      <Section title={t("Your login")} description={t("The email and password you log in with.")}>
+        <Link href="/account/password" className="inline-flex h-11 items-center rounded-xl border border-black/10 px-4 text-sm font-bold hover:bg-black/5" data-testid="change-password-link">
+          {t("Change password")}
+        </Link>
+      </Section>
     </DashPage>
   );
 }

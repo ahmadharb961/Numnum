@@ -366,6 +366,12 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
   }
 }
 
+/** The store apps (Admin → Settings) as email lines, once they're live: "App Store: …", "Google Play: …". */
+async function storeLines(): Promise<string[]> {
+  const { appLinks } = await getSettings();
+  return [appLinks.ios?.trim() && `App Store: ${appLinks.ios.trim()}`, appLinks.android?.trim() && `Google Play: ${appLinks.android.trim()}`].filter(Boolean) as string[];
+}
+
 /** Email the restaurant (its contact email + owners/managers) about a new order. Never throws. */
 async function emailNewOrder(restaurantId: string, reference: string, o: { customer: string; delivery: { km: string | null; address: string } | null; lines: string[]; total: string; deal: { summary: string | null; off: string } | null; notes: string | null }) {
   try {
@@ -376,11 +382,12 @@ async function emailNewOrder(restaurantId: string, reference: string, o: { custo
     for (const s of r.staff) if (!recipients.has(s.user.email)) recipients.set(s.user.email, s.user.locale);
     if (r.email && !recipients.has(r.email)) recipients.set(r.email, r.staff[0]?.user.locale ?? null);
     const link = `${process.env.APP_URL ?? ""}/dashboard/orders?ref=${reference}`;
+    const inStores = (await storeLines()).length > 0;
     await Promise.all(
       [...recipients].map(([addr, locale]) => {
         const t = tFor(locale);
         const how = o.delivery ? `${t("Delivery")}${o.delivery.km ? ` (${o.delivery.km})` : ""}: ${o.delivery.address}` : t("Pickup");
-        const text = [t("New order {ref} for {name}", { ref: reference, name: r.displayName }), "", `${t("Customer")}: ${o.customer}`, how, "", ...o.lines, "", ...(o.deal ? [`${t("Your deal")}: ${showDealSummary(t, o.deal.summary)} (−${o.deal.off})`] : []), `${t("Total (cash on delivery)")}: ${o.total}`, ...(o.notes ? ["", `${t("Note")}: ${o.notes}`] : []), "", `${t("Accept it in your dashboard")}: ${link}`].join("\n");
+        const text = [t("New order {ref} for {name}", { ref: reference, name: r.displayName }), "", `${t("Customer")}: ${o.customer}`, how, "", ...o.lines, "", ...(o.deal ? [`${t("Your deal")}: ${showDealSummary(t, o.deal.summary)} (−${o.deal.off})`] : []), `${t("Total (cash on delivery)")}: ${o.total}`, ...(o.notes ? ["", `${t("Note")}: ${o.notes}`] : []), "", ...(inStores ? [t("Open the numnum app to accept it."), `${t("Or in your dashboard")}: ${link}`] : [`${t("Accept it in your dashboard")}: ${link}`])].join("\n");
         return sendEmail(addr, `🔔 ${t("New order {ref} · {total}", { ref: reference, total: o.total })}`, text);
       }),
     );
@@ -413,7 +420,16 @@ async function notifyCustomer(tx: Tx, order: { id: string; userId: string | null
   // Rejected / not delivered: the customer is asked to confirm the restaurant's version.
   const note = asks ? [reason && t("Reason: {reason}", { reason }), t("Tap to tell us if that's right.")].filter(Boolean).join(" · ") : reason;
   await notifyUser(order.userId, { type: "ORDER_STATUS", title, body: note, link: `/order/${order.reference}` }, tx);
-  if (u?.email) void sendEmail(u.email, t("Order {ref} — {status}", { ref: order.reference, status: t(STATUS_META[status].label) }), `${title}${note ? `\n${note}` : ""}\n\n${process.env.APP_URL ?? ""}/order/${order.reference}?t=${order.trackingToken}`);
+  if (u?.email) {
+    const email = u.email;
+    // Once the apps are in the stores, the email also points to them (live updates on the phone).
+    void storeLines()
+      .catch(() => [] as string[])
+      .then((stores) => {
+        const app = stores.length ? `\n\n${t("Get live updates on your phone with the numnum app:")}\n${stores.join("\n")}` : "";
+        return sendEmail(email, t("Order {ref} — {status}", { ref: order.reference, status: t(STATUS_META[status].label) }), `${title}${note ? `\n${note}` : ""}\n\n${process.env.APP_URL ?? ""}/order/${order.reference}?t=${order.trackingToken}${app}`);
+      });
+  }
   // Phone notification (if they turned notifications on); tapping opens the order.
   void pushToUsers([order.userId], { title, body: note || t("Tap to see your order"), url: `/order/${order.reference}`, tag: `status-${order.reference}` });
 }

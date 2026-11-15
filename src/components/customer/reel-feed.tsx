@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { ItemSheet, prefetchItem } from "./item-sheet";
 import { api, track } from "./track";
 import { HlsVideo } from "@/components/hls-video";
+import { goBack, previousPage } from "@/components/back-button";
 import { pooledVideo, primeKeptVideos, stashVideo, unlockPooledVideos, warmVideo } from "./video-pool";
 import { markFeedReady, registerFeed, whenFeedReady } from "@/lib/feed-ready";
 import { LocationChip } from "./location-picker";
@@ -112,7 +113,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
       const now = latest.current;
       // eslint-disable-next-line react-hooks/exhaustive-deps -- the latest tabs on leaving, on purpose
       feedMemory = { ...now, tabs: { ...tabs.current }, at: Date.now() };
-      stashVideo(now.active, now.reels[now.active]?.videoUrl);
+      stashVideo(now.reels[now.active]?.videoUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -313,7 +314,9 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     tabs.current[tab] = { reels, cursor, index: active, at: tabs.current[tab]?.at ?? Date.now() };
     // The reel you're leaving keeps what it downloaded (instant when you come back), and the other
     // tab's reel, loaded in advance, may play with sound: this tap allows it.
-    stashVideo(active, reels[active]?.videoUrl);
+    stashVideo(reels[active]?.videoUrl);
+    const back = tabs.current[next];
+    if (back) stashVideo(back.reels[back.index]?.videoUrl); // the reel you return to, if still loaded
     primeKeptVideos();
     setTab(next);
     setIncoming(null);
@@ -357,7 +360,8 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     const warmOther = () => {
       const other = tabs.current[tabRef.current === "following" ? "foryou" : "following"];
       const reel = other?.reels[other.index];
-      if (reel) warmTimer = window.setTimeout(() => warmVideo(reel.videoUrl), 2500);
+      // (not when it's the very reel playing now: it's already loaded)
+      if (reel && reel.videoUrl !== latest.current.reels[latest.current.active]?.videoUrl) warmTimer = window.setTimeout(() => warmVideo(reel.videoUrl), 2500);
     };
     const cancel = whenFeedReady(() => {
       if (tabs.current.following) return warmOther();
@@ -437,7 +441,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   return (
     <div className={cn("relative bg-black text-white transition-[padding] duration-300", panel && "lg:pe-[400px]")}>
       {(fixed || backHref) && (
-        <button onClick={() => (backHref ? router.push(backHref) : router.back())} className="absolute start-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={t("Back")}>
+        <button onClick={() => goBack(router, backHref ?? "/")} data-testid="reel-back" className="absolute start-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={t("Back")}>
           <ChevronLeft className="rtl:-scale-x-100 h-6 w-6" />
         </button>
       )}
@@ -623,7 +627,14 @@ const ReelSlide = memo(function ReelSlide({
   const t = useT();
   const { loggedIn } = useLoginGate();
   const locale = useLocale();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  // The <video> this reel plays in, as state too: when it changes while the reel stays on screen
+  // (switching tab to a list where the same reel is first), playback starts again on the new one.
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+  const bindVideo = useCallback((v: HTMLVideoElement | null) => {
+    videoRef.current = v;
+    setVideoEl(v);
+  }, []);
   const onSoundBlocked = () => actions.current.soundBlocked();
   const justUnlocked = () => actions.current.justUnlocked();
   const onLike = () => actions.current.like(reel);
@@ -668,30 +679,39 @@ const ReelSlide = memo(function ReelSlide({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    // Answers to a request made by an earlier run of this effect (the reel left the screen, or its
+    // <video> changed) are ignored: only the latest request decides (muted retry, play button).
+    let live = true;
     let retry: (() => void) | null = null;
-    if (active && !paused) {
-      v.muted = muted; // a reel warmed up in advance was started muted
-      v.play().catch((e: Error) => {
+    let aborts = 0;
+    const attempt = (): void =>
+      void v.play().catch((e: Error) => {
+        if (!live) return;
         // The player (hls.js) attached the video after play() was asked, which cancels the request
-        // (a reel that's on screen as soon as it appears: after switching tab or coming Back).
+        // (a reel that's on screen as soon as it appears: first load, switching tab, coming Back).
         // Not a refusal: play as soon as it can.
-        if (e.name === "AbortError") {
-          if (retry) return;
-          retry = () => void v.play().catch(() => {});
+        if (e.name === "AbortError" && aborts++ < 3) {
+          if (retry) v.removeEventListener("canplay", retry);
+          retry = () => live && attempt();
           v.addEventListener("canplay", retry, { once: true });
-          if (v.readyState >= 3) retry();
+          if (v.readyState >= 3) {
+            v.removeEventListener("canplay", retry);
+            retry();
+          }
           return;
         }
         // Sound before any tap is blocked: play muted instead and let the feed offer sound.
         if (e.name === "NotAllowedError" && !v.muted) {
           v.muted = true;
           onSoundBlocked();
-          v.play().catch(() => setPaused(true));
-          return;
+          return attempt();
         }
         // autoplay can be blocked (e.g. low-power mode); show play affordance
         setPaused(true);
       });
+    if (active && !paused) {
+      v.muted = muted; // a reel warmed up in advance was started muted
+      attempt();
     } else {
       v.pause();
     }
@@ -699,10 +719,10 @@ const ReelSlide = memo(function ReelSlide({
       lastTick.current = null;
     }
     return () => {
+      live = false;
       if (retry) v.removeEventListener("canplay", retry);
-      retry = () => {}; // a cancelled request arriving after this must not start it again
     };
-  }, [active, paused, near, mounted]);
+  }, [active, paused, near, mounted, videoEl]);
 
   useEffect(() => {
     if (!active) setPaused(false);
@@ -891,7 +911,7 @@ const ReelSlide = memo(function ReelSlide({
       )}
       {showVideo && (
         <HlsVideo
-          ref={videoRef}
+          ref={bindVideo}
           element={pooledVideo(index, reel.videoUrl)}
           className="absolute inset-0 h-full w-full object-cover"
           src={reel.videoUrl!}
@@ -966,7 +986,7 @@ const ReelSlide = memo(function ReelSlide({
 
       {/* Right action rail */}
       <div className="absolute bottom-6 end-2 z-10 flex flex-col items-center gap-4">
-        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="relative mb-1" aria-label={t("Open {name}", { name: reel.restaurant.name })}>
+        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => openRestaurant(e, reel.restaurant.slug, onRestaurant, router)} className="relative mb-1" aria-label={t("Open {name}", { name: reel.restaurant.name })}>
           <span className="block h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-white">
             {reel.restaurant.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -1005,7 +1025,7 @@ const ReelSlide = memo(function ReelSlide({
       {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pe-20 *:pointer-events-auto">
         {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">{t("Sponsored")}</span>}
-        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
+        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => openRestaurant(e, reel.restaurant.slug, onRestaurant, router)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
           {reel.restaurant.name}
           {reel.restaurant.verified && <VerifiedBadge />}
         </Link>
@@ -1107,12 +1127,22 @@ function RailButton({ children, label, onClick, aria }: { children: React.ReactN
 
 
 /** On desktop, the restaurant photo/name opens the side panel instead of leaving the reels. */
-function desktopPanel(e: React.MouseEvent, open: () => void) {
+/**
+ * The restaurant's photo or name on a reel. Opened from that restaurant's own page (its reels
+ * grid), it goes back there instead of stacking another copy of the page, so Back never loops
+ * between the reel and the restaurant. On a computer it opens the side panel.
+ */
+function openRestaurant(e: React.MouseEvent, slug: string, panel: () => void, router: { back: () => void; push: (href: string) => void }) {
   if (window.matchMedia("(min-width: 1024px)").matches) {
     e.preventDefault();
-    open();
+    return panel();
+  }
+  if (previousPage() === `/r/${slug}`) {
+    e.preventDefault();
+    router.back();
   }
 }
+
 
 type PanelMenu = { description: string | null; openNow: boolean | null; reelCount: number; sections: { id: string; name: string; items: { id: string; name: string; priceCents: number; currency: string; available: boolean; image: string | null }[] }[] };
 

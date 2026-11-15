@@ -41,7 +41,8 @@ async function slow4g(p) {
 
   console.log("\nReel → restaurant → Back");
   await p.goto("/", { waitUntil: "load" });
-  check((await timeToPlay(p, Date.now(), 20000)) >= 0, "first reel plays");
+  const first = await timeToPlay(p, Date.now(), 20000);
+  check(first >= 0, "first reel plays", first < 0 ? await p.evaluate(() => { const s = document.querySelector("section[data-active='true']"); const v = s?.querySelector("video"); return { sections: document.querySelectorAll("section[data-index]").length, index: s?.dataset.index, video: !!v, paused: v?.paused, t: v?.currentTime, rs: v?.readyState, err: v?.error?.code, src: v?.getAttribute("src")?.slice(0, 30), playBtn: !!s?.querySelector("[aria-label='Play']") }; }) : first);
   await swipeTo(p, 2);
   await timeToPlay(p, Date.now());
   await p.waitForTimeout(1500);
@@ -76,13 +77,17 @@ async function slow4g(p) {
   const forYou = await activeInfo(p);
   await p.waitForTimeout(9000); // Following and its first reel load in the background
   if (!process.env.HLSJS) {
-    const warmed = await p.evaluate(() => [...document.querySelectorAll("body > video")].filter((v) => v.readyState >= 2).length);
-    check(warmed >= 1, "Following's first reel is loaded in advance", warmed);
+    // Ready either way: loaded in advance in the background, or already loaded because it's also the
+    // reel on screen / one of the next ones in For you (then it's reused, not loaded twice).
+    const folFirst = await p.evaluate(async () => (await (await fetch("/api/feed?tab=following")).json()).reels[0]?.videoUrl);
+    const ready = await p.evaluate((src) => [...document.querySelectorAll("video")].some((v) => v.readyState >= 2 && v.getAttribute("src") && src && v.src.includes(src.split("?")[0].replace(/^\//, ""))), folFirst);
+    check(ready, "Following's first reel is already loaded before the switch", folFirst);
   }
   let at = Date.now();
   await p.getByTestId("tab-following").click();
   const tf = await timeToPlay(p, at);
-  check(tf >= 0 && tf < 700, `Following's first reel plays at once (${tf} ms)`, tf);
+  const vstate = () => p.evaluate(() => { const s = document.querySelector("section[data-active='true']"); const v = s?.querySelector("video"); return { index: s?.dataset.index, label: s?.getAttribute("aria-label"), video: !!v, paused: v?.paused, t: v?.currentTime, rs: v?.readyState, err: v?.error?.code, src: v?.getAttribute("src")?.slice(-40), playBtn: !!s?.querySelector("[aria-label='Play']") }; });
+  check(tf >= 0 && tf < 700, `Following's first reel plays at once (${tf} ms${(await activeInfo(p)).label === forYou.label ? ", the same reel you were on in For you" : ""})`, tf < 0 ? await vstate() : tf);
   const fol = await activeInfo(p);
   check(/Burger House|Bean Bar/.test(fol.label), "and it's from a followed restaurant", fol.label);
   await swipeTo(p, 1);
@@ -120,8 +125,12 @@ async function slow4g(p) {
   await p.reload({ waitUntil: "load" });
   check((await timeToPlay(p, Date.now(), 20000)) >= 0 && !errors.length, "a fresh load still starts normally", errors);
   await p.waitForTimeout(6000);
+  const fyFirst = (await activeInfo(p)).label;
+  at = Date.now();
   await p.getByTestId("tab-following").click();
-  await timeToPlay(p, Date.now());
+  const tfs = await timeToPlay(p, at);
+  const folFirst = (await activeInfo(p)).label;
+  check(tfs >= 0 && tfs < 700, `Following plays at once (${tfs} ms; ${fyFirst === folFirst ? "same" : "different"} first reel than For you)`, tfs < 0 ? await vstate() : tfs);
   const counts = await p.evaluate(() => document.querySelectorAll("section[data-index]").length);
   await swipeTo(p, 1);
   const sw = await activeInfo(p);
@@ -129,6 +138,59 @@ async function slow4g(p) {
   const playingOne = await p.evaluate(() => [...document.querySelectorAll("section[data-index] video")].filter((v) => !v.paused).map((v) => v.closest("section").dataset.index));
   // (a reel two ahead may play silently for a moment: that's how iPhones are made to preload it)
   check(sw.index === 1 && ts >= 0 && playingOne.includes("1") && !playingOne.includes("0"), `swiping in Following moves to the next reel, which plays, and the previous one stops (${counts} reels)`, { sw, ts, playingOne });
+  console.log("\nRestaurant reels grid: no back-and-forth loop");
+  const settle = (pg) => pg.waitForFunction(() => !document.querySelector('div[hidden][id^="S:"]'), null, { timeout: 15000 }).catch(() => {});
+  const path = (pg) => new URL(pg.url()).pathname;
+  const q = await ctx.newPage(); // a fresh tab, as if the restaurant page was opened directly
+  await q.addLocatorHandler(q.getByRole("dialog", { name: "How was your order?" }), async () => q.getByRole("button", { name: "Not now" }).click({ timeout: 3000 }).catch(() => {}));
+  const openGridReel = async () => {
+    // A tap while the page is still starting up can be missed: tap again (as a person would).
+    for (let i = 0; i < 3 && !/\/reels\//.test(q.url()); i++) {
+      await q.locator("[role=tab]:visible", { hasText: "Reels" }).first().click();
+      await q.locator("a[href*='/reels/']:visible").first().click();
+      await q.waitForURL(/\/r\/burger-house\/reels\//, { timeout: 5000 }).catch(() => {});
+    }
+    await q.waitForURL(/\/r\/burger-house\/reels\//);
+    await settle(q);
+  };
+  await q.goto("/r/burger-house", { waitUntil: "load" }); await settle(q);
+  await openGridReel();
+  // the restaurant photo on the reel goes back to the page it came from (no new copy)
+  await q.locator("section[data-active='true'] a[href='/r/burger-house']").first().click();
+  await q.waitForURL((u) => u.pathname === "/r/burger-house");
+  await settle(q);
+  await q.locator("[data-testid=back-button]:visible").click();
+  await q.waitForURL((u) => u.pathname !== "/r/burger-house", { timeout: 10000 }).catch(() => {});
+  check(path(q) === "/restaurants", "reel → restaurant photo → restaurant → Back leaves the restaurant (no loop back to the reel)", path(q));
+  await q.goto("/r/burger-house", { waitUntil: "load" }); await settle(q);
+  await openGridReel();
+  await q.getByTestId("reel-back").click();
+  await q.waitForURL((u) => u.pathname === "/r/burger-house");
+  await settle(q);
+  await q.locator("[data-testid=back-button]:visible").click();
+  await q.waitForURL((u) => u.pathname !== "/r/burger-house", { timeout: 10000 }).catch(() => {});
+  check(path(q) !== "/r/burger-house" && !path(q).includes("/reels/"), "reel → reel's Back → restaurant → Back doesn't return to the reel", path(q));
+  // From the home feed: reel → restaurant → grid reel → photo → Back → the home reel you started on
+  await q.goto("/", { waitUntil: "load" }); await settle(q);
+  const feeds = await q.waitForFunction(() => document.querySelectorAll("section[data-active='true']").length === 1, null, { timeout: 15000 }).then(() => 1, () => q.evaluate(() => document.querySelectorAll("section[data-active='true']").length));
+  check(feeds === 1, "one feed on the page once loaded", feeds);
+  await swipeTo(q, 1);
+  const start = await activeInfo(q);
+  const slugHref = await q.locator("section[data-active='true'] a[href^='/r/']").first().getAttribute("href");
+  await q.locator("section[data-active='true'] a[href^='/r/']").first().click();
+  await q.waitForURL((u) => u.pathname === slugHref); await settle(q);
+  await q.locator("[role=tab]:visible", { hasText: "Reels" }).first().click();
+  await q.locator("a[href*='/reels/']:visible").first().click();
+  await q.waitForURL(/\/reels\//); await settle(q); await q.locator("section[data-active='true']").first().waitFor();
+  await q.locator(`section[data-active='true'] a[href='${slugHref}']`).first().click();
+  await q.waitForURL((u) => u.pathname === slugHref); await settle(q);
+  await q.locator("[data-testid=back-button]:visible").click();
+  await q.waitForURL((u) => u.pathname === "/", { timeout: 10000 }).catch(() => {});
+  await settle(q);
+  const end = await activeInfo(q);
+  check(path(q) === "/" && end.label === start.label, "home reel → restaurant → its reel → photo → Back returns to the home reel you started on", { path: path(q), start: start.label, end: end.label });
+  await q.close();
+
   await b.close(); await db.$disconnect();
   console.log(fails ? `\n${fails} check(s) failed` : "\nAll checks passed");
   process.exit(fails ? 1 : 0);
