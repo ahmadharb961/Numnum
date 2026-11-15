@@ -17,3 +17,13 @@ describe("Arabic translations", () => {
     expect(localName("en", "Pizza", "بيتزا")).toBe("Pizza");
   });
 });
+
+describe("Arabic counts", () => {
+  it("uses the dual for 2, the plural for 3–10, and the singular form for 11+", async () => {
+    const { format } = await import("@/i18n/core");
+    const { AR } = await import("@/i18n/ar");
+    const t = (n: number) => format(AR, n === 1 ? "{n} restaurant" : "{n} restaurants", { n });
+    expect([t(1), t(2), t(3), t(10), t(11), t(250)]).toEqual(["مطعم واحد", "مطعمان", "3 مطاعم", "10 مطاعم", "11 مطعم", "250 مطعم"]);
+    expect(format(null, "{n} restaurants", { n: 3 })).toBe("3 restaurants");
+  });
+});
