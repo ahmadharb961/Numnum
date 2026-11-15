@@ -21,7 +21,7 @@ export function NavHistory() {
 }
 
 /** Back to the previous numnum page, or to `fallback` when the page was opened directly. */
-export function BackButton({ fallback = "/" }: { fallback?: string }) {
+export function BackButton({ fallback = "/", className = "-ms-2 grid h-10 w-10 place-items-center rounded-full hover:bg-black/5" }: { fallback?: string; className?: string }) {
   const t = useT();
   const router = useRouter();
   const back = () => {
@@ -33,7 +33,7 @@ export function BackButton({ fallback = "/" }: { fallback?: string }) {
     else router.push(fallback);
   };
   return (
-    <button onClick={back} className="-ms-2 grid h-10 w-10 place-items-center rounded-full hover:bg-black/5" aria-label={t("Back")}>
+    <button onClick={back} className={className} aria-label={t("Back")} data-testid="back-button">
       <ChevronLeft className="rtl:-scale-x-100 h-6 w-6" />
     </button>
   );

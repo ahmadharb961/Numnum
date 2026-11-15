@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { ItemSheet, prefetchItem } from "./item-sheet";
 import { api, track } from "./track";
 import { HlsVideo } from "@/components/hls-video";
-import { pooledVideo, unlockPooledVideos } from "./video-pool";
+import { pooledVideo, primeKeptVideos, stashVideo, unlockPooledVideos, warmVideo } from "./video-pool";
 import { markFeedReady, registerFeed, whenFeedReady } from "@/lib/feed-ready";
 import { LocationChip } from "./location-picker";
 import { formatKm } from "@/lib/geo";
@@ -53,24 +53,39 @@ function usePreconnect(url: string | null | undefined) {
   }, [url]);
 }
 
+// The home feed as you left it (tab, reels, the reel you were on), so Back from a restaurant or a
+// dish returns to that very reel, like TikTok/Instagram. Kept for this visit only.
+type FeedMemory = {
+  tab: "foryou" | "following";
+  reels: FeedReel[];
+  cursor: number | null;
+  active: number;
+  tabs: Record<"foryou" | "following", { reels: FeedReel[]; cursor: number | null; index: number; at: number } | null>;
+  at: number;
+};
+const MEMORY_MS = 30 * 60_000;
+let feedMemory: FeedMemory | null = null;
+
 export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref, locationLabel = null }: Props) {
   const t = useT();
   const { requireLogin, askLogin, loggedIn } = useLoginGate();
   const router = useRouter();
-  const [reels, setReels] = useState<FeedReel[]>(initial);
-  const [cursor, setCursor] = useState<number | null>(fixed ? null : initialCursor);
+  const home = !fixed && !backHref;
+  const [restored] = useState(() => (home && feedMemory && Date.now() - feedMemory.at < MEMORY_MS && feedMemory.reels.length ? feedMemory : null));
+  const [reels, setReels] = useState<FeedReel[]>(restored?.reels ?? initial);
+  const [cursor, setCursor] = useState<number | null>(fixed ? null : restored ? restored.cursor : initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   // Home feed tabs: "For you" (ranked) and "Following" (newest from followed restaurants).
-  const [tab, setTab] = useState<"foryou" | "following">("foryou");
+  const [tab, setTab] = useState<"foryou" | "following">(restored?.tab ?? "foryou");
   const [tabLoading, setTabLoading] = useState(false);
   // Each tab keeps its reels and the reel you were on, so switching back and forth is instant and
   // returns you to the same place (Following is also preloaded once the first reel plays).
   type TabState = { reels: FeedReel[]; cursor: number | null; index: number; at: number };
-  const tabs = useRef<Record<"foryou" | "following", TabState | null>>({ foryou: null, following: null });
+  const tabs = useRef<Record<"foryou" | "following", TabState | null>>(restored?.tabs ?? { foryou: null, following: null });
   // Current tab and reel for async callbacks (a fetch finishing after the person switched again).
   const tabRef = useRef(tab);
   tabRef.current = tab;
-  const [active, setActive] = useState(startIndex);
+  const [active, setActive] = useState(restored?.active ?? startIndex);
   const activeRef = useRef(active);
   activeRef.current = active;
   const [incoming, setIncoming] = useState<number | null>(null);
@@ -85,6 +100,22 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   const actions = useRef<SlideActions>(null as unknown as SlideActions);
   const markBuffered = useCallback((id: string) => setBuffered((b) => (b.has(id) ? b : new Set(b).add(id))), []);
   usePreconnect(initial[startIndex]?.videoUrl ?? initial[0]?.videoUrl);
+  // Back on the home feed: straight to the reel you were on (before the first paint), and on
+  // leaving, remember where you are and keep that reel's video loaded for your return.
+  const latest = useRef({ tab, reels, cursor, active });
+  latest.current = { tab, reels, cursor, active };
+  useLayoutEffect(() => {
+    const root = containerRef.current;
+    if (restored && root) root.scrollTop = restored.active * root.clientHeight;
+    return () => {
+      if (!home) return;
+      const now = latest.current;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- the latest tabs on leaving, on purpose
+      feedMemory = { ...now, tabs: { ...tabs.current }, at: Date.now() };
+      stashVideo(now.active, now.reels[now.active]?.videoUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // The dish of the reel on screen (and the next one) loads in the background: "Order" opens instantly.
   useEffect(() => {
     const cancelReady = whenFeedReady(() => prefetchItem(reels[active]?.item.id), 3000);
@@ -205,7 +236,8 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     );
     Array.from(root.children).forEach((c) => io.observe(c));
     return () => io.disconnect();
-  }, [reels.length]);
+    // The list itself, not its length: switching tab to a list of the same length swaps every slide.
+  }, [reels]);
 
   // TikTok/Instagram: the next reel starts playing (silently) on the first frame the feed moves
   // toward it, so it's already playing when the swipe settles. Read from the scroll position, which
@@ -279,6 +311,10 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
       return;
     }
     tabs.current[tab] = { reels, cursor, index: active, at: tabs.current[tab]?.at ?? Date.now() };
+    // The reel you're leaving keeps what it downloaded (instant when you come back), and the other
+    // tab's reel, loaded in advance, may play with sound: this tap allows it.
+    stashVideo(active, reels[active]?.videoUrl);
+    primeKeptVideos();
     setTab(next);
     setIncoming(null);
     setBuffered(new Set());
@@ -312,17 +348,31 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
     if (tabRef.current === next) showTab(next, st);
   }
 
-  // Preload Following (and its first cover) once the first reel plays, so the first switch is instant.
+  // Preload Following (its list, first cover and first seconds of video) once the first reel
+  // plays, so the first switch is instant. The video waits a little more, so the next For You reel
+  // gets its head start first.
   useEffect(() => {
     if (fixed || backHref || !loggedIn) return;
-    return whenFeedReady(() => {
+    let warmTimer: number | undefined;
+    const warmOther = () => {
+      const other = tabs.current[tabRef.current === "following" ? "foryou" : "following"];
+      const reel = other?.reels[other.index];
+      if (reel) warmTimer = window.setTimeout(() => warmVideo(reel.videoUrl), 2500);
+    };
+    const cancel = whenFeedReady(() => {
+      if (tabs.current.following) return warmOther();
       void fetchTab("following").then((st) => {
         if (!st || tabs.current.following) return;
         tabs.current.following = st;
         const poster = st.reels[0]?.posterUrl;
         if (poster) new Image().src = poster;
+        if (tabRef.current === "foryou") warmOther();
       });
     }, 4000);
+    return () => {
+      cancel();
+      window.clearTimeout(warmTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn, fixed, backHref]);
 
@@ -618,9 +668,20 @@ const ReelSlide = memo(function ReelSlide({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    let retry: (() => void) | null = null;
     if (active && !paused) {
       v.muted = muted; // a reel warmed up in advance was started muted
       v.play().catch((e: Error) => {
+        // The player (hls.js) attached the video after play() was asked, which cancels the request
+        // (a reel that's on screen as soon as it appears: after switching tab or coming Back).
+        // Not a refusal: play as soon as it can.
+        if (e.name === "AbortError") {
+          if (retry) return;
+          retry = () => void v.play().catch(() => {});
+          v.addEventListener("canplay", retry, { once: true });
+          if (v.readyState >= 3) retry();
+          return;
+        }
         // Sound before any tap is blocked: play muted instead and let the feed offer sound.
         if (e.name === "NotAllowedError" && !v.muted) {
           v.muted = true;
@@ -637,6 +698,10 @@ const ReelSlide = memo(function ReelSlide({
     if (!active) {
       lastTick.current = null;
     }
+    return () => {
+      if (retry) v.removeEventListener("canplay", retry);
+      retry = () => {}; // a cancelled request arriving after this must not start it again
+    };
   }, [active, paused, near, mounted]);
 
   useEffect(() => {
@@ -827,7 +892,7 @@ const ReelSlide = memo(function ReelSlide({
       {showVideo && (
         <HlsVideo
           ref={videoRef}
-          element={pooledVideo(index)}
+          element={pooledVideo(index, reel.videoUrl)}
           className="absolute inset-0 h-full w-full object-cover"
           src={reel.videoUrl!}
           onFatal={() => setFailed(true)}
