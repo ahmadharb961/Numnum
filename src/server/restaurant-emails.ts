@@ -62,6 +62,8 @@ export type WelcomeData = {
   whishName: string;
   whishNumber: string;
   loginEmail: string;
+  /** The store apps (Admin → Settings): once set, restaurants are sent there instead of "add to home screen". */
+  appLinks?: { ios: string; android: string };
 };
 
 /** Builds the welcome email (pure: used for sending, tests and previews). */
@@ -72,6 +74,16 @@ export function welcomeEmail(d: WelcomeData, locale: string | null | undefined) 
   const whish = d.whishNumber
     ? t("Send it with Whish to {name} · {number}, with the invoice number in the note.", { name: esc(d.whishName || "numnum"), number: ltr(esc(formatPhone(d.whishNumber.replace(/\D/g, "")) || d.whishNumber)) })
     : t("Send it with Whish: the details are on every invoice in your dashboard.");
+  // The phone step follows the store links: the numnum app once it's in the stores, else the web dashboard
+  // on the home screen (same rule as the dashboard's own setup screen).
+  const ios = d.appLinks?.ios?.trim() || "";
+  const android = d.appLinks?.android?.trim() || "";
+  const inStores = !!(ios || android);
+  const phoneTitle = inStores ? t("Get the numnum app and turn on notifications") : t("Add numnum to your phone and turn on notifications");
+  const phoneBody = inStores
+    ? t("Download the numnum app on your phone, log in with {email} and allow notifications, so a new order rings even when the screen is locked.", { email: ltr(esc(d.loginEmail)) })
+    : t("Open your dashboard on your phone, add it to the home screen and allow notifications, so a new order rings even when the screen is locked.");
+  const storeButtons = [ios && storeLink("App Store", ios), android && storeLink("Google Play", android)].filter(Boolean).join("&nbsp;&nbsp;");
   const steps = [
     ["🍔", t("Add your menu and photos"), t("Import it in minutes from a spreadsheet.")],
     ["📍", t("Pin your location and delivery zones"), t("Customers outside your zones can still pick up.")],
@@ -107,7 +119,7 @@ export function welcomeEmail(d: WelcomeData, locale: string | null | undefined) 
      ${button(t("Open my dashboard"), `${app}/dashboard`)}
      ${small(t("Log in at {url} with {email}.", { url: ltr(`${app.replace(/^https?:\/\//, "")}/login`), email: ltr(esc(d.loginEmail)) }))}
 
-     ${callout("📲", t("Add numnum to your phone and turn on notifications"), t("Open your dashboard on your phone, add it to the home screen and allow notifications, so a new order rings even when the screen is locked."), "#eef6ff")}
+     ${callout("📲", phoneTitle, `${phoneBody}${storeButtons ? `<div style="margin-top:10px">${storeButtons}</div>` : ""}`, "#eef6ff")}
 
      ${callout("💵", t("Paying your commission"), `${t("On the 1st of each month you get an invoice for last month's completed orders. Pay it within {days} days.", { days: d.dueDays })} ${whish}<br><b style="color:#c2410c">${t("Please don't be late: after {days} more days, promotion stops and your profile can be paused.", { days: d.graceDays })}</b>`, "#fff7e6")}
 
@@ -128,7 +140,9 @@ export function welcomeEmail(d: WelcomeData, locale: string | null | undefined) 
     ...steps.map(([, title], i) => `${i + 1}. ${title}`),
     `${t("Open my dashboard")}: ${app}/dashboard`,
     "",
-    `${t("Add numnum to your phone and turn on notifications")}: ${t("Open your dashboard on your phone, add it to the home screen and allow notifications, so a new order rings even when the screen is locked.")}`,
+    `${phoneTitle}: ${phoneBody.replace(/<[^>]+>/g, "")}`,
+    ...(ios ? [`App Store: ${ios}`] : []),
+    ...(android ? [`Google Play: ${android}`] : []),
     "",
     `${t("Paying your commission")}: ${t("On the 1st of each month you get an invoice for last month's completed orders. Pay it within {days} days.", { days: d.dueDays })} ${whish.replace(/<[^>]+>/g, "")}`,
     t("Please don't be late: after {days} more days, promotion stops and your profile can be paused.", { days: d.graceDays }),
@@ -148,7 +162,7 @@ export async function sendRestaurantWelcome(restaurantId: string) {
   const s = await getSettings();
   const bps = r.commissionRateBps ?? s.defaultCommissionRateBps;
   const mail = welcomeEmail(
-    { ownerName: owner.name, restaurantName: r.displayName, ratePct: `${Number((bps / 100).toFixed(2))}%`, dueDays: s.invoiceDueDays, graceDays: s.graceDays, whishName: s.whish.recipientName, whishNumber: s.whish.whishNumber, loginEmail: owner.email },
+    { ownerName: owner.name, restaurantName: r.displayName, ratePct: `${Number((bps / 100).toFixed(2))}%`, dueDays: s.invoiceDueDays, graceDays: s.graceDays, whishName: s.whish.recipientName, whishNumber: s.whish.whishNumber, loginEmail: owner.email, appLinks: s.appLinks },
     owner.locale,
   );
   return sendRichEmail(owner.email, mail.subject, mail.html, mail.text);
@@ -167,6 +181,9 @@ const button = (label: string, href: string) =>
   `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0 4px"><tr><td style="border-radius:12px;background:#ff5412"><a href="${href}" style="display:inline-block;padding:14px 26px;font:800 16px Arial,sans-serif;color:#ffffff;text-decoration:none;border-radius:12px">${esc(label)}</a></td></tr></table>`;
 const callout = (icon: string, title: string, body: string, bg: string) =>
   `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 0;background:${bg};border-radius:14px"><tr><td width="44" valign="top" style="padding:16px 0 16px 16px;font-size:26px">${icon}</td><td style="padding:16px"><div style="font:800 16px Arial,sans-serif;color:#16120f">${esc(title)}</div><div style="margin-top:4px;font:14px/1.55 Arial,sans-serif;color:#4a423d">${body}</div></td></tr></table>`;
+/** A small dark store button (App Store / Google Play). */
+const storeLink = (label: string, href: string) =>
+  `<a href="${esc(href)}" style="display:inline-block;margin-top:4px;padding:9px 16px;border-radius:10px;background:#16120f;color:#ffffff;font:800 14px Arial,sans-serif;text-decoration:none">${esc(label)}</a>`;
 const bullet = (icon: string, s: string) => `<p style="margin:6px 0;font:15px/1.5 Arial,sans-serif;color:#4a423d"><span style="font-size:18px">${icon}</span>&nbsp; ${esc(s)}</p>`;
 
 function layout(locale: string | null | undefined, inner: string, { logo = true } = {}) {

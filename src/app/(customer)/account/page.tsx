@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff, LifeBuoy } from "lucide-react";
+import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff, LifeBuoy, Heart } from "lucide-react";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { PageHeader } from "@/components/customer/page-header";
@@ -23,11 +23,12 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AccountPage() {
   const t = await getT();
   const user = await requireUser("/account");
-  const [active, orderCount, addressCount, staffCount] = await Promise.all([
+  const [active, orderCount, addressCount, staffCount, followingCount] = await Promise.all([
     prisma.order.findMany({ where: { userId: user.id, status: { in: ACTIVE_STATUSES } }, orderBy: { createdAt: "desc" }, take: 3 }),
     prisma.order.count({ where: { userId: user.id } }),
     prisma.customerAddress.count({ where: { userId: user.id } }),
     prisma.restaurantStaff.count({ where: { userId: user.id } }),
+    prisma.restaurantFollow.count({ where: { userId: user.id, restaurant: { status: "ACTIVE", blockedBy: { none: { userId: user.id } } } } }),
   ]);
   const workLinks = [
     ...(staffCount ? [{ href: "/dashboard", icon: LayoutDashboard, label: "Restaurant dashboard", sub: "Orders, menu, reels, insights" }] : []),
@@ -60,6 +61,7 @@ export default async function AccountPage() {
             ...workLinks,
             { href: "/account/orders", icon: Receipt, label: "My orders", sub: t(orderCount === 1 ? "{n} order" : "{n} orders", { n: orderCount }) },
             { href: "/account/addresses", icon: MapPin, label: "Saved addresses", sub: t("{n} saved", { n: addressCount }) },
+            { href: "/account/following", icon: Heart, label: "Following", sub: t(followingCount === 1 ? "{n} restaurant" : "{n} restaurants", { n: followingCount }) },
             { href: "/saved", icon: Bookmark, label: "Saved dishes & restaurants", sub: "Reels, dishes, restaurants" },
             { href: "/account/blocked", icon: EyeOff, label: "Blocked", sub: "Restaurants and people you hid" },
             { href: "/support", icon: LifeBuoy, label: "Help & support", sub: "Contact us, terms and privacy" },

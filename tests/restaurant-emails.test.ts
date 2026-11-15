@@ -36,6 +36,35 @@ describe("welcome email content", () => {
     expect(welcomeEmail({ ...data, whishNumber: "" }, "en").html).toContain("the details are on every invoice in your dashboard");
   });
 
+  it("with the store apps set, sends restaurants to the app (not 'add to home screen')", () => {
+    const links = { ios: "https://apps.apple.com/app/numnum/id123", android: "https://play.google.com/store/apps/details?id=me.numnum.app" };
+    const m = welcomeEmail({ ...data, appLinks: links }, "en");
+    expect(m.html).toContain("Get the numnum app and turn on notifications");
+    expect(m.html).toContain(`href="${links.ios}"`);
+    expect(m.html).toContain(`href="${links.android.replace(/&/g, "&amp;")}"`);
+    expect(m.html).toContain(">App Store<");
+    expect(m.html).toContain(">Google Play<");
+    expect(m.html).not.toContain("home screen");
+    expect(m.text).toContain(`Google Play: ${links.android}`);
+    expect(m.text).not.toContain("home screen");
+    const ar = welcomeEmail({ ...data, appLinks: links }, "ar");
+    expect(ar.html).toContain("حمّل تطبيق numnum وفعّل الإشعارات");
+  });
+
+  it("only one store set: just that button", () => {
+    const m = welcomeEmail({ ...data, appLinks: { ios: "", android: "https://play.google.com/store/apps/details?id=me.numnum.app" } }, "en");
+    expect(m.html).toContain(">Google Play<");
+    expect(m.html).not.toContain(">App Store<");
+  });
+
+  it("before the app is in the stores, explains adding the dashboard to the home screen", () => {
+    for (const appLinks of [undefined, { ios: "", android: "" }]) {
+      const m = welcomeEmail({ ...data, appLinks }, "en");
+      expect(m.html).toContain("add it to the home screen");
+      expect(m.html).not.toContain(">App Store<");
+    }
+  });
+
   it("escapes names typed by restaurants", () => {
     expect(welcomeEmail({ ...data, restaurantName: "<script>x</script>" }, "en").html).not.toContain("<script>");
   });
