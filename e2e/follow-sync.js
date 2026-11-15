@@ -54,7 +54,11 @@ let fails = 0; const check = (c, m, x) => { console.log(`${c ? "✓" : "✗"} ${
   await new Promise((r) => setTimeout(r, 16000));
   await p.goto("/account", { waitUntil: "load" });
   check((await p.getByRole("link", { name: /Following/ }).innerText()).includes("2 restaurants"), "Account shows Following · 2 restaurants", await p.getByRole("link", { name: /Following/ }).innerText());
-  await p.getByRole("link", { name: /Following/ }).click();
+  // The review popup (from an earlier test's delivered order) can open as the link is tapped: tap again.
+  for (let i = 0; i < 3 && !p.url().includes("/account/following"); i++) {
+    await p.getByRole("link", { name: /Following/ }).click();
+    await p.waitForURL(/\/account\/following/, { timeout: 5000 }).catch(() => {});
+  }
   await p.waitForURL(/\/account\/following/);
   await p.getByTestId("following-list").waitFor();
   const rows = await p.getByTestId("following-row").allInnerTexts();
