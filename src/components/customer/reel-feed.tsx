@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { ItemSheet, prefetchItem } from "./item-sheet";
 import { api, track } from "./track";
 import { HlsVideo } from "@/components/hls-video";
+import { goBack, previousPage } from "@/components/back-button";
 import { pooledVideo, primeKeptVideos, stashVideo, unlockPooledVideos, warmVideo } from "./video-pool";
 import { markFeedReady, registerFeed, whenFeedReady } from "@/lib/feed-ready";
 import { LocationChip } from "./location-picker";
@@ -437,7 +438,7 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
   return (
     <div className={cn("relative bg-black text-white transition-[padding] duration-300", panel && "lg:pe-[400px]")}>
       {(fixed || backHref) && (
-        <button onClick={() => (backHref ? router.push(backHref) : router.back())} className="absolute start-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={t("Back")}>
+        <button onClick={() => goBack(router, backHref ?? "/")} data-testid="reel-back" className="absolute start-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={t("Back")}>
           <ChevronLeft className="rtl:-scale-x-100 h-6 w-6" />
         </button>
       )}
@@ -966,7 +967,7 @@ const ReelSlide = memo(function ReelSlide({
 
       {/* Right action rail */}
       <div className="absolute bottom-6 end-2 z-10 flex flex-col items-center gap-4">
-        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="relative mb-1" aria-label={t("Open {name}", { name: reel.restaurant.name })}>
+        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => openRestaurant(e, reel.restaurant.slug, onRestaurant, router)} className="relative mb-1" aria-label={t("Open {name}", { name: reel.restaurant.name })}>
           <span className="block h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-white">
             {reel.restaurant.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -1005,7 +1006,7 @@ const ReelSlide = memo(function ReelSlide({
       {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pe-20 *:pointer-events-auto">
         {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">{t("Sponsored")}</span>}
-        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => desktopPanel(e, onRestaurant)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
+        <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => openRestaurant(e, reel.restaurant.slug, onRestaurant, router)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
           {reel.restaurant.name}
           {reel.restaurant.verified && <VerifiedBadge />}
         </Link>
@@ -1107,12 +1108,22 @@ function RailButton({ children, label, onClick, aria }: { children: React.ReactN
 
 
 /** On desktop, the restaurant photo/name opens the side panel instead of leaving the reels. */
-function desktopPanel(e: React.MouseEvent, open: () => void) {
+/**
+ * The restaurant's photo or name on a reel. Opened from that restaurant's own page (its reels
+ * grid), it goes back there instead of stacking another copy of the page, so Back never loops
+ * between the reel and the restaurant. On a computer it opens the side panel.
+ */
+function openRestaurant(e: React.MouseEvent, slug: string, panel: () => void, router: { back: () => void; push: (href: string) => void }) {
   if (window.matchMedia("(min-width: 1024px)").matches) {
     e.preventDefault();
-    open();
+    return panel();
+  }
+  if (previousPage() === `/r/${slug}`) {
+    e.preventDefault();
+    router.back();
   }
 }
+
 
 type PanelMenu = { description: string | null; openNow: boolean | null; reelCount: number; sections: { id: string; name: string; items: { id: string; name: string; priceCents: number; currency: string; available: boolean; image: string | null }[] }[] };
 

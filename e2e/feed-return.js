@@ -129,6 +129,59 @@ async function slow4g(p) {
   const playingOne = await p.evaluate(() => [...document.querySelectorAll("section[data-index] video")].filter((v) => !v.paused).map((v) => v.closest("section").dataset.index));
   // (a reel two ahead may play silently for a moment: that's how iPhones are made to preload it)
   check(sw.index === 1 && ts >= 0 && playingOne.includes("1") && !playingOne.includes("0"), `swiping in Following moves to the next reel, which plays, and the previous one stops (${counts} reels)`, { sw, ts, playingOne });
+  console.log("\nRestaurant reels grid: no back-and-forth loop");
+  const settle = (pg) => pg.waitForFunction(() => !document.querySelector('div[hidden][id^="S:"]'), null, { timeout: 15000 }).catch(() => {});
+  const path = (pg) => new URL(pg.url()).pathname;
+  const q = await ctx.newPage(); // a fresh tab, as if the restaurant page was opened directly
+  await q.addLocatorHandler(q.getByRole("dialog", { name: "How was your order?" }), async () => q.getByRole("button", { name: "Not now" }).click({ timeout: 3000 }).catch(() => {}));
+  const openGridReel = async () => {
+    // A tap while the page is still starting up can be missed: tap again (as a person would).
+    for (let i = 0; i < 3 && !/\/reels\//.test(q.url()); i++) {
+      await q.locator("[role=tab]:visible", { hasText: "Reels" }).first().click();
+      await q.locator("a[href*='/reels/']:visible").first().click();
+      await q.waitForURL(/\/r\/burger-house\/reels\//, { timeout: 5000 }).catch(() => {});
+    }
+    await q.waitForURL(/\/r\/burger-house\/reels\//);
+    await settle(q);
+  };
+  await q.goto("/r/burger-house", { waitUntil: "load" }); await settle(q);
+  await openGridReel();
+  // the restaurant photo on the reel goes back to the page it came from (no new copy)
+  await q.locator("section[data-active='true'] a[href='/r/burger-house']").first().click();
+  await q.waitForURL((u) => u.pathname === "/r/burger-house");
+  await settle(q);
+  await q.locator("[data-testid=back-button]:visible").click();
+  await q.waitForURL((u) => u.pathname !== "/r/burger-house", { timeout: 10000 }).catch(() => {});
+  check(path(q) === "/restaurants", "reel → restaurant photo → restaurant → Back leaves the restaurant (no loop back to the reel)", path(q));
+  await q.goto("/r/burger-house", { waitUntil: "load" }); await settle(q);
+  await openGridReel();
+  await q.getByTestId("reel-back").click();
+  await q.waitForURL((u) => u.pathname === "/r/burger-house");
+  await settle(q);
+  await q.locator("[data-testid=back-button]:visible").click();
+  await q.waitForURL((u) => u.pathname !== "/r/burger-house", { timeout: 10000 }).catch(() => {});
+  check(path(q) !== "/r/burger-house" && !path(q).includes("/reels/"), "reel → reel's Back → restaurant → Back doesn't return to the reel", path(q));
+  // From the home feed: reel → restaurant → grid reel → photo → Back → the home reel you started on
+  await q.goto("/", { waitUntil: "load" }); await settle(q);
+  const feeds = await q.waitForFunction(() => document.querySelectorAll("section[data-active='true']").length === 1, null, { timeout: 15000 }).then(() => 1, () => q.evaluate(() => document.querySelectorAll("section[data-active='true']").length));
+  check(feeds === 1, "one feed on the page once loaded", feeds);
+  await swipeTo(q, 1);
+  const start = await activeInfo(q);
+  const slugHref = await q.locator("section[data-active='true'] a[href^='/r/']").first().getAttribute("href");
+  await q.locator("section[data-active='true'] a[href^='/r/']").first().click();
+  await q.waitForURL((u) => u.pathname === slugHref); await settle(q);
+  await q.locator("[role=tab]:visible", { hasText: "Reels" }).first().click();
+  await q.locator("a[href*='/reels/']:visible").first().click();
+  await q.waitForURL(/\/reels\//); await settle(q); await q.locator("section[data-active='true']").first().waitFor();
+  await q.locator(`section[data-active='true'] a[href='${slugHref}']`).first().click();
+  await q.waitForURL((u) => u.pathname === slugHref); await settle(q);
+  await q.locator("[data-testid=back-button]:visible").click();
+  await q.waitForURL((u) => u.pathname === "/", { timeout: 10000 }).catch(() => {});
+  await settle(q);
+  const end = await activeInfo(q);
+  check(path(q) === "/" && end.label === start.label, "home reel → restaurant → its reel → photo → Back returns to the home reel you started on", { path: path(q), start: start.label, end: end.label });
+  await q.close();
+
   await b.close(); await db.$disconnect();
   console.log(fails ? `\n${fails} check(s) failed` : "\nAll checks passed");
   process.exit(fails ? 1 : 0);
