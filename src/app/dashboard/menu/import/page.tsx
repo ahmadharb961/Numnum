@@ -17,7 +17,7 @@ export default async function ImportPage() {
   const ctx = await requireRestaurant("MANAGER");
   const history = await prisma.menuImport.findMany({ where: { restaurantId: ctx.restaurant.id }, orderBy: { createdAt: "desc" }, take: 5 });
   return (
-    <DashPage back="/dashboard/menu" title={t("Import menu from CSV")} description={t("Upload your whole menu at once. Re-upload anytime to update prices and descriptions — photos, reels and reviews are kept.")}>
+    <DashPage title={t("Import menu from CSV")} description={t("Upload your whole menu at once. Re-upload anytime to update prices and descriptions — photos, reels and reviews are kept.")}>
       <CsvImporter currency={ctx.restaurant.currency} />
       {history.length > 0 && (
         <div className="card mt-6 p-4">

@@ -385,8 +385,4 @@ export const AR5: Record<string, string> = {
   "Or in your dashboard": "أو من لوحة التحكم",
   "Get live updates on your phone with the numnum app:": "تابع طلبك مباشرة على هاتفك مع تطبيق numnum:",
   "Notifications are off for numnum. Turn them on in your phone's settings:": "الإشعارات متوقفة لتطبيق numnum. شغّلها من إعدادات هاتفك:",
-  // Dashboard on phones
-  "Confirm your email": "أكّد بريدك الإلكتروني",
-  "Link sent to {email}": "أرسلنا الرابط إلى {email}",
-  "Stop": "إيقاف",
 };

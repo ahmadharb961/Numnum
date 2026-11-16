@@ -24,7 +24,7 @@ export default async function PhotosPage() {
   ]);
   const withPhotos = items.filter((i) => i.images.length).length;
   return (
-    <DashPage back="/dashboard/menu" title={t("Menu photos")} description={t("{n} of {total} items have photos", { n: withPhotos, total: items.length })}>
+    <DashPage title={t("Menu photos")} description={t("{n} of {total} items have photos", { n: withPhotos, total: items.length })}>
       <BulkPhotos
         items={items.map((i) => ({ id: i.id, sku: i.sku, name: i.name, images: i.images.map((im) => ({ id: im.id, assetId: im.assetId, isMain: im.isMain, thumbUrl: im.asset.thumbUrl ?? im.asset.url })) }))}
         library={library.map((a) => ({ id: a.id, thumbUrl: a.thumbUrl ?? a.url, name: a.originalName, used: a._count.itemImages }))}

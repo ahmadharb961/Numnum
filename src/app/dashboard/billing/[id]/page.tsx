@@ -32,7 +32,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const evMap = new Map(events.map((e) => [e.id, e]));
   const withinWindow = Date.now() - (inv.issuedAt ?? inv.createdAt).getTime() < settings.disputeWindowDays * 86400_000;
   return (
-    <DashPage back="/dashboard/billing"
+    <DashPage
       title={t("Invoice {number}", { number: inv.number })}
       description={<>{periodLabel(inv.period, lang)} · issued {inv.issuedAt ? formatDate(inv.issuedAt, undefined, lang) : "—"} · due {formatDate(inv.dueDate, undefined, lang)}</>}
       actions={

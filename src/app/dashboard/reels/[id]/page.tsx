@@ -31,7 +31,7 @@ export default async function ReelDetailPage({ params, searchParams }: { params:
   const range = sp.days === "all" ? { from: new Date(Math.max(created.getTime(), end.getTime() - 366 * 86400_000)), to: end, label: t("Since published") } : parseRange(sp);
   const perf = reel.status === "READY" ? await reelInsight(ctx.restaurant.id, reel.id, range) : null;
   return (
-    <DashPage back="/dashboard/reels" title={t("Reel · {name}", { name: reel.menuItem.name })} description={t("Shows {name} at {price} (live price)", { name: reel.menuItem.name, price: formatMoney(reel.menuItem.priceCents, reel.menuItem.currency) })}>
+    <DashPage title={t("Reel · {name}", { name: reel.menuItem.name })} description={t("Shows {name} at {price} (live price)", { name: reel.menuItem.name, price: formatMoney(reel.menuItem.priceCents, reel.menuItem.currency) })}>
       {reel.status === "PROCESSING" && <AutoRefresh seconds={5} />}
       {perf && <ReelPerformance reelId={reel.id} currency={ctx.restaurant.currency} rangeLabel={range.label} days={sp.days === "all" ? "all" : sp.from ? null : [7, 30, 90].includes(Number(sp.days)) ? Number(sp.days) : 30} data={perf} />}
       <ReelEditor

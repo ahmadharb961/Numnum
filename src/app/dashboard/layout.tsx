@@ -4,7 +4,7 @@ import { prisma } from "@/server/db";
 import { DashboardNav } from "@/components/dashboard/nav";
 import { Alert } from "@/components/ui/misc";
 import Link from "next/link";
-import { NewOrderAlert, OrderAlertsProvider } from "@/components/dashboard/new-order-alert";
+import { NewOrderAlert } from "@/components/dashboard/new-order-alert";
 import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 import { InstallGate } from "@/components/dashboard/install-gate";
 import { getT } from "@/i18n/server";
@@ -27,10 +27,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     prisma.user.findUnique({ where: { id: ctx.user.id }, select: { email: true, emailVerifiedAt: true } }),
   ]);
   return (
-    <OrderAlertsProvider initialCount={pendingOrders}>
     <div className="min-h-dvh bg-cream">
       {ctx.asAdmin && (
-        <form action="/admin/exit-restaurant" method="post" className="fixed inset-x-0 z-[70] mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-full bg-ink py-2 pe-2 ps-4 text-sm text-white shadow-lg" style={{ bottom: "calc(var(--nav-h) + var(--safe-bottom) + 12px)" }}>
+        <form action="/admin/exit-restaurant" method="post" className="fixed inset-x-0 z-[70] mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-full bg-ink py-2 pe-2 ps-4 text-sm text-white shadow-lg" style={{ bottom: "calc(var(--safe-bottom) + 16px)" }}>
           <span className="truncate">
             Admin: managing <b>{r.displayName}</b>
           </span>
@@ -41,11 +40,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       )}
       <InstallGate bypass={ctx.asAdmin}>
       <DashboardNav restaurantName={r.displayName} slug={r.slug} role={ctx.staffRole} memberships={ctx.memberships} currentId={r.id} unread={unread} pendingOrders={pendingOrders} />
-      {/* Room for the phone's tab bar at the bottom (none on computers). */}
-      <div className="pb-[calc(var(--nav-h)+var(--safe-bottom))] lg:ps-64 lg:pb-0">
-        {/* Computers: new orders + sound above the page. Phones have them in the top bar and tabs. */}
-        <div className="hidden justify-end px-4 pt-3 lg:flex lg:px-8">
-          <NewOrderAlert />
+      <div className="lg:ps-64">
+        <div className="flex justify-end px-4 pt-3 lg:px-8">
+          <NewOrderAlert initialCount={pendingOrders} />
         </div>
         {!ctx.asAdmin && me && !me.emailVerifiedAt && (
           <div className="px-4 pt-4 lg:px-8">
@@ -69,6 +66,5 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </div>
       </InstallGate>
     </div>
-    </OrderAlertsProvider>
   );
 }

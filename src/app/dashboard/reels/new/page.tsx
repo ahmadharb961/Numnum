@@ -18,7 +18,7 @@ export default async function NewReelPage({ searchParams }: { searchParams: Prom
   const ctx = await requireRestaurant("MANAGER");
   const items = await prisma.menuItem.findMany({ where: { restaurantId: ctx.restaurant.id, archived: false }, orderBy: { name: "asc" }, select: { id: true, name: true, sku: true, priceCents: true, currency: true } });
   return (
-    <DashPage back="/dashboard/reels" title={t("Upload a reel")} description={t("Vertical 9:16 video, up to 3 minutes. We optimise it for fast playback on mobile networks.")}>
+    <DashPage title={t("Upload a reel")} description={t("Vertical 9:16 video, up to 3 minutes. We optimise it for fast playback on mobile networks.")}>
       {ctx.restaurant.status !== "ACTIVE" && <Alert className="mb-4">Your profile isn&apos;t live yet, so reels will be saved as drafts. Publish them once your restaurant is approved.</Alert>}
       {ctx.restaurant.restrictReels ? (
         <Alert tone="red">{t("New reels are restricted on your account until outstanding invoices are settled.")}</Alert>

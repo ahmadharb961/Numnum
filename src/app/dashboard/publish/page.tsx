@@ -22,7 +22,7 @@ export default async function PublishPage() {
   const required = steps.filter((x) => ["phone", "menu", "agreement"].includes(x.key));
   const ready = required.every((x) => x.done);
   return (
-    <DashPage back="/dashboard" title={t("Publish your restaurant")}>
+    <DashPage title={t("Publish your restaurant")}>
       {r.status === "ACTIVE" && <Alert tone="green" className="mb-4">{t("Your profile is live.")} <Link href={`/r/${r.slug}`} className="font-semibold underline">{t("View it")}</Link></Alert>}
       {r.status === "PENDING_APPROVAL" && <Alert className="mb-4">Your profile is waiting for approval by the numnum team. We&apos;ll notify you here.</Alert>}
       <Section title={t("Review before going live")}>
