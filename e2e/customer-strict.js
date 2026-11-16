@@ -160,7 +160,7 @@ async function chooseDelivery(page) {
   section("Delivery details validation");
   await c.fill("#name", "");
   await c.getByRole("button", { name: "Review order" }).click();
-  await c.waitForTimeout(400);
+  await c.getByText("Enter your full name").first().waitFor({ timeout: 5000 }).catch(() => {});
   check((await c.getByText("Enter your full name").count()) > 0, "empty name → 'Enter your full name'");
   await c.fill("#name", "Strict Tester");
   await c.fill("#phone", "123");
