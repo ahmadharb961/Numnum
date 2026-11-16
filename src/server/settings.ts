@@ -49,7 +49,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
   platformName: "numnum",
   tagline: "Watch it. Crave it. Order it.",
-  supportEmail: "support@numnum.app",
+  supportEmail: "support@numnum.me",
   defaultCommissionRateBps: 1400,
   billableEvent: "COMPLETED",
   autoCompleteHours: 6,
