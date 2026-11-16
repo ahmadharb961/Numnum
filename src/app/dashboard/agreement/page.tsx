@@ -21,7 +21,7 @@ export default async function AgreementPage() {
   const r = ctx.restaurant;
   const outdated = r.agreementAcceptedAt && r.agreementVersion !== s.agreementVersion;
   return (
-    <DashPage title={t("Commission agreement")}>
+    <DashPage back="/dashboard" title={t("Commission agreement")}>
       {r.agreementAcceptedAt && !outdated && (
         <Alert tone="green" className="mb-4">
           {t("Accepted on {date} (version {v}).", { date: formatDateTime(r.agreementAcceptedAt, lang), v: r.agreementVersion })}

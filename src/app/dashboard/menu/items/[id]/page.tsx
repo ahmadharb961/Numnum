@@ -30,7 +30,7 @@ export default async function EditItemPage({ params, searchParams }: { params: P
     prisma.customizationGroup.findMany({ where: { restaurantId: r.id }, orderBy: { name: "asc" }, include: { _count: { select: { options: true } } } }),
   ]);
   return (
-    <DashPage
+    <DashPage back="/dashboard/menu"
       title={item.name}
       description={
         <>

@@ -20,7 +20,7 @@ export default async function NewItemPage() {
     prisma.customizationGroup.findMany({ where: { restaurantId: r.id }, orderBy: { name: "asc" }, include: { _count: { select: { options: true } } } }),
   ]);
   return (
-    <DashPage title={t("New menu item")}>
+    <DashPage back="/dashboard/menu" title={t("New menu item")}>
       <Section title={t("Details")}>
         <ItemForm item={null} currency={r.currency} categories={categories} foodCategories={foodCategories} groups={groups.map((g) => ({ id: g.id, name: g.name, type: g.type, optionCount: g._count.options }))} />
       </Section>

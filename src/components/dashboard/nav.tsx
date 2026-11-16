@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink, BadgePercent } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Home, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink, BadgePercent } from "lucide-react";
+import { NewOrderAlertCompact, useOrderAlerts } from "./new-order-alert";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/actions/auth";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -15,10 +16,31 @@ type NavItem = { href: string; label: string; icon: React.ComponentType<{ classN
 export function DashboardNav({ restaurantName, slug, role, memberships, currentId, unread, pendingOrders }: { restaurantName: string; slug: string; role: "OWNER" | "MANAGER" | "STAFF"; memberships: { id: string; displayName: string }[]; currentId: string; unread: number; pendingOrders: number }) {
   const t = useT();
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const rank = { STAFF: 1, MANAGER: 2, OWNER: 3 }[role];
+  // New orders, live (the badge follows the 10-second check, not just the page load).
+  const liveOrders = useOrderAlerts()?.count ?? pendingOrders;
+  // The phone's tab bar, like the customer app: the screens used all day, one tap away. Staff
+  // can't open Reels, so they get Reviews there. "More" opens everything else.
+  const tabs = [
+    { href: "/dashboard", label: "Home", icon: Home, match: (p: string) => p === "/dashboard" },
+    { href: "/dashboard/orders", label: "Orders", icon: ClipboardList, badge: liveOrders, match: (p: string) => p.startsWith("/dashboard/orders") },
+    { href: "/dashboard/menu", label: "Menu", icon: LayoutGrid, match: (p: string) => p.startsWith("/dashboard/menu") || p.startsWith("/dashboard/customizations") },
+    rank >= 2
+      ? { href: "/dashboard/reels", label: "Reels", icon: Film, match: (p: string) => p.startsWith("/dashboard/reels") }
+      : { href: "/dashboard/reviews", label: "Reviews", icon: MessageSquareText, match: (p: string) => p.startsWith("/dashboard/reviews") },
+  ];
+  const onTab = tabs.some((x) => x.match(pathname));
+  useEffect(() => {
+    // Tab screens load in the background so a tap shows them at once.
+    const t = setTimeout(() => tabs.forEach((x) => router.prefetch(x.href)), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, rank]);
+  useEffect(() => setOpen(false), [pathname]);
   const groups: { title: string; items: NavItem[] }[] = [
-    { title: "", items: [{ href: "/dashboard", label: "Overview", icon: BarChart3 }, { href: "/dashboard/orders", label: "Orders", icon: ClipboardList, badge: pendingOrders }, { href: "/dashboard/insights", label: "Insights", icon: LineChart, minRole: "MANAGER" }] },
+    { title: "", items: [{ href: "/dashboard", label: "Overview", icon: BarChart3 }, { href: "/dashboard/orders", label: "Orders", icon: ClipboardList, badge: liveOrders }, { href: "/dashboard/insights", label: "Insights", icon: LineChart, minRole: "MANAGER" }] },
     {
       title: "Menu",
       items: [
@@ -97,16 +119,42 @@ export function DashboardNav({ restaurantName, slug, role, memberships, currentI
   return (
     <>
       <aside className="fixed inset-y-0 start-0 z-30 hidden w-64 border-e border-black/5 bg-white lg:block">{content}</aside>
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-black/5 bg-white/95 px-4 backdrop-blur lg:hidden" style={{ paddingTop: "var(--safe-top)", height: "calc(3.5rem + var(--safe-top))" }}>
-        <button onClick={() => setOpen(true)} className="-ms-2 grid h-10 w-10 place-items-center" aria-label={t("Open menu")}>
-          <Menu className="h-6 w-6" />
-        </button>
-        <div className="min-w-0 flex-1 truncate font-bold">{restaurantName}</div>
-        <Link href="/dashboard/notifications" className="relative grid h-10 w-10 place-items-center" aria-label={t("Notifications")}>
+      <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-black/5 bg-white/95 px-4 backdrop-blur-xl lg:hidden" style={{ paddingTop: "var(--safe-top)", height: "calc(3.5rem + var(--safe-top))" }}>
+        <div className="min-w-0 flex-1 truncate text-[17px] font-extrabold tracking-tight">{restaurantName}</div>
+        <NewOrderAlertCompact />
+        <Link href="/dashboard/notifications" className="relative grid h-10 w-10 place-items-center rounded-full active:scale-90" aria-label={t("Notifications")}>
           <Bell className="h-5 w-5" />
           {unread > 0 && <span className="absolute end-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand-500" />}
         </Link>
       </header>
+      <nav className="hide-when-typing fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 backdrop-blur-xl lg:hidden" style={{ paddingBottom: "var(--safe-bottom)" }} aria-label={t("Main")} data-testid="dash-tabs">
+        <ul className="mx-auto grid h-[var(--nav-h)] max-w-screen-sm grid-cols-5">
+          {tabs.map(({ href, label, icon: Icon, match, ...x }) => {
+            const active = match(pathname);
+            const badge = "badge" in x ? (x.badge as number) : 0;
+            return (
+              <li key={href}>
+                <Link href={href} className={cn("relative flex h-full flex-col items-center justify-center gap-1 text-[11px] font-semibold transition active:scale-95", active ? "text-brand-600" : "text-ink-muted")} aria-current={active ? "page" : undefined}>
+                  <span className="relative">
+                    <Icon className={cn("h-6 w-6", active && "stroke-[2.4]")} />
+                    {badge > 0 && <span className="absolute -end-2.5 -top-1.5 grid h-[18px] min-w-[18px] animate-pulse place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white" data-testid="orders-badge">{badge > 99 ? "99+" : badge}</span>}
+                  </span>
+                  {t(label)}
+                </Link>
+              </li>
+            );
+          })}
+          <li>
+            <button type="button" onClick={() => setOpen(true)} className={cn("relative flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-semibold transition active:scale-95", !onTab || open ? "text-brand-600" : "text-ink-muted")} aria-label={t("More")} data-testid="dash-more">
+              <span className="relative">
+                <Menu className={cn("h-6 w-6", (!onTab || open) && "stroke-[2.4]")} />
+                {unread > 0 && <span className="absolute -end-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-brand-500" />}
+              </span>
+              {t("More")}
+            </button>
+          </li>
+        </ul>
+      </nav>
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />

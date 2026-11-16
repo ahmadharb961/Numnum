@@ -12,9 +12,15 @@ export function VerifyEmailBanner({ email }: { email: string }) {
   const toast = useToast();
   const [pending, start] = useTransition();
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-sky-50 p-3 text-sm text-sky-900 ring-1 ring-sky-100" data-testid="verify-email-banner">
+    // One compact line, so the page itself stays in view.
+    <div className="flex items-center gap-2.5 rounded-2xl bg-sky-50 py-2 pe-2 ps-3 text-sky-900 ring-1 ring-sky-100" data-testid="verify-email-banner">
       <MailCheck className="h-5 w-5 shrink-0" />
-      <span className="min-w-0 flex-1">{t("Confirm your email: we sent a link to {email}.", { email })}</span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block text-sm font-bold">{t("Confirm your email")}</span>
+        <span className="block truncate text-xs text-sky-800/80" title={email}>
+          {t("Link sent to {email}", { email })}
+        </span>
+      </span>
       <button
         type="button"
         disabled={pending}
@@ -24,7 +30,7 @@ export function VerifyEmailBanner({ email }: { email: string }) {
             toast(t(r.ok ? (r.message ?? "Sent") : (r.error ?? "Something went wrong")), r.ok ? "success" : "error");
           })
         }
-        className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+        className="shrink-0 rounded-full bg-sky-600 px-3 py-1.5 text-xs font-bold text-white active:scale-95 disabled:opacity-60"
       >
         {t("Resend")}
       </button>

@@ -1,15 +1,20 @@
 "use client";
 
+import { BackButton } from "@/components/back-button";
 import { useT } from "@/i18n/client";
 
 const tr = (t: (s: string) => string, n: React.ReactNode) => (typeof n === "string" ? t(n) : n);
 
-export function DashPage({ title, description, actions, children }: { title: string; description?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode }) {
+/** A dashboard page. `back` (inner pages: an item, a reel, an invoice…) shows a back button that
+ *  returns where the person came from, or to that page when opened directly (the app has no
+ *  browser back button). */
+export function DashPage({ title, description, actions, children, back }: { title: string; description?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; back?: string }) {
   const t = useT();
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-5 lg:px-8 lg:pt-8">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
+          {back && <BackButton fallback={back} className="-ms-2 mb-1 grid h-10 w-10 place-items-center rounded-full hover:bg-black/5 active:scale-90" />}
           <h1 className="text-2xl font-black tracking-tight">{t(title)}</h1>
           {description && <div className="mt-1 text-sm text-ink-muted">{tr(t, description)}</div>}
         </div>
