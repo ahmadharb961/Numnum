@@ -464,14 +464,17 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
         </div>
       )}
       {!fixed && !backHref && (
-        // Desktop has no top bar: the tabs sit at the top of the video column.
-        <div className="absolute left-1/2 top-4 z-30 hidden -translate-x-1/2 items-center gap-5 text-[15px] font-extrabold text-shadow lg:flex" role="tablist" aria-label={t("Feed")}>
-          {(["foryou", "following"] as const).map((k) => (
-            <button key={k} role="tab" aria-selected={tab === k} onClick={() => switchTab(k)} className={cn("relative pb-1.5 transition", tab === k ? "text-white" : "text-white/60")}>
-              {k === "foryou" ? t("For you") : t("Following")}
-              {tab === k && <span className="absolute inset-x-1 bottom-0 h-[3px] rounded-full bg-white" />}
-            </button>
-          ))}
+        // Desktop has no top bar: the tabs sit at the top of the video column, centred on the
+        // visible feed (the restaurant panel takes 400px at the end side when it's open).
+        <div className={cn("pointer-events-none absolute inset-x-0 top-4 z-30 hidden justify-center transition-[padding] duration-300 lg:flex", panel && "lg:pe-[400px]")}>
+          <div className="pointer-events-auto flex items-center gap-5 text-[15px] font-extrabold text-shadow" role="tablist" aria-label={t("Feed")} data-testid="desktop-tabs">
+            {(["foryou", "following"] as const).map((k) => (
+              <button key={k} role="tab" aria-selected={tab === k} onClick={() => switchTab(k)} className={cn("relative pb-1.5 transition", tab === k ? "text-white" : "text-white/60")}>
+                {k === "foryou" ? t("For you") : t("Following")}
+                {tab === k && <span className="absolute inset-x-1 bottom-0 h-[3px] rounded-full bg-white" />}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {/* While the browser holds sound back (until the first tap), the sound button pulses instead of a text prompt. */}
