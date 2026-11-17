@@ -111,7 +111,7 @@ export function sniffVideo(head: Buffer): "mp4" | "webm" | null {
 }
 
 /** Stores a raw uploaded video (already on disk) and creates its asset in PROCESSING form. */
-export async function storeRawVideo(tmpFile: string, opts: { restaurantId: string; originalName?: string; uploadedById?: string }) {
+export async function storeRawVideo(tmpFile: string, opts: { restaurantId: string | null; originalName?: string; uploadedById?: string }) {
   const stat = await fs.stat(tmpFile);
   if (stat.size > MAX_VIDEO_BYTES) throw new MediaError("Video is larger than 200 MB");
   const fh = await fs.open(tmpFile, "r");
@@ -121,7 +121,7 @@ export async function storeRawVideo(tmpFile: string, opts: { restaurantId: strin
   const fmt = sniffVideo(head);
   if (!fmt) throw new MediaError("Unsupported video format. Upload MP4, MOV or WebM");
   const id = randomToken(12);
-  const storageKey = `video/${opts.restaurantId}/raw/${id}.${fmt}`;
+  const storageKey = `video/${opts.restaurantId ?? `u-${opts.uploadedById}`}/raw/${id}.${fmt}`;
   // raw originals are kept private; processed renditions are public
   await moveLocal(tmpFile, storageKey, true);
   return prisma.mediaAsset.create({
@@ -191,7 +191,7 @@ export async function processVideoAsset(assetId: string): Promise<{ videoUrl: st
     await run("ffmpeg", ["-y", "-ss", seek, "-i", out, "-frames:v", "1", "-q:v", "3", posterRaw], 60_000);
 
     const id = randomToken(12);
-    const base = `video/${asset.restaurantId}/${id}`;
+    const base = `video/${asset.restaurantId ?? `u-${asset.uploadedById}`}/${id}`; // creators have no restaurant
     let posterBuf: Buffer | null = null;
     try {
       posterBuf = await sharp(await fs.readFile(posterRaw)).resize({ width: 720, withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();

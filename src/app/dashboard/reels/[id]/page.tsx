@@ -20,7 +20,7 @@ export default async function ReelDetailPage({ params, searchParams }: { params:
   const t = await getT();
   const ctx = await requireRestaurant("MANAGER");
   await syncStreamReels({ restaurantId: ctx.restaurant.id }).catch((e) => console.error("stream sync", e));
-  const reel = await prisma.reel.findFirst({ where: { id: (await params).id, restaurantId: ctx.restaurant.id }, include: { menuItem: true } });
+  const reel = await prisma.reel.findFirst({ where: { id: (await params).id, restaurantId: ctx.restaurant.id, creatorId: null }, include: { menuItem: true } });
   if (!reel) notFound();
   const items = await prisma.menuItem.findMany({ where: { restaurantId: ctx.restaurant.id, archived: false }, orderBy: { name: "asc" }, select: { id: true, name: true, sku: true, priceCents: true, currency: true } });
   const sp = await searchParams;

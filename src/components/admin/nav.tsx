@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, ClipboardList, Users, CreditCard, FileText, Flag, LayoutGrid, Menu, Scale, ScrollText, Settings, ShieldCheck, Store, Wallet, X, LogOut, Megaphone } from "lucide-react";
+import { BarChart3, Bell, ClipboardList, Users, CreditCard, FileText, Flag, LayoutGrid, Menu, Scale, ScrollText, Settings, ShieldCheck, Store, Wallet, X, LogOut, Megaphone, Clapperboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/actions/auth";
 import { Logo } from "@/components/logo";
@@ -16,6 +16,7 @@ export function AdminNav({ counts }: { counts: Record<string, number> }) {
     { href: "/admin/restaurants", label: "Restaurants", icon: Store, badge: counts.pendingRestaurants },
     { href: "/admin/customers", label: "Customers", icon: Users },
     { href: "/admin/verifications", label: "Verifications", icon: ShieldCheck, badge: counts.verifications },
+    { href: "/admin/creators", label: "Creators", icon: Clapperboard, badge: counts.creators },
     { href: "/admin/orders", label: "Order records", icon: ClipboardList, badge: counts.suspicious },
     { href: "/admin/commissions", label: "Commissions", icon: Scale, badge: counts.pendingAdjustments },
     { href: "/admin/invoices", label: "Invoices", icon: FileText, badge: counts.overdue },

@@ -22,15 +22,21 @@ export const reelCardSelect = {
   restaurantId: true,
   restaurant: { select: { id: true, slug: true, displayName: true, logoUrl: true, coverUrl: true, cuisine: true, ratingAvg: true, ratingCount: true, avgPrepMinutes: true, verificationStatus: true, area: true, city: true, orderingEnabled: true, status: true, latitude: true, longitude: true, deliveryZones: true, deliveryEnabled: true } },
   menuItem: { select: { id: true, name: true, description: true, priceCents: true, currency: true, ratingAvg: true, ratingCount: true, available: true, archived: true, foodCategoryId: true } },
+  paidPartnership: true,
+  creator: { select: { id: true, handle: true, displayName: true, avatarUrl: true, verification: true } },
 } satisfies Prisma.ReelSelect;
 
 export type ReelCard = Prisma.ReelGetPayload<{ select: typeof reelCardSelect }>;
+
+/** A creator's reel is public only once the restaurant accepted the tag, and while the creator is approved. */
+export const creatorReelOk: Prisma.ReelWhereInput = { OR: [{ creatorId: null }, { tagStatus: "ACCEPTED", creator: { status: "APPROVED" } }] };
 
 export const publicReelWhere: Prisma.ReelWhereInput = {
   visibility: "PUBLISHED",
   status: "READY",
   restaurant: { status: "ACTIVE" },
   menuItem: { archived: false },
+  AND: [creatorReelOk],
 };
 
 /**
@@ -98,6 +104,10 @@ export function toPublicReel(r: ReelCard, location?: LatLng | null) {
     likeCount: r.likeCount,
     shareCount: r.shareCount,
     sponsored: r.sponsored,
+    /** Paid by (or food gifted by) the restaurant: shown as "Paid partnership". */
+    paidPartnership: r.paidPartnership,
+    /** The food creator who posted it (null: the restaurant's own reel). */
+    creator: r.creator ? { id: r.creator.id, handle: r.creator.handle, name: r.creator.displayName, avatarUrl: r.creator.avatarUrl, verified: r.creator.verification === "APPROVED" } : null,
     restaurant: {
       id: r.restaurant.id,
       slug: r.restaurant.slug,

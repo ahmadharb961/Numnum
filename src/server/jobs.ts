@@ -1,4 +1,5 @@
 import "server-only";
+import { creatorReelReady } from "./creators";
 import { notifyFollowers } from "./follows";
 import { prisma } from "./db";
 import { processVideoAsset } from "./media";
@@ -53,6 +54,8 @@ async function handle(type: JobType, payload: Record<string, string>) {
   if (type === "process_video") {
     const reel = await prisma.reel.findUniqueOrThrow({ where: { id: payload.reelId } });
     const out = await processVideoAsset(reel.videoAssetId);
+    // A creator's reel never publishes itself: the restaurant is asked (or it goes live if already accepted).
+    const creator = !!reel.creatorId;
     await prisma.reel.update({
       where: { id: reel.id },
       data: {
@@ -61,10 +64,11 @@ async function handle(type: JobType, payload: Record<string, string>) {
         posterUrl: reel.posterUrl ?? out.posterUrl, // keep a custom thumbnail if one was uploaded
         durationSec: out.durationSec,
         processingError: null,
-        ...((payload.publish === "1" || reel.autoPublish) && reel.visibility === "DRAFT" ? { visibility: "PUBLISHED", publishedAt: new Date() } : {}),
+        ...(!creator && (payload.publish === "1" || reel.autoPublish) && reel.visibility === "DRAFT" ? { visibility: "PUBLISHED", publishedAt: new Date() } : {}),
       },
     });
-    if ((payload.publish === "1" || reel.autoPublish) && reel.visibility === "DRAFT" && !reel.publishedAt) void notifyFollowers(reel.restaurantId, { kind: "reel", reelId: reel.id });
+    if (creator) await creatorReelReady(reel.id);
+    else if ((payload.publish === "1" || reel.autoPublish) && reel.visibility === "DRAFT" && !reel.publishedAt) void notifyFollowers(reel.restaurantId, { kind: "reel", reelId: reel.id });
   }
 }
 

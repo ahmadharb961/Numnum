@@ -21,10 +21,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const t = await getT();
   const ctx = await requireRestaurant();
   const r = ctx.restaurant;
-  const [unread, pendingOrders, me] = await Promise.all([
+  const [unread, pendingOrders, me, creatorTags] = await Promise.all([
     prisma.notification.count({ where: { restaurantId: r.id, audience: "RESTAURANT", readAt: null } }),
     prisma.order.count({ where: { restaurantId: r.id, status: "PLACED" } }),
     prisma.user.findUnique({ where: { id: ctx.user.id }, select: { email: true, emailVerifiedAt: true } }),
+    prisma.reel.count({ where: { restaurantId: r.id, creatorId: { not: null }, tagStatus: "PENDING", status: "READY", creator: { status: "APPROVED" } } }),
   ]);
   return (
     <div className="min-h-dvh bg-cream">
@@ -39,7 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </form>
       )}
       <InstallGate bypass={ctx.asAdmin}>
-      <DashboardNav restaurantName={r.displayName} slug={r.slug} role={ctx.staffRole} memberships={ctx.memberships} currentId={r.id} unread={unread} pendingOrders={pendingOrders} />
+      <DashboardNav restaurantName={r.displayName} slug={r.slug} role={ctx.staffRole} memberships={ctx.memberships} currentId={r.id} unread={unread} pendingOrders={pendingOrders} creatorTags={creatorTags} />
       <div className="lg:ps-64">
         <div className="flex justify-end px-4 pt-3 lg:px-8">
           <NewOrderAlert initialCount={pendingOrders} />

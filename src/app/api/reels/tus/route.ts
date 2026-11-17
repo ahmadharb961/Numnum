@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/server/db";
-import { getRestaurantContext, canAccess } from "@/server/auth";
+import { getCurrentUser, getRestaurantContext, canAccess } from "@/server/auth";
 import { createTusUpload, parseTusMetadata, STREAM_MAX_BYTES } from "@/server/stream";
 
 export const runtime = "nodejs";
@@ -11,11 +11,23 @@ export const runtime = "nodejs";
  * file then goes from the phone straight to Cloudflare, resuming on bad connections.
  */
 export async function POST(req: NextRequest) {
-  const ctx = await getRestaurantContext();
-  if (!ctx || !canAccess(ctx.staffRole, "MANAGER")) return new NextResponse("Unauthorized", { status: 401 });
-  if (ctx.restaurant.restrictReels) return new NextResponse("Reel uploads are restricted on this account", { status: 403 });
   const assetId = req.nextUrl.searchParams.get("assetId") ?? "";
-  const asset = await prisma.mediaAsset.findFirst({ where: { id: assetId, restaurantId: ctx.restaurant.id, kind: "VIDEO", storageKey: "stream:pending" } });
+  // A food creator's upload (scope=creator) or a restaurant's.
+  let owner: string;
+  let asset;
+  if (req.nextUrl.searchParams.get("scope") === "creator") {
+    const user = await getCurrentUser();
+    const creator = user && (await prisma.creator.findUnique({ where: { userId: user.id }, select: { id: true, status: true } }));
+    if (!user || creator?.status !== "APPROVED") return new NextResponse("Unauthorized", { status: 401 });
+    owner = `creator:${creator.id}`;
+    asset = await prisma.mediaAsset.findFirst({ where: { id: assetId, restaurantId: null, uploadedById: user.id, kind: "VIDEO", storageKey: "stream:pending" } });
+  } else {
+    const ctx = await getRestaurantContext();
+    if (!ctx || !canAccess(ctx.staffRole, "MANAGER")) return new NextResponse("Unauthorized", { status: 401 });
+    if (ctx.restaurant.restrictReels) return new NextResponse("Reel uploads are restricted on this account", { status: 403 });
+    owner = ctx.restaurant.id;
+    asset = await prisma.mediaAsset.findFirst({ where: { id: assetId, restaurantId: ctx.restaurant.id, kind: "VIDEO", storageKey: "stream:pending" } });
+  }
   if (!asset) return new NextResponse("Not found", { status: 404 });
 
   const length = req.headers.get("upload-length") ?? "";
@@ -23,7 +35,7 @@ export async function POST(req: NextRequest) {
   if (Number(length) > STREAM_MAX_BYTES) return new NextResponse("File too large", { status: 413 });
   const meta = parseTusMetadata(req.headers.get("upload-metadata"));
   try {
-    const { location, uid } = await createTusUpload({ uploadLength: length, fileName: meta.filename ?? meta.name ?? "reel.mp4", creator: ctx.restaurant.id });
+    const { location, uid } = await createTusUpload({ uploadLength: length, fileName: meta.filename ?? meta.name ?? "reel.mp4", creator: owner });
     await prisma.mediaAsset.update({ where: { id: asset.id }, data: { storageKey: `stream:${uid}`, sizeBytes: Number(length), originalName: (meta.filename ?? "").slice(0, 200) || null } });
     return new NextResponse(null, { status: 201, headers: { Location: location, "Tus-Resumable": "1.0.0", "Access-Control-Expose-Headers": "Location" } });
   } catch (e) {

@@ -26,7 +26,7 @@ export function BottomNav() {
   // reel is playing (or after a moment on other pages), so it never slows the first video down.
   useEffect(() => whenFeedReady(() => items.forEach(({ href }) => router.prefetch(href)), 1500), [router]);
   const { count } = useCart();
-  const dark = pathname === "/" || pathname.startsWith("/reel/") || /^\/r\/[^/]+\/reels/.test(pathname);
+  const dark = pathname === "/" || pathname.startsWith("/reel/") || /^\/(r|c)\/[^/]+\/reels/.test(pathname);
   // The page background also colors any area iOS leaves around the app (e.g. below the nav).
   useEffect(() => {
     document.body.style.backgroundColor = dark ? "#000" : "";

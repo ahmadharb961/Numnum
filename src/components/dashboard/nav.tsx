@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink, BadgePercent } from "lucide-react";
+import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink, BadgePercent, Clapperboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/actions/auth";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -12,7 +12,7 @@ import { useT } from "@/i18n/client";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; minRole?: "MANAGER" | "OWNER"; badge?: number };
 
-export function DashboardNav({ restaurantName, slug, role, memberships, currentId, unread, pendingOrders }: { restaurantName: string; slug: string; role: "OWNER" | "MANAGER" | "STAFF"; memberships: { id: string; displayName: string }[]; currentId: string; unread: number; pendingOrders: number }) {
+export function DashboardNav({ restaurantName, slug, role, memberships, currentId, unread, pendingOrders, creatorTags = 0 }: { restaurantName: string; slug: string; role: "OWNER" | "MANAGER" | "STAFF"; memberships: { id: string; displayName: string }[]; currentId: string; unread: number; pendingOrders: number; creatorTags?: number }) {
   const t = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -28,7 +28,7 @@ export function DashboardNav({ restaurantName, slug, role, memberships, currentI
         { href: "/dashboard/menu/photos", label: "Photos", icon: ImageIcon, minRole: "MANAGER" },
       ],
     },
-    { title: "Content", items: [{ href: "/dashboard/reels", label: "Reels", icon: Film, minRole: "MANAGER" }, { href: "/dashboard/deals", label: "Deals", icon: BadgePercent, minRole: "MANAGER" }, { href: "/dashboard/reviews", label: "Reviews", icon: MessageSquareText }] },
+    { title: "Content", items: [{ href: "/dashboard/reels", label: "Reels", icon: Film, minRole: "MANAGER" }, { href: "/dashboard/creator-reels", label: "Creator reels", icon: Clapperboard, minRole: "MANAGER", badge: creatorTags }, { href: "/dashboard/deals", label: "Deals", icon: BadgePercent, minRole: "MANAGER" }, { href: "/dashboard/reviews", label: "Reviews", icon: MessageSquareText }] },
     {
       title: "Account",
       items: [

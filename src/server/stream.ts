@@ -1,4 +1,5 @@
 import "server-only";
+import { creatorReelReady } from "./creators";
 import { notifyFollowers } from "./follows";
 import { prisma } from "./db";
 
@@ -111,10 +112,10 @@ export const streamUidOf = (storageKey: string) => (isStreamKey(storageKey) ? st
  * Brings PROCESSING reels up to date with Cloudflare. Called when restaurants
  * view their reels, and by the hourly cron, so no webhook setup is needed.
  */
-export async function syncStreamReels(where: { restaurantId?: string; reelId?: string } = {}) {
+export async function syncStreamReels(where: { restaurantId?: string; reelId?: string; creatorId?: string } = {}) {
   if (!streamConfigured()) return 0;
   const reels = await prisma.reel.findMany({
-    where: { status: "PROCESSING", videoAsset: { storageKey: { startsWith: "stream:" } }, ...(where.restaurantId ? { restaurantId: where.restaurantId } : {}), ...(where.reelId ? { id: where.reelId } : {}) },
+    where: { status: "PROCESSING", videoAsset: { storageKey: { startsWith: "stream:" } }, ...(where.restaurantId ? { restaurantId: where.restaurantId } : {}), ...(where.reelId ? { id: where.reelId } : {}), ...(where.creatorId ? { creatorId: where.creatorId } : {}) },
     include: { videoAsset: true, restaurant: { select: { status: true, restrictReels: true } } },
     take: 50,
   });
@@ -131,14 +132,16 @@ export async function syncStreamReels(where: { restaurantId?: string; reelId?: s
       const code = await customerCode(info.hls);
       if (!code) continue;
       const urls = playbackUrls(code, uid);
-      const publish = r.autoPublish && r.visibility === "DRAFT" && r.restaurant.status === "ACTIVE" && !r.restaurant.restrictReels;
+      // A creator's reel never publishes itself: the restaurant is asked (or it goes live if already accepted).
+      const publish = !r.creatorId && r.autoPublish && r.visibility === "DRAFT" && r.restaurant.status === "ACTIVE" && !r.restaurant.restrictReels;
       await prisma.reel.update({
         where: { id: r.id },
         data: { status: "READY", videoUrl: urls.hls, posterUrl: r.posterUrl ?? urls.poster, durationSec: info.durationSec, processingError: null, ...(publish ? { visibility: "PUBLISHED", publishedAt: new Date() } : {}) },
       });
       await prisma.mediaAsset.update({ where: { id: r.videoAssetId }, data: { url: urls.hls, posterUrl: urls.poster, durationSec: info.durationSec, mimeType: "application/x-mpegURL" } });
       // A reel going live for the first time: followers hear about it.
-      if (publish && !r.publishedAt) void notifyFollowers(r.restaurantId, { kind: "reel", reelId: r.id });
+      if (r.creatorId) await creatorReelReady(r.id);
+      else if (publish && !r.publishedAt) void notifyFollowers(r.restaurantId, { kind: "reel", reelId: r.id });
       changed++;
     }
   }

@@ -16,7 +16,7 @@ export const getPublicRestaurant = cache(async function getPublicRestaurant(key:
       where,
       include: {
         menuCategories: { orderBy: { sortOrder: "asc" } },
-        _count: { select: { menuItems: { where: { archived: false } }, reels: { where: { visibility: "PUBLISHED", status: "READY" } } } },
+        _count: { select: { menuItems: { where: { archived: false } }, reels: { where: { visibility: "PUBLISHED", status: "READY", creatorId: null } } } },
       },
     }),
     prisma.menuItem.findMany({
@@ -28,7 +28,7 @@ export const getPublicRestaurant = cache(async function getPublicRestaurant(key:
       },
     }),
     prisma.reel.findMany({
-      where: { restaurant: where, visibility: "PUBLISHED", status: "READY", menuItem: { archived: false } },
+      where: { restaurant: where, visibility: "PUBLISHED", status: "READY", menuItem: { archived: false }, creatorId: null },
       orderBy: { publishedAt: "desc" },
       select: { id: true, posterUrl: true, viewCount: true, menuItem: { select: { name: true } } },
     }),

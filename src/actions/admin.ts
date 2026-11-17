@@ -6,7 +6,7 @@ import { prisma } from "@/server/db";
 import { requireAdmin } from "@/server/auth";
 import { audit } from "@/server/audit";
 import { ipHash } from "@/server/request";
-import { notifyRestaurant } from "@/server/notifications";
+import { notifyRestaurant, notifyUser } from "@/server/notifications";
 import { getSettings, updateSettings, type Settings } from "@/server/settings";
 import { adminCancelOrder } from "@/server/orders";
 import { sendBroadcast, type BroadcastInput, type BroadcastResult } from "@/server/broadcast";
@@ -300,14 +300,19 @@ export async function moderateReelAction(id: string, action: "REMOVE" | "RESTORE
       action === "REMOVE"
         ? { visibility: "REMOVED" as const, removedReason: reason || "Violates content guidelines" }
         : action === "RESTORE"
-          ? { visibility: "UNPUBLISHED" as const, removedReason: null }
+          ? // A creator can't re-publish: their accepted reel goes straight back live.
+            { visibility: reel.creatorId && reel.tagStatus === "ACCEPTED" ? ("PUBLISHED" as const) : ("UNPUBLISHED" as const), removedReason: null }
           : action === "FEATURE" || action === "UNFEATURE"
             ? { featured: action === "FEATURE" }
             : { sponsored: action === "SPONSOR" };
     if ((action === "FEATURE" || action === "SPONSOR") && reel.restaurant.restrictPromotion) throw new Error("This restaurant's promoted content is restricted");
     await prisma.reel.update({ where: { id }, data });
     await audit({ actorId: user.id, action: `reel.${action.toLowerCase()}`, entityType: "reel", entityId: id, data: { reason }, ipHash: ip });
-    if (action === "REMOVE") await notifyRestaurant(reel.restaurantId, { type: "CONTENT_REMOVED", title: "A reel was removed by moderation", body: reason, link: `/dashboard/reels/${id}` });
+    if (action === "REMOVE" && reel.creatorId) {
+      // A creator's reel: the creator hears about it (the restaurant only accepted the tag).
+      const c = await prisma.creator.findUnique({ where: { id: reel.creatorId }, select: { userId: true } });
+      if (c) await notifyUser(c.userId, { type: "CONTENT_REMOVED", title: "A reel was removed by moderation", body: reason, link: "/creator" });
+    } else if (action === "REMOVE") await notifyRestaurant(reel.restaurantId, { type: "CONTENT_REMOVED", title: "A reel was removed by moderation", body: reason, link: `/dashboard/reels/${id}` });
     revalidatePath("/admin/moderation");
   }, "Done");
 }

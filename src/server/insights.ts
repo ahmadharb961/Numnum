@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 
 export type InsightsRange = { from: Date; to: Date; label: string };
@@ -27,7 +28,7 @@ export async function restaurantInsights(restaurantId: string, range: InsightsRa
     prisma.order.aggregate({ where: { restaurantId, status: "COMPLETED", createdAt: created }, _sum: { totalCents: true, subtotalCents: true, deliveryFeeCents: true }, _count: true }),
     prisma.commissionEvent.aggregate({ where: { restaurantId, createdAt: created, status: { not: "VOIDED" } }, _sum: { commissionCents: true } }),
     prisma.orderItem.groupBy({ by: ["menuItemId", "name"], where: { order: { restaurantId, status: "COMPLETED", createdAt: created } }, _sum: { quantity: true, lineTotalCents: true }, orderBy: { _sum: { quantity: "desc" } }, take: 10 }),
-    prisma.reelView.groupBy({ by: ["reelId"], where: { reel: { restaurantId }, createdAt: created }, _count: true, orderBy: { _count: { reelId: "desc" } }, take: 5 }),
+    prisma.reelView.groupBy({ by: ["reelId"], where: { reel: { restaurantId, creatorId: null }, createdAt: created }, _count: true, orderBy: { _count: { reelId: "desc" } }, take: 5 }),
     prisma.order.findMany({ where: { restaurantId, createdAt: created }, orderBy: { createdAt: "desc" }, take: 1000, select: { reference: true, createdAt: true, status: true, fulfillment: true, customerName: true, totalCents: true, subtotalCents: true, deliveryFeeCents: true, items: { select: { quantity: true } } } }),
   ]);
   // A restaurant deleted while the page loads shows empty numbers instead of an error page.
@@ -90,6 +91,9 @@ export type Insights = Awaited<ReturnType<typeof restaurantInsights>>;
 export type ReelPerf = {
   id: string;
   name: string;
+  restaurantName: string;
+  currency: string;
+  creator: string | null;
   posterUrl: string | null;
   visibility: string;
   publishedAt: string | null;
@@ -108,9 +112,23 @@ export type ReelPerf = {
 
 /** Per-reel performance in a date range: views, engagement, funnel and the orders/revenue attributed to it. */
 export async function reelsPerformance(restaurantId: string, range: InsightsRange, onlyReelId?: string): Promise<ReelPerf[]> {
+  return perf({ restaurantId, creatorId: null, ...(onlyReelId ? { id: onlyReelId } : { visibility: { in: ["PUBLISHED", "UNPUBLISHED"] } }) }, range, restaurantId);
+}
+
+/** The creator reels a restaurant accepted, the same numbers (its "Creator reels" page). */
+export async function restaurantCreatorReelsPerformance(restaurantId: string, range: InsightsRange): Promise<ReelPerf[]> {
+  return perf({ restaurantId, creatorId: { not: null }, tagStatus: { in: ["ACCEPTED", "REMOVED"] } }, range, restaurantId);
+}
+
+/** A food creator's reels, the same numbers (orders at any restaurant they tagged). */
+export async function creatorReelsPerformance(creatorId: string, range: InsightsRange, onlyReelId?: string): Promise<ReelPerf[]> {
+  return perf({ creatorId, ...(onlyReelId ? { id: onlyReelId } : { tagStatus: { in: ["ACCEPTED", "REMOVED"] } }) }, range, null);
+}
+
+async function perf(where: Prisma.ReelWhereInput, range: InsightsRange, restaurantId: string | null): Promise<ReelPerf[]> {
   const reels = await prisma.reel.findMany({
-    where: { restaurantId, ...(onlyReelId ? { id: onlyReelId } : { visibility: { in: ["PUBLISHED", "UNPUBLISHED"] } }) },
-    select: { id: true, posterUrl: true, visibility: true, publishedAt: true, menuItem: { select: { name: true } } },
+    where,
+    select: { id: true, posterUrl: true, visibility: true, publishedAt: true, menuItem: { select: { name: true } }, restaurant: { select: { displayName: true, currency: true } }, creator: { select: { handle: true } } },
   });
   if (!reels.length) return [];
   const ids = reels.map((r) => r.id);
@@ -124,7 +142,7 @@ export async function reelsPerformance(restaurantId: string, range: InsightsRang
       SELECT rid AS "reelId", COUNT(o.id) AS orders, COUNT(o.id) FILTER (WHERE o.status = 'COMPLETED') AS completed, SUM(o."totalCents") FILTER (WHERE o.status = 'COMPLETED') AS revenue
       FROM analytics_events e CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(e.data->'reelIds', '[]'::jsonb)) AS rid
       JOIN orders o ON o.id = e."orderId"
-      WHERE e.type = 'order_placed' AND e."restaurantId" = ${restaurantId} AND e."createdAt" >= ${range.from} AND e."createdAt" < ${range.to} AND rid = ANY(${ids})
+      WHERE e.type = 'order_placed' AND (${restaurantId}::text IS NULL OR e."restaurantId" = ${restaurantId}) AND e."createdAt" >= ${range.from} AND e."createdAt" < ${range.to} AND rid = ANY(${ids})
       GROUP BY rid`,
   ]);
   const ev = (id: string, t: string) => events.find((e) => e.reelId === id && e.type === t)?._count ?? 0;
@@ -137,6 +155,10 @@ export async function reelsPerformance(restaurantId: string, range: InsightsRang
       return {
         id: r.id,
         name: r.menuItem.name,
+        restaurantName: r.restaurant.displayName,
+        currency: r.restaurant.currency,
+        /** Posted by a food creator (their handle), or null for the restaurant's own reel. */
+        creator: r.creator?.handle ?? null,
         posterUrl: r.posterUrl,
         visibility: r.visibility,
         publishedAt: r.publishedAt?.toISOString() ?? null,
@@ -176,4 +198,39 @@ export async function reelInsight(restaurantId: string, reelId: string, range: I
   for (const r of dailyEv) { const x = at(r.d); if (x) { if (r.type === "product_opened") x.opens = Number(r.n); else x.addToCarts = Number(r.n); } }
   for (const r of dailyOrders) { const x = at(r.d); if (x) { x.orders = Number(r.n); x.revenueCents = Number(r.revenue ?? 0); } }
   return { reel: mine ?? null, days, rank, reelCount: all.length, average: { views: avg("views"), orders: avg("orders"), likes: avg("likes") } };
+}
+
+/** A food creator's insights: totals, daily views and orders, followers, and each reel's numbers. */
+export async function creatorInsights(creatorId: string, range: InsightsRange) {
+  const [reels, creator, newFollowers] = await Promise.all([
+    creatorReelsPerformance(creatorId, range),
+    prisma.creator.findUniqueOrThrow({ where: { id: creatorId }, select: { followerCount: true } }),
+    prisma.creatorFollow.count({ where: { creatorId, createdAt: { gte: range.from, lt: range.to } } }),
+  ]);
+  const ids = reels.map((r) => r.id);
+  const sum = (k: "views" | "uniqueViewers" | "likes" | "shares" | "orders" | "completedOrders" | "productOpens") => reels.reduce((n, r) => n + r[k], 0);
+  // Revenue is per restaurant currency (a creator can tag USD and LBP menus).
+  const revenue = new Map<string, number>();
+  for (const r of reels) if (r.revenueCents) revenue.set(r.currency, (revenue.get(r.currency) ?? 0) + r.revenueCents);
+  const [viewsDaily, ordersDaily] = ids.length
+    ? await Promise.all([
+        prisma.$queryRaw<{ d: Date; n: bigint }[]>`SELECT date_trunc('day', "createdAt") AS d, COUNT(*) AS n FROM reel_views WHERE "reelId" = ANY(${ids}) AND "createdAt" >= ${range.from} AND "createdAt" < ${range.to} GROUP BY 1`,
+        prisma.$queryRaw<{ d: Date; n: bigint }[]>`
+          SELECT date_trunc('day', e."createdAt") AS d, COUNT(DISTINCT e."orderId") AS n
+          FROM analytics_events e CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(e.data->'reelIds', '[]'::jsonb)) AS rid
+          WHERE e.type = 'order_placed' AND rid = ANY(${ids}) AND e."createdAt" >= ${range.from} AND e."createdAt" < ${range.to} GROUP BY 1`,
+      ])
+    : [[], []];
+  const days: { date: string; views: number; orders: number }[] = [];
+  for (let t = range.from.getTime(); t < range.to.getTime(); t += 86400_000) days.push({ date: dayKey(new Date(t)), views: 0, orders: 0 });
+  const at = (d: Date) => days.find((x) => x.date === dayKey(d));
+  for (const r of viewsDaily) { const x = at(r.d); if (x) x.views = Number(r.n); }
+  for (const r of ordersDaily) { const x = at(r.d); if (x) x.orders = Number(r.n); }
+  const views = sum("views");
+  return {
+    totals: { views, uniqueViewers: sum("uniqueViewers"), likes: sum("likes"), shares: sum("shares"), dishOpens: sum("productOpens"), orders: sum("orders"), completedOrders: sum("completedOrders"), conversion: views ? sum("orders") / views : null, followers: creator.followerCount, newFollowers, liveReels: reels.length },
+    revenue: [...revenue].map(([currency, cents]) => ({ currency, cents })),
+    days,
+    reels,
+  };
 }

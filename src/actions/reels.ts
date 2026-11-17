@@ -11,7 +11,7 @@ import type { ActionResult } from "./menu";
 
 async function ownReel(id: string) {
   const ctx = await requireRestaurant("MANAGER");
-  const reel = await prisma.reel.findFirst({ where: { id, restaurantId: ctx.restaurant.id } });
+  const reel = await prisma.reel.findFirst({ where: { id, restaurantId: ctx.restaurant.id, creatorId: null } }); // creators' reels: only accept/decline/remove
   if (!reel) throw new Error("Reel not found");
   return { ctx, reel };
 }

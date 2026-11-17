@@ -5,6 +5,7 @@ import { errorResponse, json, limit } from "@/server/http";
 import { MAX_DOC_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, processImage, storePrivateDocument, storeRawVideo, streamToTempFile } from "@/server/media";
 import { attachImage } from "@/server/menu";
 import { streamConfigured } from "@/server/stream";
+import { prisma } from "@/server/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -25,6 +26,27 @@ export async function PUT(req: Request) {
     const filename = decodeURIComponent(req.headers.get("x-filename") || "upload").slice(0, 200);
     if (!req.body) return json({ error: "Empty upload" }, 400);
 
+    // Food creators: their reel videos and profile photo (also while applying), not tied to a restaurant.
+    if (url.searchParams.get("scope") === "creator") {
+      if (kind === "image") {
+        await limit(`creator-img:${user.id}`, 30, 60 * 60_000);
+        const { file } = await streamToTempFile(req.body, MAX_IMAGE_BYTES);
+        tmp = file;
+        const asset = await processImage(await fs.readFile(file), { restaurantId: null, originalName: filename, uploadedById: user.id });
+        return json({ id: asset.id, url: asset.url, thumbUrl: asset.thumbUrl, width: asset.width, height: asset.height }, 201);
+      }
+      if (kind === "video") {
+        if (streamConfigured()) return json({ error: "Videos upload directly to Cloudflare Stream" }, 400);
+        const creator = await prisma.creator.findUnique({ where: { userId: user.id }, select: { status: true } });
+        if (creator?.status !== "APPROVED") return json({ error: "Only approved creators can post reels" }, 403);
+        const { file } = await streamToTempFile(req.body, MAX_VIDEO_BYTES);
+        tmp = file;
+        const asset = await storeRawVideo(file, { restaurantId: null, originalName: filename, uploadedById: user.id });
+        tmp = null; // moved into storage
+        return json({ id: asset.id, sizeBytes: asset.sizeBytes }, 201);
+      }
+      return json({ error: "Invalid upload" }, 400);
+    }
     // Admins can upload platform-level images (e.g. category art); everyone else uploads into their restaurant.
     const ctx = await getRestaurantContext();
     const forPlatform = url.searchParams.get("scope") === "platform" && hasRole(user, "ADMIN");

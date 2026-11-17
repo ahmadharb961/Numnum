@@ -40,7 +40,7 @@ async function Reports() {
   const itemRevIds = reports.filter((r) => r.targetType === "ITEM_REVIEW").map((r) => r.targetId);
   const restRevIds = reports.filter((r) => r.targetType === "RESTAURANT_REVIEW").map((r) => r.targetId);
   const [reels, itemRevs, restRevs] = await Promise.all([
-    prisma.reel.findMany({ where: { id: { in: reelIds } }, include: { restaurant: { select: { displayName: true } } } }),
+    prisma.reel.findMany({ where: { id: { in: reelIds } }, include: { restaurant: { select: { displayName: true } }, creator: { select: { handle: true } } } }),
     prisma.itemReview.findMany({ where: { id: { in: itemRevIds } } }),
     prisma.restaurantReview.findMany({ where: { id: { in: restRevIds } } }),
   ]);
@@ -67,7 +67,16 @@ async function Reports() {
                   <img src={reel.posterUrl} alt="" className="h-20 w-12 rounded object-cover" />
                 )}
                 <div>
-                  {reel.restaurant.displayName} · {reel.visibility.toLowerCase()}
+                  {reel.restaurant.displayName}
+                  {reel.creator && (
+                    <>
+                      {" · by "}
+                      <a href={`/admin/creators?tab=approved`} className="font-semibold text-brand-600">
+                        @{reel.creator.handle}
+                      </a>
+                    </>
+                  )}{" "}
+                  · {reel.visibility.toLowerCase()}
                   {reel.videoUrl && (
                     <a href={reel.videoUrl} target="_blank" rel="noopener" className="ml-2 font-semibold text-brand-600">
                       Watch
@@ -107,7 +116,7 @@ async function Reports() {
 }
 
 async function Reels() {
-  const reels = await prisma.reel.findMany({ where: { visibility: { in: ["PUBLISHED", "REMOVED"] } }, orderBy: { createdAt: "desc" }, take: 60, include: { restaurant: { select: { displayName: true } }, menuItem: { select: { name: true } } } });
+  const reels = await prisma.reel.findMany({ where: { visibility: { in: ["PUBLISHED", "REMOVED"] } }, orderBy: { createdAt: "desc" }, take: 60, include: { restaurant: { select: { displayName: true } }, menuItem: { select: { name: true } }, creator: { select: { handle: true } } } });
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {reels.map((r) => (
@@ -126,7 +135,8 @@ async function Reels() {
           <div className="space-y-1.5 p-2 text-xs">
             <div className="truncate font-semibold">{r.menuItem.name}</div>
             <div className="truncate text-ink-muted">
-              {r.restaurant.displayName} · {compactNumber(r.viewCount)} views
+              {r.restaurant.displayName}
+              {r.creator ? ` · @${r.creator.handle}` : ""} · {compactNumber(r.viewCount)} views
             </div>
             <div className="flex flex-wrap gap-1">
               {r.visibility === "REMOVED" ? (

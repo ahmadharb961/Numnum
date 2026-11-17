@@ -17,7 +17,7 @@ export const viewport: Viewport = { themeColor: "#000000" };
 
 export default async function RestaurantReelsViewer({ params }: { params: Promise<{ slug: string; reelId: string }> }) {
   const { slug, reelId } = await params;
-  const reels = await prisma.reel.findMany({ where: { ...publicReelWhere, restaurant: { slug, status: "ACTIVE" } }, select: reelCardSelect, orderBy: { publishedAt: "desc" } });
+  const reels = await prisma.reel.findMany({ where: { ...publicReelWhere, creatorId: null, restaurant: { slug, status: "ACTIVE" } }, select: reelCardSelect, orderBy: { publishedAt: "desc" } });
   const idx = reels.findIndex((r) => r.id === reelId);
   if (idx === -1) notFound();
   const blocked = await restaurantBlockFor(reels[idx].restaurantId);
