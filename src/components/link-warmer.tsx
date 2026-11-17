@@ -112,7 +112,38 @@ export function LinkWarmer() {
       return result;
     };
     window.fetch = wrapped;
+
+    // Safety net for taps: a tap that lands while the page is still being put together (the
+    // moment after it opens) can be swallowed, and nothing happens. If the screen hasn't changed a
+    // moment after a tap on an in-app link, open it. Only plain page links (data-pf): links that do
+    // something else on tap (open a sheet, go back) don't load ahead and aren't touched.
+    const onTap = (e: MouseEvent) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.("a[data-pf]");
+      const href = a?.getAttribute("href");
+      if (!a || !href?.startsWith("/") || a.getAttribute("target")) return;
+      const to = new URL(href, location.href);
+      if (to.pathname === location.pathname && to.search === location.search) return; // same screen
+      const from = location.href;
+      // Stand down as soon as the screen changes even once (the tap worked, even if the person
+      // has come back to the same screen since, e.g. signed up and returned to checkout).
+      let moved = false;
+      const watch = setInterval(() => {
+        if (location.href !== from) moved = true;
+        if (moved) clearInterval(watch);
+      }, 100);
+      for (const ms of [1500, 4000]) {
+        const t = setTimeout(() => {
+          timers.delete(t);
+          if (ms === 4000) clearInterval(watch);
+          if (!moved && location.href === from) router.push(href);
+        }, ms);
+        timers.add(t);
+      }
+    };
+    document.addEventListener("click", onTap, true);
     return () => {
+      document.removeEventListener("click", onTap, true);
       if (window.fetch === wrapped) window.fetch = original;
       io.disconnect();
       mo.disconnect();
