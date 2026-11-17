@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { getSettings } from "@/server/settings";
 import { getLocale, getT } from "@/i18n/server";
 

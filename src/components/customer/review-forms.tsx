@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { Star } from "lucide-react";
 import { itemReviewAction, restaurantReviewAction } from "@/actions/reviews";
 import type { FormState } from "@/actions/auth";

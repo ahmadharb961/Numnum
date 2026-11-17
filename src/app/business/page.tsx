@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { BadgeCheck, Film, MessageCircle, Receipt, Upload, Wallet } from "lucide-react";
 import { getSettings } from "@/server/settings";
 import { getCurrentUser } from "@/server/auth";

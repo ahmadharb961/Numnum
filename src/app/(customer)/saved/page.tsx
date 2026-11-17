@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { Bookmark } from "lucide-react";
 import { prisma } from "@/server/db";
 import { ownerKey } from "@/server/engagement";
@@ -14,6 +14,7 @@ import { formatMoney } from "@/lib/money";
 import { STATUS_META } from "@/lib/order-status";
 import { MapPin, Receipt, UserRound } from "lucide-react";
 import { getT } from "@/i18n/server";
+import { BackButton } from "@/components/back-button";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -63,7 +64,10 @@ export default async function SavedPage() {
   return (
     <main className="pb-nav">
       <header className="container-wide pb-2" style={{ paddingTop: "calc(var(--safe-top) + 14px)" }}>
-        <h1 className="text-2xl font-black tracking-tight">{t("Saved")}</h1>
+        <div className="flex items-center gap-1">
+          <BackButton fallback="/account" />
+          <h1 className="text-2xl font-black tracking-tight">{t("Saved")}</h1>
+        </div>
         {user && (
           <p className="mt-1 text-sm text-ink-muted">
             {t("Signed in as {name}", { name: user.name })} ·{" "}

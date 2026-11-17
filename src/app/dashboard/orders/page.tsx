@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
-import Link from "next/link";
+import Link from "@/components/link";
 import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { DashPage } from "@/components/dashboard/page";

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/link";
 import { useEffect, useRef, useState } from "react";
 import { ItemSheet, prefetchItem } from "./item-sheet";
 import { Eye, MapPin, Play, Timer } from "lucide-react";

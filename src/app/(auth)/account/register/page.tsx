@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { CustomerRegisterForm } from "@/components/auth-forms";
 import { getT } from "@/i18n/server";
 

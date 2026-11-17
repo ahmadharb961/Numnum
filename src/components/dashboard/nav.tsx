@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
+import { preloadMap } from "@/components/map-picker";
+import Link from "@/components/link";
+import { useKeepLoaded } from "@/components/link-warmer";
 import { usePathname } from "next/navigation";
 import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink, BadgePercent, Clapperboard } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,6 +42,9 @@ export function DashboardNav({ restaurantName, slug, role, memberships, currentI
       ],
     },
   ];
+  // Every menu screen the person can open is ready before the menu is even opened.
+  useKeepLoaded(groups.flatMap((g) => g.items.filter((i) => !i.minRole || rank >= { MANAGER: 2, OWNER: 3 }[i.minRole]).map((i) => i.href)));
+  useEffect(preloadMap, []); // Settings shows the restaurant's spot on a map
   const isActive = (href: string) => (href === "/dashboard" ? pathname === href : pathname.startsWith(href) && !(href === "/dashboard/menu" && /\/menu\/(import|photos)/.test(pathname)));
 
   const content = (

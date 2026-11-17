@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { prisma } from "@/server/db";
 import { getSettings } from "@/server/settings";
 import { suspiciousRestaurants } from "@/server/analytics";

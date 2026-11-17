@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Bookmark, Flag, Heart, UserPlus } from "lucide-react";
 import { Sheet } from "@/components/ui/sheet";

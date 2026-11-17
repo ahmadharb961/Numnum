@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { ArrowDown, ArrowUp, Archive, Film, ImageOff, Pencil, Search, Trash2, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";

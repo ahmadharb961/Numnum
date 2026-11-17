@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { Plus, Upload, Image as ImageIcon } from "lucide-react";
 import { requireRestaurant, canAccess } from "@/server/auth";
 import { prisma } from "@/server/db";

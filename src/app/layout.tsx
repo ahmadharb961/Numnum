@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/cairo";
+import "leaflet/dist/leaflet.css"; // in the main stylesheet: map screens never wait for their own
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { CartProvider } from "@/components/customer/cart";
 import { ServiceWorker } from "@/components/sw-register";
 import { NavHistory } from "@/components/back-button";
+import { LinkWarmer } from "@/components/link-warmer";
 import { TypingWatcher } from "@/components/typing-watcher";
 import { InstallPromptListener } from "@/components/install-guide";
 import { I18nProvider } from "@/i18n/client";
@@ -68,6 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </ToastProvider>
         <ServiceWorker />
         <NavHistory />
+        <LinkWarmer />
         <TypingWatcher />
         <InstallPromptListener />
         </AppLinksProvider>

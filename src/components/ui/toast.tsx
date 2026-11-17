@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { cn } from "@/lib/utils";
 import { useT } from "@/i18n/client";
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { Download, Eye, FileText, Film } from "lucide-react";
 import { requireRestaurant } from "@/server/auth";
 import { parseRange, restaurantInsights } from "@/server/insights";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { Download, FileText } from "lucide-react";
 import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";

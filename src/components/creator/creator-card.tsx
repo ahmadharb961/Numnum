@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { BadgeCheck, UserRound } from "lucide-react";
 import type { ExploreCreator } from "@/server/explore-search";
 import { compactNumber } from "@/lib/utils";
@@ -8,7 +8,7 @@ import { useT } from "@/i18n/client";
 export function CreatorCard({ c }: { c: ExploreCreator }) {
   const t = useT();
   return (
-    <Link href={`/c/${c.handle}`} className="card flex items-center gap-3 p-3 transition active:scale-[0.99]" data-testid="creator-result">
+    <Link prefetch href={`/c/${c.handle}`} className="card flex min-w-0 items-center gap-3 p-3 transition active:scale-[0.99]" data-testid="creator-result">
       <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-50 text-brand-500">
         {c.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

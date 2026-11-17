@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { prisma } from "@/server/db";
 import { DashPage, Section } from "@/components/dashboard/page";
 import { ActionButton } from "@/components/admin/action-button";
@@ -71,9 +71,9 @@ async function Reports() {
                   {reel.creator && (
                     <>
                       {" · by "}
-                      <a href={`/admin/creators?tab=approved`} className="font-semibold text-brand-600">
+                      <Link href={`/admin/creators?tab=approved`} className="font-semibold text-brand-600">
                         @{reel.creator.handle}
-                      </a>
+                      </Link>
                     </>
                   )}{" "}
                   · {reel.visibility.toLowerCase()}

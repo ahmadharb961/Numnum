@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, MapPin, Home as HomeIcon } from "lucide-react";
-import { MapPicker, type Pin } from "@/components/map-picker";
+import { MapPicker, preloadMap, type Pin } from "@/components/map-picker";
+import { whenFeedReady } from "@/lib/feed-ready";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,8 @@ export function writeLocation(l: Loc) {
 export function LocationChip({ label, dark, className, compact }: { label: string | null; dark?: boolean; className?: string; compact?: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  // The map opens instantly when tapped: its code downloads after the first reel is playing.
+  useEffect(() => whenFeedReady(preloadMap, 4000), []);
   if (compact)
     // Reel feed top bar: just the pin (orange once a delivery location is set).
     return (

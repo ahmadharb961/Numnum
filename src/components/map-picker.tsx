@@ -3,9 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { LocateFixed, Loader2 } from "lucide-react";
 import type { Map as LMap, Marker, Circle } from "leaflet";
-import "leaflet/dist/leaflet.css";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/client";
+
+/**
+ * Downloads the map code in the background (once), so a screen with a map shows it at once.
+ * Called where a map is likely next: the cart (checkout), the location chip, the dashboard.
+ */
+export function preloadMap() {
+  if (typeof window === "undefined") return;
+  const go = () => void import("leaflet").catch(() => {});
+  if ("requestIdleCallback" in window) window.requestIdleCallback(go, { timeout: 4000 });
+  else setTimeout(go, 1500);
+}
 
 export type Pin = { lat: number; lng: number };
 

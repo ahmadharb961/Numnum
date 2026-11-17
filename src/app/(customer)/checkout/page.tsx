@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { MapPin, Receipt, ShieldCheck } from "lucide-react";
 import { getCurrentUser } from "@/server/auth";
 import { Checkout } from "@/components/customer/checkout";

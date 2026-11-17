@@ -1,3 +1,4 @@
+import { openInApp } from "@/lib/prefetch";
 // Browser side of notifications (adapted from Hireel). The phone always asks the person; code can't force the permission.
 
 /** "error": allowed, but the phone or the server didn't answer in time (try again). */
@@ -107,7 +108,7 @@ export function setUpAppNotifications() {
     const url = typeof notification?.data?.url === "string" ? notification.data.url : "/";
     // Only our own pages (a path, or a full numnum.me address).
     const target = url.startsWith("/") ? url : url.startsWith(location.origin) ? url.slice(location.origin.length) || "/" : "/";
-    if (target !== location.pathname + location.search) location.assign(target);
+    if (target !== location.pathname + location.search) openInApp(target);
   });
 }
 

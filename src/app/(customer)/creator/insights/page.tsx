@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { redirect } from "next/navigation";
 import { Eye, Heart, MousePointerClick, Send, ShoppingBag, Users } from "lucide-react";
 import { requireUser } from "@/server/auth";
@@ -39,7 +39,7 @@ export default async function CreatorInsightsPage({ searchParams }: { searchPara
       <div className="container-app max-w-3xl space-y-5 py-5">
         <div className="flex gap-2">
           {[7, 30, 90].map((d) => (
-            <Link key={d} href={`/creator/insights?days=${d}`} className={cn("chip h-9 text-sm", days === d && "chip-active")}>
+            <Link prefetch key={d} href={`/creator/insights?days=${d}`} className={cn("chip h-9 text-sm", days === d && "chip-active")}>
               {t("{n} days", { n: d })}
             </Link>
           ))}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
+import { useKeepLoaded } from "@/components/link-warmer";
 import { usePathname } from "next/navigation";
 import { BarChart3, Bell, ClipboardList, Users, CreditCard, FileText, Flag, LayoutGrid, Menu, Scale, ScrollText, Settings, ShieldCheck, Store, Wallet, X, LogOut, Megaphone, Clapperboard } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,8 @@ export function AdminNav({ counts }: { counts: Record<string, number> }) {
     { href: "/admin/push", label: "Push notifications", icon: Megaphone },
     { href: "/admin/notifications", label: "Notifications", icon: Bell, badge: counts.notifications },
   ];
+  // Every menu screen is ready before the menu is even opened: switching section is instant.
+  useKeepLoaded(items.map((i) => i.href));
   const content = (
     <div className="flex h-full flex-col">
       <div className="border-b border-white/10 p-4">

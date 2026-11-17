@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { confirmEmail } from "@/server/restaurant-emails";
 import { getCurrentUser } from "@/server/auth";
 import { buttonClass } from "@/components/ui/button";

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getBlocks } from "@/server/blocks";
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/link";
 import { prisma } from "@/server/db";
 import { searchDishes, searchReels } from "@/server/search";
 import { DishCard, ReelThumb } from "@/components/customer/cards";

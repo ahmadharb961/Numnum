@@ -3,7 +3,7 @@ import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { DashboardNav } from "@/components/dashboard/nav";
 import { Alert } from "@/components/ui/misc";
-import Link from "next/link";
+import Link from "@/components/link";
 import { NewOrderAlert } from "@/components/dashboard/new-order-alert";
 import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 import { InstallGate } from "@/components/dashboard/install-gate";

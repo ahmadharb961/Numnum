@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/link";
+import { prefetchPage } from "@/lib/prefetch";
+import { preloadMap } from "@/components/map-picker";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart, lineTotal } from "./cart";
@@ -23,7 +25,8 @@ export function CartView() {
   // Checkout opens ready: its page and the answers it needs load while the cart is on screen.
   useEffect(() => {
     if (!cart?.lines.length) return;
-    router.prefetch("/checkout");
+    prefetchPage(router, "/checkout");
+    preloadMap(); // checkout asks for the delivery spot on a map
     preloadCheckout(cart.restaurantId);
   }, [cart?.restaurantId, cart?.lines.length, router]);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Upload, XCircle } from "lucide-react";
 import { CSV_FIELDS, decodeCsvBytes, errorReportCsv, MAX_CSV_BYTES, type ColumnMapping, type ImportRow } from "@/lib/csv-import";
 import { formatMoney } from "@/lib/money";

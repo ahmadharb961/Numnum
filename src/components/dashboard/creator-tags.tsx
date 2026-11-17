@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/link";
 import { BadgeCheck, Ban, Check, Eye, Handshake, Heart, ShoppingBag, UserRound, X } from "lucide-react";
 import { blockCreatorAction, decideTagAction, removeTagAction } from "@/actions/creators";
 import { HlsVideo } from "@/components/hls-video";

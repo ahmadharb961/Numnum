@@ -1,7 +1,8 @@
 "use client";
 
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { prefetchPage } from "@/lib/prefetch";
+import Link from "@/components/link";
 import { useRouter } from "next/navigation";
 import { BadgePercent, Bookmark, Check, UserPlus, ChevronLeft, Eye, FastForward, Heart, Loader2, MapPin, Play, Plus, Send, Volume2, VolumeX, RotateCcw, X } from "lucide-react";
 import type { PublicReel } from "@/server/feed";
@@ -761,9 +762,15 @@ const ReelSlide = memo(function ReelSlide({
   // Sliding in: start playing silently from the beginning, so the reel is already moving when the
   // swipe settles (it then picks up the sound setting). Swiped back: stop and rewind.
   const router = useRouter();
+  const creatorHandle = reel.creator?.handle;
   useEffect(() => {
-    if (active && showImages) return whenFeedReady(() => router.prefetch(`/r/${reel.restaurant.slug}`), 3000);
-  }, [active, showImages, reel.restaurant.slug, router]);
+    // The pages a tap on this reel opens are ready before the tap: the restaurant, and the creator.
+    if (active && showImages)
+      return whenFeedReady(() => {
+        prefetchPage(router, `/r/${reel.restaurant.slug}`);
+        if (creatorHandle) prefetchPage(router, `/c/${creatorHandle}`);
+      }, 3000);
+  }, [active, showImages, reel.restaurant.slug, creatorHandle, router]);
 
   const peeked = useRef(false);
   useEffect(() => {

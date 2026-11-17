@@ -7,7 +7,7 @@ import { Alert } from "@/components/ui/misc";
 import { minorDigits } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import type { OpeningHours } from "@/lib/hours";
-import Link from "next/link";
+import Link from "@/components/link";
 import { normalizeZones } from "@/lib/geo";
 import { getT } from "@/i18n/server";
 

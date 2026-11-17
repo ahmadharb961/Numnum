@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, MailCheck } from "lucide-react";
 import { changePasswordAction, forgotPasswordAction, resetPasswordAction } from "@/actions/password";
 import type { FormState } from "@/actions/auth";

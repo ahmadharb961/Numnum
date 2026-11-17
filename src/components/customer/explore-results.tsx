@@ -275,7 +275,7 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
             ))}
           {type === "creators" &&
             (creators.length ? (
-              <div className="grid gap-2.5 lg:grid-cols-2 lg:gap-4" data-testid="creator-results">
+              <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2 lg:gap-4" data-testid="creator-results">
                 {creators.map((c) => (
                   <CreatorCard key={c.id} c={c} />
                 ))}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { useRouter } from "next/navigation";
 import { EyeOff } from "lucide-react";
 import { Button, buttonClass } from "@/components/ui/button";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { getCurrentUser } from "@/server/auth";
 import { RestaurantRegisterForm } from "@/components/auth-forms";
 import { BackButton } from "@/components/back-button";
