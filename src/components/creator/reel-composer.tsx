@@ -6,6 +6,7 @@ import { CheckCircle2, Film, Handshake } from "lucide-react";
 import { createCreatorReelAction, startCreatorStreamUploadAction } from "@/actions/creators";
 import { uploadFile } from "@/components/dashboard/upload";
 import { DishPicker, type PickedDish } from "./dish-picker";
+import { CoverPicker, type Cover } from "@/components/cover-picker";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
@@ -25,6 +26,7 @@ export function ReelComposer({ stream, dailyLeft }: { stream: boolean; dailyLeft
   const [dish, setDish] = useState<PickedDish | null>(null);
   const [caption, setCaption] = useState("");
   const [paid, setPaid] = useState(false);
+  const [cover, setCover] = useState<Cover | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
@@ -35,6 +37,7 @@ export function ReelComposer({ stream, dailyLeft }: { stream: boolean; dailyLeft
     const max = stream ? 500 : 200;
     if (f.size > max * 1024 * 1024) return setError(t("Video is larger than {n} MB", { n: max }));
     setPreview(URL.createObjectURL(f));
+    setCover(null); // a new video: its cover is picked again
     setAssetId(null);
     setProgress(0);
     try {
@@ -71,7 +74,7 @@ export function ReelComposer({ stream, dailyLeft }: { stream: boolean; dailyLeft
     if (!assetId) return setError(t("Wait for the video upload to finish"));
     if (!dish) return setFieldErr({ menuItemId: "Choose the dish in your reel" });
     start(async () => {
-      const r = await createCreatorReelAction({ videoAssetId: assetId, menuItemId: dish.id, caption, paidPartnership: paid });
+      const r = await createCreatorReelAction({ videoAssetId: assetId, menuItemId: dish.id, caption, paidPartnership: paid, posterAssetId: cover?.id ?? null });
       if (!r.ok) {
         setError(r.error);
         setFieldErr(r.fieldErrors ?? {});
@@ -119,6 +122,11 @@ export function ReelComposer({ stream, dailyLeft }: { stream: boolean; dailyLeft
           </button>
         )}
         <input ref={input} type="file" accept="video/mp4,video/quicktime,video/webm,video/*" hidden onChange={(e) => e.target.files?.[0] && pickVideo(e.target.files[0])} data-testid="video-input" />
+        {preview && (
+          <div className="mt-4 border-t border-black/5 pt-4">
+            <CoverPicker videoUrl={preview} value={cover} onChange={setCover} uploadParams={{ scope: "creator" }} />
+          </div>
+        )}
       </div>
       <div className="card p-4">
         <div className="mb-2 text-sm font-bold">{t("2. Tag the dish")}</div>

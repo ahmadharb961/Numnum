@@ -17,6 +17,17 @@ let ip = 20;
 const reelHidden = async (page, id) => /Reel not found/.test(await (await page.request.get(`/reel/${id}`)).text());
 const profileHidden = async (page, handle) => !(await (await page.request.get(`/c/${handle}`)).text()).includes('data-testid="creator-profile"');
 
+/** Search a dish, tap it once the results are in (scrolled above the bottom bar), wait until chosen. */
+async function pickDish(page, q, restaurant) {
+  await page.getByTestId("dish-search").fill(q);
+  const hit = page.getByTestId("dish-result").filter({ hasText: restaurant }).first();
+  await hit.waitFor();
+  await page.waitForTimeout(400); // results settle (search runs as you type)
+  await page.evaluate(() => window.scrollBy(0, 400));
+  await hit.click();
+  await page.getByTestId("picked-dish").waitFor();
+}
+
 (async () => {
   const db = new PrismaClient();
   const started = new Date();
@@ -54,7 +65,12 @@ const profileHidden = async (page, handle) => !(await (await page.request.get(`/
     await n.locator("form:has(#password) button[type=submit]").click();
     await n.waitForURL(/\/creator\/apply/, { timeout: 15000 }).catch(() => {});
     await settle(n);
-    check(new URL(n.url()).pathname === "/creator/apply" && (await n.locator("[data-testid=creator-form]:visible").count()) === 1, "a new person creates an account and lands on the creator application", n.url());
+    const formShown = await n.locator("[data-testid=creator-form]:visible").first().waitFor({ timeout: 8000 }).then(() => true, () => false);
+    if (!formShown) {
+      console.log("debug apply:", n.url(), (await n.locator("main, body").first().innerText()).slice(0, 300).replace(/\n+/g, " | "));
+      await n.screenshot({ path: (process.env.SHOTS || "/tmp") + "/creators-apply-missing.png" });
+    }
+    check(new URL(n.url()).pathname === "/creator/apply" && formShown, "a new person creates an account and lands on the creator application", n.url());
     // The last button isn't hidden behind the bottom bar (scrolled to the end).
     const covered = await n.evaluate(() => {
       window.scrollTo(0, document.documentElement.scrollHeight);
@@ -118,15 +134,29 @@ const profileHidden = async (page, handle) => !(await (await page.request.get(`/
   section("Post a reel (real video, same pipeline as restaurants)");
   await c.goto("/creator", { waitUntil: "load" }); await settle(c);
   await c.getByTestId("new-reel").click();
-  await c.waitForURL(/\/creator\/new/); await settle(c);
+  await c.waitForURL(/\/creator\/new/).catch(async (e) => {
+    console.log("debug stuck:", c.url(), await c.evaluate(() => performance.getEntriesByType("resource").filter((r) => /creator/.test(r.name)).map((r) => `${r.name.slice(21, 100)} start=${r.startTime | 0} end=${r.responseEnd | 0}`)));
+    await c.screenshot({ path: (process.env.SHOTS || "/tmp") + "/creators-stuck.png" });
+    throw e;
+  }); await settle(c);
   await c.getByTestId("video-input").setInputFiles(videoFile);
   await c.getByText("Uploaded").waitFor({ timeout: 120000 });
-  await c.getByTestId("dish-search").fill("Double Smash");
-  await c.getByTestId("dish-result").filter({ hasText: "Burger House" }).first().click();
+  await pickDish(c, "Double Smash", "Burger House");
   await c.getByTestId("paid-partnership").check();
   await c.fill("#caption", "Best smash in Hamra");
+  const posts = [];
+  c.on("request", (r) => r.method() === "POST" && posts.push(`${Date.now()} POST ${r.url().slice(21)}`));
+  c.on("response", (r) => r.request().method() === "POST" && posts.push(`${Date.now()} done ${r.status()}`));
+  // Done typing (the keyboard closes and the bottom bar comes back), then tap Post.
+  await c.evaluate(() => document.activeElement?.blur());
+  await c.waitForTimeout(300);
   await c.getByTestId("post-reel").click();
-  await c.waitForURL((u) => u.pathname === "/creator");
+  await c.waitForURL((u) => u.pathname === "/creator").catch(async (e) => {
+    console.log("debug posts:", posts);
+    console.log("debug post:", c.url(), await c.locator("[role=alert], .text-red-600").allTextContents());
+    await c.screenshot({ path: (process.env.SHOTS || "/tmp") + "/creators-post.png", fullPage: true });
+    throw e;
+  });
   const reel = await db.reel.findFirst({ where: { creatorId: approved.id }, orderBy: { createdAt: "desc" }, include: { restaurant: true } });
   check(reel?.tagStatus === "PENDING" && reel.restaurant.slug === "burger-house" && reel.paidPartnership, "posted: waiting for Burger House, paid partnership", reel && { tag: reel.tagStatus, r: reel.restaurant.slug });
   for (let i = 0; i < 90 && (await db.reel.findUnique({ where: { id: reel.id } })).status !== "READY"; i++) await new Promise((r) => setTimeout(r, 1000));
@@ -186,8 +216,7 @@ const profileHidden = async (page, handle) => !(await (await page.request.get(`/
   await c.goto("/creator/new", { waitUntil: "load" }); await settle(c);
   await c.getByTestId("video-input").setInputFiles(videoFile);
   await c.getByText("Uploaded").waitFor({ timeout: 120000 });
-  await c.getByTestId("dish-search").fill("Latte");
-  await c.getByTestId("dish-result").filter({ hasText: "Bean Bar" }).first().click();
+  await pickDish(c, "Latte", "Bean Bar");
   await c.getByTestId("post-reel").click();
   await c.waitForURL((u) => u.pathname === "/creator");
   const second = await db.reel.findFirst({ where: { creatorId: approved.id, id: { not: reel.id } } });

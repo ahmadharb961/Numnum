@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Film, ImagePlus, CheckCircle2 } from "lucide-react";
+import { Film, CheckCircle2 } from "lucide-react";
+import { CoverPicker, type Cover } from "@/components/cover-picker";
 import { createReelAction, startStreamUploadAction } from "@/actions/reels";
 import { uploadFile } from "./upload";
 import { ItemPicker } from "./item-picker";
@@ -19,12 +20,11 @@ export function ReelUploader({ items, defaultItemId, canPublish, stream }: { ite
   const [progress, setProgress] = useState<number | null>(null);
   const [itemId, setItemId] = useState(defaultItemId ?? "");
   const [caption, setCaption] = useState("");
-  const [poster, setPoster] = useState<{ id: string; url: string } | null>(null);
+  const [poster, setPoster] = useState<Cover | null>(null);
   const [publish, setPublish] = useState(canPublish);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const vInput = useRef<HTMLInputElement>(null);
-  const pInput = useRef<HTMLInputElement>(null);
 
   async function pickVideo(f: File) {
     setError(null);
@@ -32,6 +32,7 @@ export function ReelUploader({ items, defaultItemId, canPublish, stream }: { ite
     if (f.size > max * 1024 * 1024) return setError(t("Video is larger than {n} MB", { n: max }));
     setVideo(f);
     setPreview(URL.createObjectURL(f));
+    setPoster(null); // a new video: its cover is picked again
     setAssetId(null);
     setProgress(0);
     try {
@@ -60,15 +61,6 @@ export function ReelUploader({ items, defaultItemId, canPublish, stream }: { ite
     } catch (e) {
       setError((e as Error).message);
       setProgress(null);
-    }
-  }
-
-  async function pickPoster(f: File) {
-    try {
-      const res = await uploadFile(f, "image");
-      setPoster({ id: res.id, url: res.thumbUrl ?? res.url ?? "" });
-    } catch (e) {
-      setError((e as Error).message);
     }
   }
 
@@ -126,20 +118,7 @@ export function ReelUploader({ items, defaultItemId, canPublish, stream }: { ite
         <Field label="Caption (optional)">
           <textarea className="input" maxLength={300} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder={t("Smashed to order, every time 🔥")} />
         </Field>
-        <div>
-          <div className="label">{t("Thumbnail (optional)")}</div>
-          <div className="flex items-center gap-3">
-            {poster && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={poster.url} alt="" className="h-20 w-12 rounded-lg object-cover" />
-            )}
-            <Button type="button" variant="outline" size="sm" onClick={() => pInput.current?.click()}>
-              <ImagePlus className="h-4 w-4" /> {poster ? t("Replace") : t("Upload custom thumbnail")}
-            </Button>
-          </div>
-          <p className="mt-1 text-xs text-ink-muted">{t("We generate one automatically from the video if you skip this.")}</p>
-          <input ref={pInput} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && pickPoster(e.target.files[0])} />
-        </div>
+        {preview && <CoverPicker videoUrl={preview} value={poster} onChange={setPoster} />}
         <label className="flex items-center gap-3 text-sm font-semibold">
           <input type="checkbox" checked={publish} disabled={!canPublish} onChange={(e) => setPublish(e.target.checked)} className="h-5 w-5 accent-brand-500" />
           {t("Publish automatically when processing finishes")}

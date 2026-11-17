@@ -50,6 +50,7 @@ async function chooseDelivery(page) {
   await page.locator("#name").waitFor();
 }
 
+let crashPage = null; // for a screenshot if a step crashes
 (async () => {
   const browser = await chromium.launch();
   const errors = [];
@@ -80,6 +81,7 @@ async function chooseDelivery(page) {
   // ── Customer: browse, build a cart ──
   const ctx = await browser.newContext({ ...devices["iPhone 13"], baseURL: BASE, geolocation: HAMRA, permissions: ["geolocation"] });
   const c = await ctx.newPage();
+  crashPage = c;
   watch(c);
 
   section("Restaurant profile");
@@ -362,6 +364,10 @@ async function chooseDelivery(page) {
   process.exit(failures ? 1 : 0);
 })().catch(async (e) => {
   console.error("\nCRASHED at step", step, e);
+  if (crashPage) {
+    console.error("page:", crashPage.url(), (await crashPage.locator("body").innerText().catch(() => "")).slice(0, 500));
+    await crashPage.screenshot({ path: `${process.env.SHOTS || "/tmp"}/strict-crash.png`, fullPage: true }).catch(() => {});
+  }
   await db.$disconnect();
   process.exit(1);
 });

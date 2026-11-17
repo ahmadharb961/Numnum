@@ -204,4 +204,15 @@ export const AR6: Record<string, string> = {
   "{n} creators": "{n} صانع محتوى",
   "{n} creators|2": "صانعا محتوى",
   "{n} creators|3-10": "{n} صنّاع محتوى",
+  // Reel cover (restaurants and creators)
+  "Cover": "الغلاف",
+  "Automatic": "تلقائي",
+  "Choose a frame": "اختر لقطة من الفيديو",
+  "Upload a photo": "حمّل صورة",
+  "Use the automatic cover": "استخدم الغلاف التلقائي",
+  "This device can't show the frames of this video. Upload a photo instead.": "لا يمكن لهذا الجهاز عرض لقطات هذا الفيديو. حمّل صورة بدلاً من ذلك.",
+  "Frame {n}": "اللقطة {n}",
+  "Choose the moment": "اختر اللحظة",
+  "Use this frame": "استخدم هذه اللقطة",
+  "You'll pay with {paid} — change: {change}": "ستدفع {paid} — الباقي: {change}",
 };

@@ -17,7 +17,7 @@ const count = () => db.analyticsEvent.count({ where: { type: "client_error" } })
   const p = await c.newPage();
   for (const u of ["/", "/restaurants", "/explore", "/r/burger-house", "/cart", "/checkout", "/account"]) { await p.goto(u, { waitUntil: "load" }); await p.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {}); await p.waitForTimeout(400); }
   await p.waitForTimeout(800);
-  check((await count()) === 0, "browsing 7 pages reports no errors", await count());
+  check((await count()) === 0, "browsing 7 pages reports no errors", (await db.analyticsEvent.findMany({ where: { type: "client_error" }, select: { data: true } })).map((e) => e.data));
 
   // A hydration error on the restaurant page: the phone shows a word the server never sent
   await p.goto("/r/burger-house", { waitUntil: "networkidle" });

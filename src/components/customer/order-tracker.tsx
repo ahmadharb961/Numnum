@@ -195,7 +195,7 @@ export function OrderTracker({ order: o, token, placed, loggedIn }: { order: Ord
           <div className="mb-2 flex items-center gap-2 text-sm font-bold">
             <Banknote className="h-5 w-5 text-emerald-600" /> {delivery ? t("Cash on delivery") : t("Cash at pickup")}: {formatMoney(o.totalCents, o.currency)}
           </div>
-          {o.changeForCents && <p className="mb-2 text-xs text-ink-muted">You&apos;ll pay with {formatMoney(o.changeForCents, o.currency)} — change: {formatMoney(o.changeForCents - o.totalCents, o.currency)}</p>}
+          {o.changeForCents && <p className="mb-2 text-xs text-ink-muted">{t("You'll pay with {paid} — change: {change}", { paid: formatMoney(o.changeForCents, o.currency), change: formatMoney(o.changeForCents - o.totalCents, o.currency) })}</p>}
           <div className="divide-y divide-black/5 text-sm">
             {o.items.map((i) => (
               <div key={i.id} className="flex justify-between gap-3 py-2">

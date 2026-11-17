@@ -199,6 +199,7 @@ export const reelInputSchema = z.object({
   menuItemId: z.string().min(1, "Choose the dish in your reel"),
   caption: z.string().trim().max(300).optional(),
   paidPartnership: z.boolean().default(false),
+  posterAssetId: z.string().min(1).nullish(), // the cover they picked (a frame or a photo)
 });
 
 /** Posts a reel tagging a restaurant's dish; it waits for the restaurant before going public. */
@@ -215,8 +216,10 @@ export async function createCreatorReel(userId: string, raw: unknown) {
   if (!item) throw new CreatorError("Choose the dish in your reel", "menuItemId");
   if (await prisma.reel.findFirst({ where: { videoAssetId: asset.id }, select: { id: true } })) throw new CreatorError("This video is already used by another reel");
   if (await prisma.restaurantCreatorBlock.findUnique({ where: { restaurantId_creatorId: { restaurantId: item.restaurantId, creatorId: c.id } } })) throw new CreatorError("This restaurant doesn't accept tags from you", "menuItemId");
+  // Their own image only. Kept when the video finishes processing (it replaces the automatic one).
+  const poster = input.posterAssetId ? await prisma.mediaAsset.findFirst({ where: { id: input.posterAssetId, uploadedById: userId, restaurantId: null, kind: "IMAGE" }, select: { url: true } }) : null;
   const reel = await prisma.reel.create({
-    data: { restaurantId: item.restaurantId, menuItemId: item.id, videoAssetId: asset.id, creatorId: c.id, tagStatus: "PENDING", paidPartnership: input.paidPartnership, caption: input.caption?.trim() || null, status: "PROCESSING", visibility: "DRAFT", autoPublish: false },
+    data: { restaurantId: item.restaurantId, menuItemId: item.id, videoAssetId: asset.id, creatorId: c.id, posterUrl: poster?.url ?? null, tagStatus: "PENDING", paidPartnership: input.paidPartnership, caption: input.caption?.trim() || null, status: "PROCESSING", visibility: "DRAFT", autoPublish: false },
   });
   if (isStreamKey(asset.storageKey)) await syncStreamReels({ reelId: reel.id });
   else await enqueue("process_video", { reelId: reel.id, publish: "0" });
