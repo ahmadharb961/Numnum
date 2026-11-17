@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { loginAction, registerCustomerAction, registerRestaurantAction, type FormState } from "@/actions/auth";
 import { Button } from "@/components/ui/button";

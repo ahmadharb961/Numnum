@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { getBlocks } from "@/server/blocks";
 import { browseRestaurants, facets } from "@/server/search";
 import { customerLocation } from "@/server/location";

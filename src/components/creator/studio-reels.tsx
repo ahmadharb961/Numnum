@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/link";
 import { Clock, Eye, Heart, Loader2, Pin, PinOff, RotateCcw, ShoppingBag, Trash2 } from "lucide-react";
 import { deleteCreatorReelAction, pinReelAction, requestVerificationAction, retagReelAction } from "@/actions/creators";
 import { DishPicker, type PickedDish } from "./dish-picker";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { checkResetToken } from "@/server/password-reset";
 import { ResetPasswordForm } from "@/components/password-forms";
 import { buttonClass } from "@/components/ui/button";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { DashPage } from "@/components/dashboard/page";

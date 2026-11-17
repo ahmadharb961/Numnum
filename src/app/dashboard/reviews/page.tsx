@@ -3,7 +3,7 @@ import { requireRestaurant, canAccess } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { DashPage } from "@/components/dashboard/page";
 import { ReviewList } from "@/components/dashboard/review-list";
-import Link from "next/link";
+import Link from "@/components/link";
 import { cn } from "@/lib/utils";
 import { getT } from "@/i18n/server";
 

@@ -2,7 +2,7 @@
 
 import { showDealSummary } from "@/lib/deals";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { useRouter } from "next/navigation";
 import { Banknote, CheckCircle2, ChefHat, Circle, Clock, Phone, RotateCcw, Star, XCircle, Bike, ShoppingBag, PartyPopper } from "lucide-react";
 import { formatMoney } from "@/lib/money";

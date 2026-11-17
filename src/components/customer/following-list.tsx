@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/link";
 import { BadgePercent, Check, Store, UserPlus } from "lucide-react";
 import { VerifiedBadge } from "@/components/ui/misc";
 import { buttonClass } from "@/components/ui/button";

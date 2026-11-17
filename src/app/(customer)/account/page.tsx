@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff, LifeBuoy, Heart, KeyRound, Clapperboard } from "lucide-react";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/misc";
 import { formatPhone } from "@/lib/phone";
 import { formatMoney } from "@/lib/money";
 import { STATUS_META, ACTIVE_STATUSES } from "@/lib/order-status";
+import { KeepLoaded } from "@/components/link-warmer";
 import { getT } from "@/i18n/server";
 import { LanguageSwitcher } from "@/components/language-switcher";
 
@@ -66,6 +67,8 @@ export default async function AccountPage() {
           <LanguageSwitcher />
         </section>
         <nav className="card divide-y divide-black/5">
+          {/* A short menu: every screen in it is ready at once, even the ones further down. */}
+          <KeepLoaded hrefs={[...workLinks.map((l) => l.href), "/account/orders", "/account/addresses", "/account/following", "/saved", "/account/blocked", "/account/password", "/support"]} />
           {[
             ...workLinks,
             { href: "/account/orders", icon: Receipt, label: "My orders", sub: t(orderCount === 1 ? "{n} order" : "{n} orders", { n: orderCount }) },

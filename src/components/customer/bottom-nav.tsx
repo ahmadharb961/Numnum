@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useKeepLoaded } from "@/components/link-warmer";
+import Link from "@/components/link";
+import { usePathname } from "next/navigation";
 import { whenFeedReady } from "@/lib/feed-ready";
 import { Compass, Home, ShoppingBag, Store, User } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,14 +18,17 @@ const items = [
   // Saved items live inside Account (and in the desktop sidebar).
   { href: "/account", label: "Account", icon: User, match: (p: string) => p.startsWith("/account") || p.startsWith("/saved") || p.startsWith("/order/") },
 ];
+const TAB_HREFS = items.map((i) => i.href);
 
 export function BottomNav() {
   const t = useT();
   const pathname = usePathname();
-  const router = useRouter();
-  // Each tab's screen loads in the background so tapping it is instant, but only once the first
-  // reel is playing (or after a moment on other pages), so it never slows the first video down.
-  useEffect(() => whenFeedReady(() => items.forEach(({ href }) => router.prefetch(href)), 1500), [router]);
+  // Each tab's screen loads fully in the background so tapping it is instant, but only once the
+  // first reel is playing (or after a moment on other pages), so it never slows the first video
+  // down. Checked again on every page change: screens already loaded aren't fetched again.
+  const [feedReady, setFeedReady] = useState(false);
+  useEffect(() => whenFeedReady(() => setFeedReady(true), 1500), []);
+  useKeepLoaded(TAB_HREFS, feedReady);
   const { count } = useCart();
   const dark = pathname === "/" || pathname.startsWith("/reel/") || /^\/(r|c)\/[^/]+\/reels/.test(pathname);
   // The page background also colors any area iOS leaves around the app (e.g. below the nav).

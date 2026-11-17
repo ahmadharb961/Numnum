@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { DashPage } from "@/components/dashboard/page";
 import { RestaurantCreateForm } from "@/components/admin/restaurant-create-form";
 import { getSettings } from "@/server/settings";

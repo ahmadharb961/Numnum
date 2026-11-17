@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { redirect } from "next/navigation";
 import { BadgeCheck, BarChart3, ExternalLink, Pencil, Plus, UserRound } from "lucide-react";
 import { requireUser } from "@/server/auth";
@@ -90,19 +90,19 @@ export default async function CreatorStudioPage() {
             ))}
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2">
-            <Link href={`/c/${c.handle}`} className={buttonClass("outline", "sm")}>
+            <Link prefetch href={`/c/${c.handle}`} className={buttonClass("outline", "sm")}>
               <ExternalLink className="h-4 w-4" /> {t("Profile")}
             </Link>
-            <Link href="/creator/profile" className={buttonClass("outline", "sm")}>
+            <Link prefetch href="/creator/profile" className={buttonClass("outline", "sm")}>
               <Pencil className="h-4 w-4" /> {t("Edit")}
             </Link>
-            <Link href="/creator/insights" className={buttonClass("outline", "sm")} data-testid="creator-insights-link">
+            <Link prefetch href="/creator/insights" className={buttonClass("outline", "sm")} data-testid="creator-insights-link">
               <BarChart3 className="h-4 w-4" /> {t("Insights")}
             </Link>
           </div>
         </section>
         {c.status === "APPROVED" && (
-          <Link href="/creator/new" className={buttonClass("primary", "lg") + " w-full"} data-testid="new-reel">
+          <Link prefetch href="/creator/new" className={buttonClass("primary", "lg") + " w-full"} data-testid="new-reel">
             <Plus className="h-5 w-5" /> {t("Post a reel")}
           </Link>
         )}

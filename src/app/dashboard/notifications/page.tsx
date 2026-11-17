@@ -1,6 +1,6 @@
 import { showText } from "@/lib/notification-text";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { DashPage } from "@/components/dashboard/page";

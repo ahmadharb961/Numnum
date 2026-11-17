@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "@/components/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, FileArchive, ImagePlus, Loader2, RotateCcw, Trash2, XCircle, Check, Sparkles } from "lucide-react";
@@ -327,9 +328,9 @@ function Assign({ items, library }: { items: Item[]; library: Lib[] }) {
             ) : (
               <p className="text-sm text-ink-muted">{t("No photos yet — tap a photo below to assign it.")}</p>
             )}
-            <a href={`/dashboard/menu/items/${item.id}`} className="mt-2 inline-block text-xs font-semibold text-brand-600">
+            <Link href={`/dashboard/menu/items/${item.id}`} className="mt-2 inline-block text-xs font-semibold text-brand-600">
               {t("Reorder, crop or set main photo →")}
-            </a>
+            </Link>
           </div>
         )}
         <div className="card p-3">

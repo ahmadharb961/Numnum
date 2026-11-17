@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { ReportButton } from "./report-button";
-import Link from "next/link";
+import Link from "@/components/link";
 import { BadgePercent, Check, Clock, Minus, Plus, Play } from "lucide-react";
 import type { PublicItem } from "@/server/items";
 import { validateSelections, unitPrice, effectiveBounds, type Selections } from "@/lib/customization";

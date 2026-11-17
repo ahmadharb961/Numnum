@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { setUpAppNotifications } from "@/lib/push-client";
+import { openInApp } from "@/lib/prefetch";
 
 export function ServiceWorker() {
   useEffect(() => {
@@ -12,7 +13,7 @@ export function ServiceWorker() {
       const d = e.data as { type?: string; url?: string } | null;
       if (d?.type !== "nn:open" || !d.url) return;
       const u = new URL(d.url, location.origin);
-      if (u.origin === location.origin) location.assign(u.pathname + u.search + u.hash);
+      if (u.origin === location.origin) openInApp(u.pathname + u.search + u.hash);
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
     if (process.env.NODE_ENV === "production") navigator.serviceWorker.register("/sw.js").catch(() => {});

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { BlockedNotice } from "@/components/customer/blocked-notice";
 import { restaurantBlockFor } from "@/server/blocks";
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/link";
 import { BackButton } from "@/components/back-button";
 import { BadgeCheck, BadgePercent, Bike, ChevronRight, Clapperboard, Clock, ConciergeBell, Globe, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, UtensilsCrossed } from "lucide-react";
 import { getPublicRestaurant } from "@/server/restaurant-public";

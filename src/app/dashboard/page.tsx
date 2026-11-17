@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { CheckCircle2, Circle, Eye, Heart, Send } from "lucide-react";
 import { requireRestaurant, canAccess } from "@/server/auth";
 import { restaurantOverview } from "@/server/analytics";

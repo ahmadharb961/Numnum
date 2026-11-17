@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "@/components/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { BellOff, BellRing, Volume2 } from "lucide-react";
@@ -88,9 +89,9 @@ export function NewOrderAlert({ initialCount }: { initialCount: number }) {
   return (
     <div className="flex items-center gap-2">
       {count > 0 && (
-        <a href="/dashboard/orders" className="inline-flex animate-pulse items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1.5 text-xs font-bold text-white">
+        <Link href="/dashboard/orders" className="inline-flex animate-pulse items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1.5 text-xs font-bold text-white">
           <BellRing className="h-4 w-4" /> {t(count === 1 ? "{n} new order" : "{n} new orders", { n: count })}
-        </a>
+        </Link>
       )}
       {ringing && soundOn && count > 0 && (
         <button onClick={() => setRinging(false)} className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-xs font-bold text-white">

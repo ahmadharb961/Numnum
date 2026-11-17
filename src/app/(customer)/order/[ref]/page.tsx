@@ -1,6 +1,6 @@
 import { verdictAllowed } from "@/server/orders";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/link";
 import { loadCustomerOrder } from "@/server/order-view";
 import { getCurrentUser } from "@/server/auth";
 import { OrderTracker } from "@/components/customer/order-tracker";

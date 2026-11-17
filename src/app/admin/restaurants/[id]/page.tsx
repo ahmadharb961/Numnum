@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db";
 import { getSettings } from "@/server/settings";
