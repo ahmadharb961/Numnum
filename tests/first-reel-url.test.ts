@@ -14,4 +14,8 @@ describe("first reel URL: the page's early <video> and the player load the same 
       expect(srcSet).toBe(playableSrc(url, d ?? null));
     });
   }
+  it("iPhones (no reported speed) start at 480p, not 720p", () => {
+    // Cloudflare lists first the rendition closest to the hint: 1.5 Mbps → 480p, 1.8 → 720p.
+    expect(playableSrc(url)).toBe(`${url}?clientBandwidthHint=1.5`);
+  });
 });
