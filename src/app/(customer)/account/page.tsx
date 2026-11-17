@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "@/components/link";
-import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff, LifeBuoy, Heart, KeyRound, Clapperboard } from "lucide-react";
+import { Bookmark, LayoutDashboard, MapPin, ShoppingBag, Shield, EyeOff, Headphones, Heart, KeyRound, Clapperboard, Globe } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
-import { PageHeader } from "@/components/customer/page-header";
+import { cn } from "@/lib/utils";
 import { AccountForm } from "@/components/customer/account-form";
 import { NotifyPrompt } from "@/components/customer/notify-prompt";
 import { logoutAction } from "@/actions/auth";
@@ -15,6 +16,9 @@ import { STATUS_META, ACTIVE_STATUSES } from "@/lib/order-status";
 import { KeepLoaded } from "@/components/link-warmer";
 import { getT } from "@/i18n/server";
 import { LanguageSwitcher } from "@/components/language-switcher";
+
+// The browser bar matches the orange header.
+export const viewport: Viewport = { themeColor: "#f03a08" };
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -32,22 +36,44 @@ export default async function AccountPage() {
     prisma.restaurantFollow.count({ where: { userId: user.id, restaurant: { status: "ACTIVE", blockedBy: { none: { userId: user.id } } } } }),
     prisma.creator.findUnique({ where: { userId: user.id }, select: { status: true } }),
   ]);
+  type Tile = { href: string; icon: LucideIcon; label: string; sub: string; tone: string };
   // Food creators: apply, wait for review, then the studio.
-  const creatorLink =
+  const creatorTile: Tile =
     creator?.status === "APPROVED" || creator?.status === "SUSPENDED"
-      ? { href: "/creator", icon: Clapperboard, label: "Creator studio", sub: "Your reels, tags and insights" }
+      ? { href: "/creator", icon: Clapperboard, label: "Creator studio", sub: "Your reels, tags and insights", tone: TONES.orange }
       : creator?.status === "PENDING"
-        ? { href: "/creator/apply", icon: Clapperboard, label: "Creator application", sub: "Being reviewed" }
-        : { href: "/creator/apply", icon: Clapperboard, label: "Become a food creator", sub: "Post reels, tag dishes, people order from your videos" };
-  const workLinks = [
-    ...(staffCount ? [{ href: "/dashboard", icon: LayoutDashboard, label: "Restaurant dashboard", sub: "Orders, menu, reels, insights" }] : []),
-    ...(user.roles.includes("ADMIN") ? [{ href: "/admin", icon: Shield, label: "Admin panel", sub: "Restaurants, payments, settings" }] : []),
-    creatorLink,
+        ? { href: "/creator/apply", icon: Clapperboard, label: "Creator application", sub: "Being reviewed", tone: TONES.orange }
+        : { href: "/creator/apply", icon: Clapperboard, label: "Become a food creator", sub: "Post reels, tag dishes, people order from your videos", tone: TONES.orange };
+  const tiles: Tile[] = [
+    ...(staffCount ? [{ href: "/dashboard", icon: LayoutDashboard, label: "Restaurant dashboard", sub: "Orders, menu, reels, insights", tone: TONES.teal }] : []),
+    ...(user.roles.includes("ADMIN") ? [{ href: "/admin", icon: Shield, label: "Admin panel", sub: "Restaurants, payments, settings", tone: TONES.slate }] : []),
+    creatorTile,
+    { href: "/account/orders", icon: ShoppingBag, label: "My orders", sub: t(orderCount === 1 ? "{n} order" : "{n} orders", { n: orderCount }), tone: TONES.amber },
+    { href: "/account/addresses", icon: MapPin, label: "Saved addresses", sub: t("{n} saved", { n: addressCount }), tone: TONES.red },
+    { href: "/account/following", icon: Heart, label: "Following", sub: t(followingCount === 1 ? "{n} restaurant" : "{n} restaurants", { n: followingCount }), tone: TONES.pink },
+    { href: "/saved", icon: Bookmark, label: "Saved dishes & restaurants", sub: "Reels, dishes, restaurants", tone: TONES.violet },
+    { href: "/account/blocked", icon: EyeOff, label: "Blocked", sub: "Restaurants and people you hid", tone: TONES.blue },
+    { href: "/account/password", icon: KeyRound, label: "Change password", sub: "Keep your account secure", tone: TONES.green },
+    { href: "/support", icon: Headphones, label: "Help & support", sub: "Contact us, terms and privacy", tone: TONES.sky },
   ];
+  // Rows of three; a last row of two shares the width, a single last tile takes the whole row.
+  const rest = tiles.length % 3;
+  const span = (i: number) => (rest === 2 && i >= tiles.length - 2 ? "col-span-3" : rest === 1 && i === tiles.length - 1 ? "col-span-6" : "col-span-2");
   return (
     <main className="pb-nav">
-      <PageHeader title={t("Hi, {name}", { name: user.name.split(" ")[0] })} back={false} />
-      <div className="container-app space-y-5 pt-4">
+      <header className="relative overflow-hidden bg-gradient-to-br from-brand-600 via-brand-500 to-brand-400 text-white" style={{ paddingTop: "var(--safe-top)" }} data-testid="account-hero">
+        <div className="container-app pb-16 pt-8">
+          <h1 className="text-[1.9rem] font-black leading-tight tracking-tight">
+            {t("Hi, {name}", { name: greetingName(user.name) })} <span aria-hidden>👋</span>
+          </h1>
+        </div>
+        {/* The wave the page flows out of */}
+        <svg className="absolute inset-x-0 -bottom-px h-12 w-full text-cream" viewBox="0 0 400 48" preserveAspectRatio="none" aria-hidden>
+          <path d="M0 30 C 90 6, 170 6, 250 22 S 360 44, 400 18 L400 48 L0 48 Z" fill="currentColor" />
+          <path d="M0 30 C 90 6, 170 6, 250 22 S 360 44, 400 18" fill="none" stroke="white" strokeOpacity="0.25" strokeWidth="10" />
+        </svg>
+      </header>
+      <div className="container-app space-y-5 pt-1">
         {active.map((o) => (
           <Link prefetch key={o.id} href={`/order/${o.reference}`} className="card flex items-center gap-3 p-4">
             <span className="relative flex h-3 w-3"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" /><span className="relative inline-flex h-3 w-3 rounded-full bg-brand-500" /></span>
@@ -59,35 +85,27 @@ export default async function AccountPage() {
           </Link>
         ))}
         <NotifyPrompt details={user.roles.includes("ADMIN")} />
-        <section className="card flex flex-wrap items-center justify-between gap-3 p-4">
-          <div>
+        <section className="card flex flex-wrap items-center justify-between gap-3 rounded-3xl p-4">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-500">
+            <Globe className="h-6 w-6" />
+          </span>
+          <div className="min-w-0 flex-1">
             <h2 className="font-extrabold">{t("Language")}</h2>
             <p className="text-xs text-ink-muted">{t("The app, emails and notifications")}</p>
           </div>
-          <LanguageSwitcher />
+          {/* Phones: the switch gets its own full-width row; wider screens: beside the title. */}
+          <LanguageSwitcher className="w-full sm:w-auto" />
         </section>
-        <nav className="card divide-y divide-black/5">
+        <nav className="grid grid-cols-6 gap-2.5" data-testid="account-tiles">
           {/* A short menu: every screen in it is ready at once, even the ones further down. */}
-          <KeepLoaded hrefs={[...workLinks.map((l) => l.href), "/account/orders", "/account/addresses", "/account/following", "/saved", "/account/blocked", "/account/password", "/support"]} />
-          {[
-            ...workLinks,
-            { href: "/account/orders", icon: Receipt, label: "My orders", sub: t(orderCount === 1 ? "{n} order" : "{n} orders", { n: orderCount }) },
-            { href: "/account/addresses", icon: MapPin, label: "Saved addresses", sub: t("{n} saved", { n: addressCount }) },
-            { href: "/account/following", icon: Heart, label: "Following", sub: t(followingCount === 1 ? "{n} restaurant" : "{n} restaurants", { n: followingCount }) },
-            { href: "/saved", icon: Bookmark, label: "Saved dishes & restaurants", sub: "Reels, dishes, restaurants" },
-            { href: "/account/blocked", icon: EyeOff, label: "Blocked", sub: "Restaurants and people you hid" },
-            { href: "/account/password", icon: KeyRound, label: "Change password", sub: "Keep your account secure" },
-            { href: "/support", icon: LifeBuoy, label: "Help & support", sub: "Contact us, terms and privacy" },
-          ].map((l) => (
-            <Link prefetch key={l.href} href={l.href} className="flex items-center gap-3 p-4">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
-                <l.icon className="h-5 w-5" />
+          <KeepLoaded hrefs={tiles.map((l) => l.href)} />
+          {tiles.map((l, i) => (
+            <Link prefetch key={l.href} href={l.href} className={cn("card flex min-w-0 flex-col items-center rounded-3xl px-2 pb-4 pt-5 text-center transition active:scale-[0.97]", span(i))}>
+              <span className={cn("grid h-16 w-16 place-items-center rounded-2xl", l.tone)}>
+                <l.icon className="h-8 w-8" strokeWidth={1.8} />
               </span>
-              <span className="flex-1">
-                <span className="block font-semibold">{t(l.label)}</span>
-                <span className="block text-xs text-ink-muted">{t(l.sub)}</span>
-              </span>
-              <ChevronRight className="rtl:-scale-x-100 h-5 w-5 text-ink-muted" />
+              <span className="mt-3 block text-[15px] font-extrabold leading-tight">{t(l.label)}</span>
+              <span className="mt-1 line-clamp-2 text-xs leading-snug text-ink-muted">{t(l.sub)}</span>
             </Link>
           ))}
         </nav>
@@ -109,4 +127,24 @@ export default async function AccountPage() {
       </div>
     </main>
   );
+}
+
+// Icon tile colors: a soft background with the icon in the same hue.
+const TONES = {
+  orange: "bg-brand-50 text-brand-500",
+  amber: "bg-amber-50 text-amber-500",
+  red: "bg-rose-50 text-rose-600",
+  pink: "bg-pink-50 text-pink-500",
+  violet: "bg-violet-50 text-violet-600",
+  blue: "bg-indigo-50 text-indigo-600",
+  green: "bg-emerald-50 text-emerald-600",
+  sky: "bg-sky-50 text-sky-600",
+  teal: "bg-teal-50 text-teal-600",
+  slate: "bg-slate-100 text-slate-700",
+};
+
+/** "Ahmad Harb" → "Ahmad"; a title stays with the name: "Mr. Ahmad" → "Mr. Ahmad". */
+function greetingName(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return /^(mr|mrs|ms|miss|dr|prof|sir)\.?$/i.test(parts[0] ?? "") && parts[1] ? `${parts[0]} ${parts[1]}` : (parts[0] ?? "");
 }
