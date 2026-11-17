@@ -192,4 +192,8 @@ export const AR6: Record<string, string> = {
   "{n} likes": "{n} إعجاب",
   "{n}s watched on average": "{n} ثانية مشاهدة بالمتوسط",
   "Your live reels' numbers show here.": "تظهر هنا أرقام فيديوهاتك المنشورة.",
+  // Login page
+  "Log in to your customer, food creator or restaurant account.": "سجّل الدخول إلى حسابك كزبون أو صانع محتوى أو مطعم.",
+  "Food creator?": "صانع محتوى طعام؟",
+  "Apply as a food creator": "قدّم كصانع محتوى طعام",
 };

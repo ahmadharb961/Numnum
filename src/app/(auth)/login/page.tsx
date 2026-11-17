@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, Store, User, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, Clapperboard, Store, User, UtensilsCrossed } from "lucide-react";
 import { LoginForm } from "@/components/auth-forms";
 import { getT } from "@/i18n/server";
 
@@ -9,9 +9,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("Log in"), robots: { index: false } };
 }
 
-function LinkCard({ href, icon: Icon, title, action }: { href: string; icon: typeof User; title: string; action: string }) {
+function LinkCard({ href, icon: Icon, title, action, testId }: { href: string; icon: typeof User; title: string; action: string; testId?: string }) {
   return (
-    <Link href={href} className="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(22,18,15,0.05),0_6px_20px_rgba(22,18,15,0.05)] transition hover:shadow-md active:scale-[0.99]">
+    <Link href={href} data-testid={testId} className="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(22,18,15,0.05),0_6px_20px_rgba(22,18,15,0.05)] transition hover:shadow-md active:scale-[0.99]">
       <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-600">
         <Icon className="h-6 w-6" />
       </span>
@@ -39,7 +39,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <path d="M6 14 L14 6 M9 19 L19 15" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" fill="none" />
           </svg>
         </h1>
-        <p className="mx-auto mt-1 max-w-xs text-[15px] font-medium text-ink-soft">{t("Log in to your restaurant dashboard or customer account.")}</p>
+        <p className="mx-auto mt-1 max-w-xs text-[15px] font-medium text-ink-soft">{t("Log in to your customer, food creator or restaurant account.")}</p>
       </div>
       <div className="mt-6">
         <LoginForm next={next} reset={reset === "1"} />
@@ -51,6 +51,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       </div>
       <div className="space-y-3">
         <LinkCard href={`/account/register${q}`} icon={User} title={t("New here?")} action={t("Create a customer account")} />
+        {/* New creators make their account first, then land on the creator application. */}
+        <LinkCard href={`/account/register?next=${encodeURIComponent("/creator/apply")}`} icon={Clapperboard} title={t("Food creator?")} action={t("Apply as a food creator")} testId="creator-card" />
         <LinkCard href="/business/register" icon={Store} title={t("Own a restaurant?")} action={t("Register your restaurant")} />
       </div>
       <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-ink-muted">

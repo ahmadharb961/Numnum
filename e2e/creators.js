@@ -40,6 +40,25 @@ const profileHidden = async (page, handle) => !(await (await page.request.get(`/
   const videoFile = path.join(ROOT, "storage/public", sampleVideo.url.replace(/^\/media\//, ""));
   const photo = path.join(ROOT, "storage/public", sampleVideo.posterUrl.replace(/^\/media\//, "")); // the demo video's poster image
 
+  section("New here: login page → Food creator? → account → application");
+  {
+    const ctx = await b.newContext({ ...devices["iPhone 13"], baseURL: BASE, extraHTTPHeaders: { "x-forwarded-for": `10.3.4.${ip++}` } });
+    const n = await ctx.newPage();
+    n.on("pageerror", (e) => errors.push(`new user on ${n.url()}: ${String(e).slice(0, 120)}`));
+    await n.goto("/login", { waitUntil: "load" }); await settle(n);
+    await n.locator("[data-testid=creator-card]:visible").click();
+    await n.waitForURL(/\/account\/register/); await settle(n);
+    const email = `new-creator-${Date.now()}@numnum.test`;
+    await n.fill("#name", "New Creator"); await n.fill("#email", email); await n.fill("#phone", "70 123 456"); await n.fill("#password", "new-creator-1");
+    await n.getByTestId("customer-terms").check();
+    await n.locator("form:has(#password) button[type=submit]").click();
+    await n.waitForURL(/\/creator\/apply/, { timeout: 15000 }).catch(() => {});
+    await settle(n);
+    check(new URL(n.url()).pathname === "/creator/apply" && (await n.locator("[data-testid=creator-form]:visible").count()) === 1, "a new person creates an account and lands on the creator application", n.url());
+    await db.user.deleteMany({ where: { email } });
+    await ctx.close();
+  }
+
   section("Apply");
   const c = await as("buyer2@numnum.demo");
   await c.goto("/account", { waitUntil: "load" }); await settle(c);
