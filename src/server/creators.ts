@@ -12,6 +12,7 @@ import { getSettings } from "./settings";
 import { deleteStreamVideo, isStreamKey, streamUidOf, syncStreamReels } from "./stream";
 import { encodeText } from "@/lib/notification-text";
 import { tFor } from "@/i18n/server";
+import { creatorSearchFields } from "./search-text";
 
 // Food creators (bloggers): apply → an admin approves (welcome email) → they post reels tagging a
 // restaurant's dish → the restaurant accepts (the reel goes live with the normal Order button) or
@@ -39,7 +40,7 @@ const handleSchema = z
   .trim()
   .toLowerCase()
   .transform((h) => h.replace(/^@/, ""))
-  .pipe(z.string().regex(/^[a-z0-9._]{3,24}$/, "3–24 letters, numbers, dots or underscores").refine((h) => !RESERVED.has(h) && !/^[._]|[._]$|\.\./.test(h), "Choose another handle"));
+  .pipe(z.string().regex(/^[a-z0-9._]{3,24}$/, "3–24 letters, numbers, dots or underscores").refine((h) => !RESERVED.has(h) && !/^[._]|[._]$|\.\./.test(h), "Choose another username"));
 const optUrlOrHandle = z.string().trim().max(200).optional().transform((v) => v || null);
 
 export const applySchema = z.object({
@@ -63,15 +64,24 @@ async function avatarUrl(userId: string, assetId: string | null | undefined) {
 
 // ───── Applying, approval, verification ─────
 
+/** Live check while typing a username: the cleaned-up form, and whether it's free. */
+export async function checkHandle(userId: string, raw: string): Promise<{ handle: string; available: boolean; error?: string }> {
+  const parsed = handleSchema.safeParse(raw);
+  const cleaned = String(raw ?? "").trim().toLowerCase().replace(/^@/, "");
+  if (!parsed.success) return { handle: cleaned, available: false, error: parsed.error.issues[0]?.message ?? "Choose another username" };
+  const taken = await prisma.creator.findFirst({ where: { handle: parsed.data, NOT: { userId } }, select: { id: true } });
+  return { handle: parsed.data, available: !taken, ...(taken ? { error: "This username is taken" } : {}) };
+}
+
 /** Apply to become a creator (or apply again after a decline). */
 export async function applyAsCreator(userId: string, raw: unknown) {
   const input = applySchema.parse(raw);
   const existing = await prisma.creator.findUnique({ where: { userId } });
   if (existing && existing.status !== "DECLINED") throw new CreatorError(existing.status === "PENDING" ? "Your application is being reviewed" : "You're already a creator");
   const taken = await prisma.creator.findFirst({ where: { handle: input.handle, NOT: { userId } }, select: { id: true } });
-  if (taken) throw new CreatorError("This handle is taken", "handle");
+  if (taken) throw new CreatorError("This username is taken", "handle");
   const avatar = await avatarUrl(userId, input.avatarAssetId);
-  const data = { handle: input.handle, displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), status: "PENDING" as const, decisionNote: null };
+  const data = { handle: input.handle, displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), status: "PENDING" as const, decisionNote: null, ...creatorSearchFields(input) };
   const c = existing ? await prisma.creator.update({ where: { id: existing.id }, data }) : await prisma.creator.create({ data: { ...data, userId } });
   await notifyAdmins({ type: "creator_application", title: `New creator application: @${c.handle}`, link: "/admin/creators" });
   return c;
@@ -102,7 +112,7 @@ export async function updateCreatorProfile(userId: string, raw: unknown) {
   const c = await prisma.creator.findUnique({ where: { userId } });
   if (!c || c.status !== "APPROVED") throw new CreatorError("Only approved creators can edit their profile");
   const avatar = await avatarUrl(userId, input.avatarAssetId);
-  return prisma.creator.update({ where: { id: c.id }, data: { displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}) } });
+  return prisma.creator.update({ where: { id: c.id }, data: { displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), ...creatorSearchFields({ handle: c.handle, ...input }) } });
 }
 
 /** The creator asks for the verified badge. */

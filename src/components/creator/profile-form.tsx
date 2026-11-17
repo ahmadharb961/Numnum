@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AtSign, Camera, UserRound } from "lucide-react";
-import { applyCreatorAction, updateCreatorProfileAction } from "@/actions/creators";
+import { applyCreatorAction, checkHandleAction, updateCreatorProfileAction } from "@/actions/creators";
 import { uploadFile } from "@/components/dashboard/upload";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
@@ -74,13 +74,19 @@ export function CreatorProfileForm({ mode, initial }: { mode: "apply" | "edit"; 
         <div className="text-sm text-ink-muted">{uploading ? t("Uploading…") : t("Add a clear photo of you: it shows on your profile and reels.")}</div>
         <input ref={file} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && pickAvatar(e.target.files[0])} />
       </div>
-      {mode === "apply" && (
-        <Field label="Handle" error={errors.handle} hint="Your profile address: numnum.me/c/yourhandle" htmlFor="handle">
+      {mode === "apply" ? (
+        <Field label="Username" error={errors.handle} htmlFor="handle">
           <span className="relative block">
             <AtSign className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
-            <input id="handle" value={v.handle} onChange={set("handle")} required autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="rana.eats" className="input ps-9" dir="ltr" />
+            <input id="handle" value={v.handle} onChange={(e) => setV((x) => ({ ...x, handle: e.target.value.replace(/\s+/g, "").toLowerCase() }))} required autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="rana.eats" className="input ps-9" dir="ltr" maxLength={25} />
           </span>
+          <HandleStatus handle={v.handle} />
         </Field>
+      ) : (
+        <div className="text-sm">
+          <span className="text-ink-muted">{t("Username")}: </span>
+          <b dir="ltr">@{v.handle}</b>
+        </div>
       )}
       <Field label="Name shown on your profile" error={errors.displayName} htmlFor="displayName">
         <input id="displayName" value={v.displayName} onChange={set("displayName")} required className="input" />
@@ -109,5 +115,38 @@ export function CreatorProfileForm({ mode, initial }: { mode: "apply" | "edit"; 
       </Button>
       {mode === "apply" && <p className="text-center text-xs text-ink-muted">{t("We review every application, usually within a day. You'll get an email once you're approved.")}</p>}
     </form>
+  );
+}
+
+/** As they type: the profile address, and whether the username is free (checked after a short pause). */
+function HandleStatus({ handle }: { handle: string }) {
+  const t = useT();
+  const [state, setState] = useState<{ for: string; available: boolean; error?: string } | null>(null);
+  const clean = handle.trim().replace(/^@/, "");
+  useEffect(() => {
+    if (clean.length < 3) return setState(null);
+    let live = true;
+    const timer = setTimeout(async () => {
+      const r = await checkHandleAction(clean).catch(() => null);
+      if (live && r) setState({ for: clean, available: r.available, error: r.error });
+    }, 350);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [clean]);
+  const current = state?.for === clean ? state : null;
+  return (
+    <p className="mt-1 text-xs" data-testid="handle-status" aria-live="polite">
+      <span className="text-ink-muted" dir="ltr">
+        numnum.me/c/{clean || "username"}
+      </span>
+      {current &&
+        (current.available ? (
+          <span className="ms-2 font-semibold text-emerald-700">✓ {t("Available")}</span>
+        ) : (
+          <span className="ms-2 font-semibold text-red-600">{t(current.error ?? "This username is taken")}</span>
+        ))}
+    </p>
   );
 }

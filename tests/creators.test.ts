@@ -28,6 +28,7 @@ import {
   setCreatorBlocked,
   setCreatorFollow,
   suspendCreator,
+  updateCreatorProfile,
   DAILY_REELS,
   PIN_MAX,
 } from "@/server/creators";
@@ -223,5 +224,26 @@ describe("reels, tags and the feed", () => {
     expect((await followingFeed(fan.id)).reels).toHaveLength(0);
     await suspendCreator(admin.id, creator.id, false);
     expect(await isPublic(reel.id)).toBe(true);
+  });
+});
+
+describe("search finds creators", () => {
+  beforeEach(resetDb);
+
+  it("by username, name or bio; approved creators only; counted on the Creators tab", async () => {
+    const { exploreSearch } = await import("@/server/explore-search");
+    const { user, creator, admin } = await approvedCreator("mr.foodies");
+    await updateCreatorProfile(user.id, { displayName: "Mr. Foodies", bio: "Shawarma hunter" });
+    const pendingUser = await makeCustomer();
+    await applyAsCreator(pendingUser.id, { handle: "foodies.pending", displayName: "Pending Foodies" });
+    const find = async (q: string) => (await exploreSearch({ q, type: "creators" }, null)).creators!.map((c) => c.handle);
+    expect(await find("foodies")).toEqual(["mr.foodies"]);
+    expect(await find("mr foodies")).toEqual(["mr.foodies"]);
+    expect(await find("shawarma hunter")).toEqual(["mr.foodies"]);
+    expect(await find("nobody-like-this")).toEqual([]);
+    const r = await exploreSearch({ q: "foodies", type: "dishes" }, null);
+    expect(r.counts.creators).toBe(1);
+    await suspendCreator(admin.id, creator.id, true);
+    expect(await find("FOODIES")).toEqual([]); // (a new query: identical searches are cached for 20 s)
   });
 });

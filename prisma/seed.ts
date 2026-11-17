@@ -20,7 +20,7 @@ import { updateSetting, DEFAULT_SETTINGS } from "../src/server/settings";
 import { previousPeriod } from "../src/lib/utils";
 import { deleteStreamVideo, streamConfigured, streamUidOf, syncStreamReels, uploadVideoToStream } from "../src/server/stream";
 import { DEMOS, PALETTES, type Demo } from "./demo-data";
-import { refreshAllSearchText } from "../src/server/search-text";
+import { creatorSearchFields, refreshAllSearchText } from "../src/server/search-text";
 
 const CATEGORIES = [
   ["burgers", "Burgers", "برغر", "🍔"],
@@ -276,6 +276,7 @@ async function ensureDemoCreator(pw: string) {
       area: "Beirut",
       audienceSize: 25000,
       avatarUrl: "/demo/mr-foodies.jpg",
+      ...creatorSearchFields({ handle: "mr.foodies", displayName: "Mr. Foodies", bio: "Eating my way through Beirut, one reel at a time 🍔", area: "Beirut" }),
       status: "APPROVED",
       approvedAt: new Date(),
     },

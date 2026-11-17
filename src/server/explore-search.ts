@@ -14,11 +14,12 @@ export const PAGE = 24;
 const CANDIDATES = 192; // best matches re-ranked precisely (8 pages)
 export const COUNT_CAP = 1000;
 
-type Tab = "dishes" | "reels" | "restaurants";
+type Tab = "dishes" | "reels" | "restaurants" | "creators";
 
 export type ExploreDish = { id: string; name: string; description: string | null; priceCents: number; currency: string; ratingAvg: number; ratingCount: number; available: boolean; image: { url: string; thumbUrl: string | null } | null; restaurant: { slug: string; displayName: string; verificationStatus: string } };
 export type ExploreRestaurant = { id: string; slug: string; displayName: string; logoUrl: string | null; coverUrl: string | null; cuisine: string | null; area: string | null; city: string | null; verificationStatus: string; ratingAvg: number; ratingCount: number; deliveryEnabled: boolean; pickupEnabled: boolean; openingHours: unknown; avgPrepMinutes: number | null; delivery: { km: number | null; deliverable: boolean; feeCents: number | null } | null };
 export type ExploreReel = { id: string; posterUrl: string | null; views: number; label: string };
+export type ExploreCreator = { id: string; handle: string; displayName: string; avatarUrl: string | null; bio: string | null; area: string | null; verified: boolean; followerCount: number; reelCount: number };
 export type ExploreResult = {
   q: string;
   type: Tab;
@@ -29,6 +30,7 @@ export type ExploreResult = {
   dishes?: ExploreDish[];
   restaurants?: ExploreRestaurant[];
   reels?: ExploreReel[];
+  creators?: ExploreCreator[];
 };
 
 // ---- SQL building -------------------------------------------------------------------------
@@ -105,7 +107,17 @@ function restaurantWhere(p: SearchParams, query: Query, fuzzy: boolean) {
   return Prisma.join(f, " AND ");
 }
 
-const reelWhere = (p: SearchParams, query: Query, fuzzy: boolean) => Prisma.sql`rl."visibility" = 'PUBLISHED' AND rl."status" = 'READY' AND ${dishWhere(p, query, fuzzy)}`;
+// A creator's reel shows only once the restaurant accepted the tag, and while the creator is approved.
+const creatorReelOk = Prisma.sql`(rl."creatorId" IS NULL OR (rl."tagStatus" = 'ACCEPTED' AND EXISTS (SELECT 1 FROM "creators" cr WHERE cr."id" = rl."creatorId" AND cr."status" = 'APPROVED')))`;
+const reelWhere = (p: SearchParams, query: Query, fuzzy: boolean) => Prisma.sql`rl."visibility" = 'PUBLISHED' AND rl."status" = 'READY' AND ${creatorReelOk} AND ${dishWhere(p, query, fuzzy)}`;
+
+/** Food creators: approved ones, matched on username, name, bio and area (an area filter applies too). */
+function creatorWhere(p: SearchParams, query: Query) {
+  const f: Prisma.Sql[] = [Prisma.sql`c."status" = 'APPROVED'`];
+  if (p.area) f.push(Prisma.sql`c."area" ILIKE ${`%${likeEscape(p.area)}%`}`);
+  if (query.length) f.push(matchSql('c."searchText"', query));
+  return Prisma.join(f, " AND ");
+}
 
 const nameFirst = (col: string, query: Query, fuzzy: boolean) => (query.length ? Prisma.sql`(${matchSql(col, query, fuzzy)}) DESC,` : Prisma.empty);
 
@@ -156,6 +168,22 @@ function reelRows(p: SearchParams, query: Query, fuzzy: boolean, offset: number)
     LIMIT ${PAGE} OFFSET ${offset}`;
 }
 
+type CreatorRow = Omit<ExploreCreator, "verified"> & { verification: string };
+
+function creatorRows(p: SearchParams, query: Query, limit: number, offset: number) {
+  const nameMatch = nameFirst('c."searchName"', query, false);
+  return prisma.$queryRaw<CreatorRow[]>`
+    SELECT c."id", c."handle", c."displayName", c."avatarUrl", left(c."bio", 160) AS "bio", c."area", c."verification"::text AS "verification", c."followerCount",
+      (SELECT count(*)::int FROM "reels" rl JOIN "restaurants" r ON r."id" = rl."restaurantId" JOIN "menu_items" m ON m."id" = rl."menuItemId"
+        WHERE rl."creatorId" = c."id" AND rl."tagStatus" = 'ACCEPTED' AND rl."visibility" = 'PUBLISHED' AND rl."status" = 'READY' AND r."status" = 'ACTIVE' AND m."archived" = false) AS "reelCount"
+    FROM "creators" c
+    WHERE ${creatorWhere(p, query)}
+    ORDER BY ${nameMatch} (c."verification" = 'APPROVED') DESC, c."followerCount" DESC, c."createdAt" ASC
+    LIMIT ${limit} OFFSET ${offset}`;
+}
+
+const toCreator = ({ verification, ...c }: CreatorRow): ExploreCreator => ({ ...c, verified: verification === "APPROVED" });
+
 /** Counts stop at COUNT_CAP (shown as "1000+") so they stay cheap on big catalogs. */
 async function count(tab: Tab, p: SearchParams, query: Query, fuzzy: boolean) {
   const inner =
@@ -163,7 +191,9 @@ async function count(tab: Tab, p: SearchParams, query: Query, fuzzy: boolean) {
       ? Prisma.sql`SELECT 1 FROM "menu_items" m JOIN "restaurants" r ON r."id" = m."restaurantId" WHERE ${dishWhere(p, query, fuzzy)}`
       : tab === "restaurants"
         ? Prisma.sql`SELECT 1 FROM "restaurants" r WHERE ${restaurantWhere(p, query, fuzzy)}`
-        : Prisma.sql`SELECT 1 FROM "reels" rl JOIN "menu_items" m ON m."id" = rl."menuItemId" JOIN "restaurants" r ON r."id" = rl."restaurantId" WHERE ${reelWhere(p, query, fuzzy)}`;
+        : tab === "creators"
+          ? Prisma.sql`SELECT 1 FROM "creators" c WHERE ${creatorWhere(p, query)}`
+          : Prisma.sql`SELECT 1 FROM "reels" rl JOIN "menu_items" m ON m."id" = rl."menuItemId" JOIN "restaurants" r ON r."id" = rl."restaurantId" WHERE ${reelWhere(p, query, fuzzy)}`;
   const [row] = await prisma.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM (${inner} LIMIT ${COUNT_CAP + 1}) t`;
   return Math.min(row.n, COUNT_CAP + 1);
 }
@@ -220,17 +250,20 @@ async function run(p: SearchParams, tab: Tab, page: number, query: Query, fuzzy:
   const start = ranked ? 0 : offset;
   const page_ = <T,>(rows: T[], fields: (r: T) => Field[]) => (ranked ? rerank(rows, query, fuzzy, fields).slice(offset, offset + PAGE) : rows);
   // List and the three (capped) counts run in parallel: one database round trip of latency.
-  const [list, dishes, reels, restaurants] = await Promise.all([
+  const [list, dishes, reels, restaurants, creators] = await Promise.all([
     tab === "dishes"
       ? dishRows(p, query, fuzzy, window, start).then((rows) => page_(rows, dishFields).map(toDish))
       : tab === "restaurants"
         ? restaurantRows(p, query, fuzzy, window, start).then((rows) => page_(rows, restaurantFields).map((r) => toRestaurant(r, loc)))
-        : reelRows(p, query, fuzzy, offset),
+        : tab === "creators"
+          ? creatorRows(p, query, PAGE, offset).then((rows) => rows.map(toCreator))
+          : reelRows(p, query, fuzzy, offset),
     count("dishes", p, query, fuzzy),
     count("reels", p, query, fuzzy),
     count("restaurants", p, query, fuzzy),
+    count("creators", p, query, fuzzy),
   ]);
-  const counts = { dishes, reels, restaurants };
+  const counts = { dishes, reels, restaurants, creators };
   return { list, counts };
 }
 
@@ -250,7 +283,7 @@ export async function exploreSearch(p: SearchParams, loc: LatLng | null): Promis
   let corrected = false;
   let res = await run(p, tab, page, query, false, loc);
   // Nothing spelled exactly like that: search the closest spellings on the menus instead.
-  if (query.length && !res.counts.dishes && !res.counts.restaurants) {
+  if (query.length && !res.counts.dishes && !res.counts.restaurants && !res.counts.creators) {
     const fix = await correct(query);
     if (fix) {
       const again = await run(p, tab, page, fix, true, loc);

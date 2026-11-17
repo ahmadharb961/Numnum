@@ -25,8 +25,8 @@ export const AR6: Record<string, string> = {
   "Application sent. We'll let you know once it's reviewed.": "تم إرسال الطلب. سنبلغك فور مراجعته.",
   "Profile saved": "تم حفظ الملف",
   "You're already a creator": "أنت صانع محتوى بالفعل",
-  "This handle is taken": "اسم المستخدم هذا مأخوذ",
-  "Choose another handle": "اختر اسم مستخدم آخر",
+  "This username is taken": "اسم المستخدم هذا مأخوذ",
+  "Choose another username": "اختر اسم مستخدم آخر",
   "3–24 letters, numbers, dots or underscores": "من 3 إلى 24 حرفاً أو رقماً أو نقطة أو شرطة سفلية",
   "Only approved creators can edit their profile": "فقط صانعو المحتوى الموافق عليهم يمكنهم تعديل ملفهم",
   "Check the highlighted fields": "تحقّق من الحقول المحدّدة",
@@ -196,4 +196,12 @@ export const AR6: Record<string, string> = {
   "Log in to your customer, food creator or restaurant account.": "سجّل الدخول إلى حسابك كزبون أو صانع محتوى أو مطعم.",
   "Food creator?": "صانع محتوى طعام؟",
   "Apply as a food creator": "قدّم كصانع محتوى طعام",
+  // Username, search
+  "Username": "اسم المستخدم",
+  "Available": "متاح",
+  "Creators": "صانعو المحتوى",
+  "{n} creator": "{n} صانع محتوى",
+  "{n} creators": "{n} صانع محتوى",
+  "{n} creators|2": "صانعا محتوى",
+  "{n} creators|3-10": "{n} صنّاع محتوى",
 };

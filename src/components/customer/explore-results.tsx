@@ -8,14 +8,15 @@ import type { ExploreResult } from "@/server/explore-search";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/misc";
 import { DishCard, ReelThumb, RestaurantCard } from "./cards";
+import { CreatorCard } from "@/components/creator/creator-card";
 import { rememberSearch } from "./search-controls";
 import { setCounts, setQuery, setSearching, useQuery } from "./search-state";
 import { useLocale, useT } from "@/i18n/client";
 import { localName } from "@/i18n/core";
 
 type Category = { slug: string; name: string; nameAr: string | null; emoji: string | null; imageUrl: string | null };
-type Tab = "dishes" | "reels" | "restaurants";
-const TABS: Tab[] = ["dishes", "reels", "restaurants"];
+type Tab = "dishes" | "reels" | "restaurants" | "creators";
+const TABS: Tab[] = ["dishes", "reels", "restaurants", "creators"];
 const FILTERS = ["category", "cuisine", "area", "minPrice", "maxPrice", "delivery", "pickup", "verified", "available", "minRating", "minItemRating"];
 
 // Answers already seen (per exact request) are reused for a minute: going back, switching tabs
@@ -187,6 +188,7 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
   const dishes = pages.flatMap((p) => p.dishes ?? []);
   const reels = pages.flatMap((p) => p.reels ?? []);
   const restaurants = pages.flatMap((p) => p.restaurants ?? []);
+  const creators = pages.flatMap((p) => p.creators ?? []);
   const total = shown?.counts[type] ?? 0;
   const onPick = () => q && rememberSearch(q);
 
@@ -225,7 +227,7 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
           shown &&
           total > 0 && (
             <span>
-              {t(type === "dishes" ? (total === 1 ? "{n} dish" : "{n} dishes") : type === "reels" ? (total === 1 ? "{n} reel" : "{n} reels") : total === 1 ? "{n} restaurant" : "{n} restaurants", { n: formatCount(total) })}
+              {t(type === "dishes" ? (total === 1 ? "{n} dish" : "{n} dishes") : type === "reels" ? (total === 1 ? "{n} reel" : "{n} reels") : type === "creators" ? (total === 1 ? "{n} creator" : "{n} creators") : total === 1 ? "{n} restaurant" : "{n} restaurants", { n: formatCount(total) })}
             </span>
           )
         )}
@@ -270,6 +272,16 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
               </div>
             ) : (
               empty("restaurants")
+            ))}
+          {type === "creators" &&
+            (creators.length ? (
+              <div className="grid gap-2.5 lg:grid-cols-2 lg:gap-4" data-testid="creator-results">
+                {creators.map((c) => (
+                  <CreatorCard key={c.id} c={c} />
+                ))}
+              </div>
+            ) : (
+              empty("creators")
             ))}
         </div>
       )}

@@ -9,6 +9,7 @@ import { rateLimit } from "@/server/rate-limit";
 import {
   applyAsCreator,
   approvedCreator,
+  checkHandle,
   createCreatorReel,
   CreatorError,
   decideCreator,
@@ -56,6 +57,12 @@ export async function applyCreatorAction(input: unknown): Promise<CreatorResult>
   } catch (e) {
     return fail(e);
   }
+}
+
+export async function checkHandleAction(handle: string): Promise<{ handle: string; available: boolean; error?: string }> {
+  const me = await requireUser("/creator/apply");
+  if (!rateLimit(`creator-handle:${me.id}`, 120, 10 * 60_000).ok) return { handle: String(handle ?? ""), available: false, error: "Too many attempts. Try again in a few minutes." };
+  return checkHandle(me.id, String(handle ?? "").slice(0, 40));
 }
 
 export async function updateCreatorProfileAction(input: unknown): Promise<CreatorResult> {

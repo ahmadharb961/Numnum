@@ -88,8 +88,21 @@ export async function refreshWords(force = false) {
 }
 
 /** Rebuilds everything that's stale (deploy/seed, cron). */
+/** Creators' search text (username, name, bio, area), for the ones not filled yet. */
+export async function refreshCreatorSearch(limit = 2000) {
+  const rows = await prisma.creator.findMany({ where: { searchText: "" }, take: limit, select: { id: true, handle: true, displayName: true, bio: true, area: true } });
+  for (const c of rows) await prisma.creator.update({ where: { id: c.id }, data: creatorSearchFields(c) });
+  return rows.length;
+}
+
+/** Normalized search fields for a creator (the same spelling rules as dishes and restaurants). */
+export function creatorSearchFields(c: { handle: string; displayName: string; bio?: string | null; area?: string | null }) {
+  return { searchName: norm(`${c.handle} ${c.displayName}`), searchText: join(c.handle, c.displayName, c.bio, c.area) };
+}
+
 export async function refreshAllSearchText() {
   const total = { items: 0, restaurants: 0 };
+  await refreshCreatorSearch();
   for (let i = 0; i < 200; i++) {
     const r = await refreshSearchText(2000);
     total.items += r.items;

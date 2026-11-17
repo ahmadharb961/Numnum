@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 
 // Shared state between the search box and the results: what's typed (live, every keystroke),
 // whether a server search is running, and result counts for the tabs.
-type State = { searching: boolean; query: string; counts: { dishes: number; reels: number; restaurants: number } | null };
+type State = { searching: boolean; query: string; counts: { dishes: number; reels: number; restaurants: number; creators: number } | null };
 let state: State = { searching: false, query: "", counts: null };
 const subs = new Set<() => void>();
 function set(patch: Partial<State>) {
@@ -22,7 +22,7 @@ export function setQuery(query: string) {
 }
 export function setCounts(counts: State["counts"]) {
   const c = state.counts;
-  if (c === counts || (c && counts && c.dishes === counts.dishes && c.reels === counts.reels && c.restaurants === counts.restaurants)) return;
+  if (c === counts || (c && counts && c.dishes === counts.dishes && c.reels === counts.reels && c.restaurants === counts.restaurants && c.creators === counts.creators)) return;
   set({ counts });
 }
 export const useSearching = () => use((s) => s.searching, false);

@@ -41,7 +41,7 @@ describe("explore search (database)", () => {
     expect(r.corrected).toBe(true);
     expect(names(r)).toContain("Chicken Shawarma Sandwich");
     expect((await search("shawarma")).corrected).toBe(false);
-    expect((await search("zzqx")).counts).toEqual({ dishes: 0, reels: 0, restaurants: 0 });
+    expect((await search("zzqx")).counts).toEqual({ dishes: 0, reels: 0, restaurants: 0, creators: 0 });
   });
 
   it("searches restaurants by name and by what they serve", async () => {

@@ -149,10 +149,10 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
             ))}
           </div>
         )}
-        <div className="mt-3 grid grid-cols-3 rounded-xl bg-black/5 p-1 text-sm font-semibold">
-          {(["dishes", "reels", "restaurants"] as const).map((k) => (
-            <button key={k} onClick={() => setTab(k)} className={cn("h-9 rounded-lg transition", type === k ? "bg-white shadow-sm" : "text-ink-muted")}>
-              {t(k === "dishes" ? "Dishes" : k === "reels" ? "Reels" : "Restaurants")}
+        <div className="mt-3 grid grid-cols-4 rounded-xl bg-black/5 p-1 text-[13px] font-semibold sm:text-sm">
+          {(["dishes", "reels", "restaurants", "creators"] as const).map((k) => (
+            <button key={k} onClick={() => setTab(k)} className={cn("h-9 min-w-0 truncate rounded-lg px-1 transition", type === k ? "bg-white shadow-sm" : "text-ink-muted")} data-testid={`search-tab-${k}`}>
+              {t(k === "dishes" ? "Dishes" : k === "reels" ? "Reels" : k === "creators" ? "Creators" : "Restaurants")}
               {q.trim() && counts && <span className={cn("ms-1 tabular text-xs", type === k ? "text-brand-600" : "text-ink-muted/70")}>{counts[k] > 1000 ? "1000+" : counts[k]}</span>}
             </button>
           ))}

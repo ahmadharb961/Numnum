@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ChangePasswordPage() {
   await requireUser("/account/password");
   return (
-    <div>
+    <div className="pb-nav">
       <PageHeader title="Change password" />
       <div className="container-app max-w-md py-6">
         <ChangePasswordForm />
