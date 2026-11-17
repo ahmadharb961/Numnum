@@ -85,7 +85,7 @@ curl -fsS -H "Authorization: Bearer YOUR_CRON_SECRET" https://yourdomain.com/api
 
 1. Open `https://yourdomain.com/login` and sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 2. **Admin → Settings → Whish Money / Whish Pay recipient**: enter the name, Whish number and instructions restaurants will pay to.
-3. Check **Commission** (14%, charged on completed orders; open orders auto-complete after 6 hours) and **Invoicing** (due days, reminders).
+3. Check **Commission** (8% by default, charged on completed orders; open orders auto-complete after 6 hours) and **Invoicing** (due days, reminders).
 4. Restaurants sign up at `https://yourdomain.com/business`. Approve them in **Admin → Restaurants**.
 5. Tell restaurants: on their phone, open `https://yourdomain.com/dashboard` in **Safari (iPhone)** or **Chrome (Android)**. The dashboard asks them to **add numnum to the home screen** and **allow notifications** — new orders then arrive as phone notifications. In **Settings → Online ordering**, they pin their restaurant on the map and set delivery zones (e.g. up to 3 km $1.50, up to 6 km $2.50).
 

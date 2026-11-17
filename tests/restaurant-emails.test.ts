@@ -14,13 +14,13 @@ import { confirmEmail, sendRestaurantWelcome, sendVerifyEmail, verifyToken, welc
 import { updateSetting, DEFAULT_SETTINGS } from "@/server/settings";
 import { makeRestaurant, resetDb } from "./helpers";
 
-const data = { ownerName: "Karim Haddad", restaurantName: "Burger House", ratePct: "14%", dueDays: 10, graceDays: 7, whishName: "numnum SAL", whishNumber: "96170123456", loginEmail: "karim@burger.lb" };
+const data = { ownerName: "Karim Haddad", restaurantName: "Burger House", ratePct: "8%", dueDays: 10, graceDays: 7, whishName: "numnum SAL", whishNumber: "96170123456", loginEmail: "karim@burger.lb" };
 
 describe("welcome email content", () => {
   it("covers commission, onboarding, the app + notifications, Whish payment and insights", () => {
     const m = welcomeEmail(data, "en");
     expect(m.subject).toBe("Welcome to numnum, Burger House 🎉");
-    for (const s of ["Welcome to numnum, Karim!", "14%", "only on completed orders", "Go live in 3 steps", "Add your menu and photos", "Upload your first reel", "/dashboard", "turn on notifications", "On the 1st of each month", "within 10 days", "numnum SAL", "+961 70 123 456", "don't be late", "after 7 more days", "Insights"])
+    for (const s of ["Welcome to numnum, Karim!", "8%", "only on completed orders", "Nothing on delivery fees", "you keep your own drivers", "Go live in 3 steps", "Add your menu and photos", "Upload your first reel", "/dashboard", "turn on notifications", "On the 1st of each month", "within 10 days", "numnum SAL", "+961 70 123 456", "don't be late", "after 7 more days", "Insights"])
       expect(m.html).toContain(s);
     expect(m.text).toContain("Open my dashboard");
   });

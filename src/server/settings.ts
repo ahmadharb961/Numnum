@@ -50,7 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   platformName: "numnum",
   tagline: "Watch it. Crave it. Order it.",
   supportEmail: "support@numnum.me",
-  defaultCommissionRateBps: 1400,
+  defaultCommissionRateBps: 800, // 8%: no delivery cut, a fraction of what delivery apps charge
   billableEvent: "COMPLETED",
   autoCompleteHours: 6,
   agreementVersion: "2026-10",

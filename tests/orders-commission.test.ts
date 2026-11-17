@@ -191,7 +191,7 @@ describe("order lifecycle", () => {
 });
 
 describe("commission integrity", () => {
-  it("a $20 completed order generates exactly one $2.80 commission; rejected/canceled never do", async () => {
+  it("a $20 completed order generates exactly one $1.60 commission (8% default); rejected/canceled never do", async () => {
     const f = await makeRestaurant();
     const { order } = await place(f, "f");
     await restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "ACCEPT");
@@ -199,7 +199,7 @@ describe("commission integrity", () => {
     await Promise.all([1, 2, 3].map(() => restaurantOrderAction(f.restaurant.id, f.user.id, order.id, "COMPLETE").catch(() => null)));
     const events = await prisma.commissionEvent.findMany();
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ baseCents: 2000, rateBps: 1400, commissionCents: 280, billableEvent: "COMPLETED" }); // delivery fee excluded
+    expect(events[0]).toMatchObject({ baseCents: 2000, rateBps: 800, commissionCents: 160, billableEvent: "COMPLETED" }); // delivery fee excluded
 
     const rej = await place(f, "rej", { deviceKey: "d-rej-aaaaaaaaaaaaaaa" }, { customer: { ...orderPayload(f, "z").customer, phone: "71 999 999" } });
     await restaurantOrderAction(f.restaurant.id, f.user.id, rej.order.id, "REJECT", { reason: "busy" });
@@ -265,7 +265,7 @@ describe("monthly billing & Whish settlement", () => {
     const f = await completedOrders(3);
     const { invoice, created } = await generateInvoice(f.restaurant.id, "2026-09", null);
     expect(created).toBe(true);
-    expect(invoice).toMatchObject({ orderCount: 3, grossSubtotalCents: 6000, grossCommissionCents: 840, totalDueCents: 840, status: "AWAITING_PAYMENT" });
+    expect(invoice).toMatchObject({ orderCount: 3, grossSubtotalCents: 6000, grossCommissionCents: 480, totalDueCents: 480, status: "AWAITING_PAYMENT" });
     expect(await prisma.invoiceLine.count({ where: { invoiceId: invoice!.id } })).toBe(3);
     const again = await runMonthlyBilling("2026-09");
     expect(again.every((r) => !r.created)).toBe(true);
@@ -283,13 +283,13 @@ describe("monthly billing & Whish settlement", () => {
     const f = await completedOrders(1);
     const { invoice } = await generateInvoice(f.restaurant.id, "2026-09", null);
     const receipt = await prisma.mediaAsset.create({ data: { restaurantId: f.restaurant.id, kind: "RECEIPT", isPrivate: true, storageKey: "db", url: "/api/private-media/x", mimeType: "image/webp", sizeBytes: 10 } });
-    const payment = await submitPayment({ restaurantId: f.restaurant.id, invoiceId: invoice!.id, userId: f.user.id, amountCents: 280, paymentDate: new Date(), whishReference: "WH-123456", evidenceAssetIds: [receipt.id] });
+    const payment = await submitPayment({ restaurantId: f.restaurant.id, invoiceId: invoice!.id, userId: f.user.id, amountCents: 160, paymentDate: new Date(), whishReference: "WH-123456", evidenceAssetIds: [receipt.id] });
     expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).status).toBe("PAYMENT_SUBMITTED");
     const admin = await prisma.user.create({ data: { email: "admin@test.dev", passwordHash: "x", name: "Admin", roles: { create: { role: "ADMIN" } } } });
-    await reviewPayment(admin.id, payment.id, { action: "APPROVE", verifiedAmountCents: 200 });
+    await reviewPayment(admin.id, payment.id, { action: "APPROVE", verifiedAmountCents: 100 });
     expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).status).toBe("PARTIALLY_PAID");
-    const p2 = await submitPayment({ restaurantId: f.restaurant.id, invoiceId: invoice!.id, userId: f.user.id, amountCents: 80, paymentDate: new Date(), whishReference: "WH-777", evidenceAssetIds: [] });
-    await reviewPayment(admin.id, p2.id, { action: "APPROVE", verifiedAmountCents: 80 });
+    const p2 = await submitPayment({ restaurantId: f.restaurant.id, invoiceId: invoice!.id, userId: f.user.id, amountCents: 60, paymentDate: new Date(), whishReference: "WH-777", evidenceAssetIds: [] });
+    await reviewPayment(admin.id, p2.id, { action: "APPROVE", verifiedAmountCents: 60 });
     expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).status).toBe("PAID");
   });
 
@@ -297,7 +297,7 @@ describe("monthly billing & Whish settlement", () => {
     const f = await completedOrders(1);
     const other = await makeRestaurant();
     const { invoice } = await generateInvoice(f.restaurant.id, "2026-09", null);
-    await expect(submitPayment({ restaurantId: other.restaurant.id, invoiceId: invoice!.id, userId: other.user.id, amountCents: 280, paymentDate: new Date(), whishReference: "WH-1", evidenceAssetIds: [] })).rejects.toThrow(/not found/);
+    await expect(submitPayment({ restaurantId: other.restaurant.id, invoiceId: invoice!.id, userId: other.user.id, amountCents: 160, paymentDate: new Date(), whishReference: "WH-1", evidenceAssetIds: [] })).rejects.toThrow(/not found/);
   });
 
   it("accepted disputes on invoiced orders become credits on the next invoice", async () => {
@@ -307,8 +307,8 @@ describe("monthly billing & Whish settlement", () => {
     const d = await openDispute({ restaurantId: f.restaurant.id, userId: f.user.id, commissionEventId: ev.id, reason: "Customer refused the order" });
     const admin = await prisma.user.create({ data: { email: "admin2@test.dev", passwordHash: "x", name: "Admin", roles: { create: { role: "ADMIN" } } } });
     await resolveDispute(admin.id, d.id, true, "Verified");
-    expect((await prisma.commissionAdjustment.findFirstOrThrow()).amountCents).toBe(-280);
-    expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).totalDueCents).toBe(560);
+    expect((await prisma.commissionAdjustment.findFirstOrThrow()).amountCents).toBe(-160);
+    expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice!.id } })).totalDueCents).toBe(320);
   });
 });
 
@@ -352,7 +352,7 @@ describe("customer confirms rejected / not-delivered orders", () => {
     const o = await customerVerdictOnOrder(order.reference, meta.userId!, "RECEIVED");
     expect(o).toMatchObject({ customerVerdict: "RECEIVED", status: "FAILED" });
     const ev = await prisma.commissionEvent.findUniqueOrThrow({ where: { orderId: order.id } });
-    expect(ev).toMatchObject({ billableEvent: "CUSTOMER_CONFIRMED", baseCents: 2000, rateBps: 1400, commissionCents: 280, status: "ACCRUED" });
+    expect(ev).toMatchObject({ billableEvent: "CUSTOMER_CONFIRMED", baseCents: 2000, rateBps: 800, commissionCents: 160, status: "ACCRUED" });
     expect(await prisma.notification.count({ where: { audience: "ADMIN", type: "ORDER_CONTRADICTED" } })).toBe(1);
     expect(await prisma.notification.count({ where: { restaurantId: f.restaurant.id, type: "ORDER_CONTRADICTED" } })).toBe(1);
     // answering again changes nothing

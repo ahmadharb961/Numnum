@@ -56,7 +56,7 @@ export async function sendVerifyEmail(userId: string) {
 export type WelcomeData = {
   ownerName: string;
   restaurantName: string;
-  ratePct: string; // "14%"
+  ratePct: string; // "8%"
   dueDays: number;
   graceDays: number;
   whishName: string;
@@ -100,7 +100,7 @@ export function welcomeEmail(d: WelcomeData, locale: string | null | undefined) 
          <td width="96" align="center" style="padding:16px 0 16px 16px"><div style="width:80px;height:80px;border-radius:40px;background:#ff5412;color:#fff;font:900 24px/80px Arial,sans-serif;text-align:center">${esc(d.ratePct)}</div></td>
          <td style="padding:16px">
            <div style="font:800 17px Arial,sans-serif;color:#16120f">${t("Your commission")}</div>
-           <div style="font:15px/1.5 Arial,sans-serif;color:#4a423d">${t("{rate} of the food total, only on completed orders. No monthly fee, no setup fee.", { rate: esc(d.ratePct) })}</div>
+           <div style="font:15px/1.5 Arial,sans-serif;color:#4a423d">${t("{rate} of the food total, only on completed orders. Nothing on delivery fees, no monthly fee, no setup fee.", { rate: esc(d.ratePct) })}</div>
          </td>
        </tr>
      </table>
@@ -125,6 +125,7 @@ export function welcomeEmail(d: WelcomeData, locale: string | null | undefined) 
 
      ${h2(t("Why restaurants love numnum"))}
      ${bullet("🎬", t("Customers discover your food through short videos, then order in one tap."))}
+     ${bullet("🤝", t("A low commission: you keep your own drivers, your delivery fees and your customers."))}
      ${bullet("💵", t("Cash on delivery: you deliver and collect, nothing to set up."))}
      ${bullet("📈", t("Insights show your views, orders and revenue, so you know what sells."))}
      <div style="height:8px"></div>
@@ -134,7 +135,7 @@ export function welcomeEmail(d: WelcomeData, locale: string | null | undefined) 
   const text = [
     t("Welcome to numnum, {name}! 🎉", { name: first }),
     "",
-    `${t("Your commission")}: ${t("{rate} of the food total, only on completed orders. No monthly fee, no setup fee.", { rate: d.ratePct })}`,
+    `${t("Your commission")}: ${t("{rate} of the food total, only on completed orders. Nothing on delivery fees, no monthly fee, no setup fee.", { rate: d.ratePct })}`,
     "",
     t("Go live in 3 steps"),
     ...steps.map(([, title], i) => `${i + 1}. ${title}`),
@@ -147,6 +148,7 @@ export function welcomeEmail(d: WelcomeData, locale: string | null | undefined) 
     `${t("Paying your commission")}: ${t("On the 1st of each month you get an invoice for last month's completed orders. Pay it within {days} days.", { days: d.dueDays })} ${whish.replace(/<[^>]+>/g, "")}`,
     t("Please don't be late: after {days} more days, promotion stops and your profile can be paused.", { days: d.graceDays }),
     "",
+    t("A low commission: you keep your own drivers, your delivery fees and your customers."),
     t("Insights show your views, orders and revenue, so you know what sells."),
   ].join("\n");
   return { subject: t("Welcome to numnum, {restaurant} 🎉", { restaurant: d.restaurantName }), html, text };

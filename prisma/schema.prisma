@@ -1,7 +1,7 @@
 // numnum database schema
 // Conventions:
 //  - Money is stored as integer minor units (USD cents, whole LBP).
-//  - Rates are stored in basis points (1400 = 14.00%).
+//  - Rates are stored in basis points (800 = 8.00%).
 //  - All timestamps are UTC.
 //  - Order / commission / invoice rows hold immutable snapshots; they never
 //    reference mutable menu prices for financial values.
