@@ -55,6 +55,14 @@ const profileHidden = async (page, handle) => !(await (await page.request.get(`/
     await n.waitForURL(/\/creator\/apply/, { timeout: 15000 }).catch(() => {});
     await settle(n);
     check(new URL(n.url()).pathname === "/creator/apply" && (await n.locator("[data-testid=creator-form]:visible").count()) === 1, "a new person creates an account and lands on the creator application", n.url());
+    // The last button isn't hidden behind the bottom bar (scrolled to the end).
+    const covered = await n.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      const btn = [...document.querySelectorAll("[data-testid=creator-form] button[type=submit]")].find((b) => b.offsetParent);
+      const bar = document.querySelector("nav[aria-label=Main].fixed") || document.querySelector("nav.fixed");
+      return btn && bar ? btn.getBoundingClientRect().bottom - bar.getBoundingClientRect().top : null;
+    });
+    check(covered !== null && covered <= 0, "'Send my application' is fully visible above the bottom bar", covered);
     await db.user.deleteMany({ where: { email } });
     await ctx.close();
   }
@@ -66,7 +74,10 @@ const profileHidden = async (page, handle) => !(await (await page.request.get(`/
   await c.waitForURL(/\/creator\/apply/); await settle(c);
   await c.locator("input[type=file][accept='image/*']").setInputFiles(photo);
   await c.waitForFunction(() => document.querySelector("[data-testid=creator-form] button img"), null, { timeout: 15000 });
+  await c.fill("#handle", "admin");
+  check(await c.getByTestId("handle-status").filter({ hasText: "Choose another username" }).waitFor({ timeout: 8000 }).then(() => true, () => false), "Username: a reserved name is refused as they type");
   await c.fill("#handle", HANDLE);
+  check(await c.getByTestId("handle-status").filter({ hasText: "Available" }).waitFor({ timeout: 8000 }).then(() => true, () => false), "Username: shows 'Available' and the profile address");
   await c.fill("#bio", "Burgers and manakish around Beirut");
   await c.fill("#instagram", "@e2e.eats");
   await c.fill("#audienceSize", "12000");
@@ -92,6 +103,17 @@ const profileHidden = async (page, handle) => !(await (await page.request.get(`/
   const approved = await db.creator.findUnique({ where: { handle: HANDLE } });
   check(approved.status === "APPROVED", "approved", approved.status);
   check((await db.notification.count({ where: { userId: creatorUser.id, type: "creator_approved", createdAt: { gte: started } } })) === 1, "the creator is notified (and emailed the welcome)");
+
+  section("Search finds creators");
+  {
+    await c.goto(`/explore?q=${encodeURIComponent(HANDLE.split(".")[0])}&type=creators`, { waitUntil: "load" }); await settle(c);
+    const hit = c.locator("[data-testid=creator-result]:visible").filter({ hasText: `@${HANDLE}` });
+    check(await hit.first().waitFor({ timeout: 10000 }).then(() => true, () => false), "Explore → Creators: searching the username finds them");
+    await c.goto(`/explore?q=${encodeURIComponent("Burgers and manakish")}&type=creators`, { waitUntil: "load" }); await settle(c);
+    check(await c.locator("[data-testid=creator-result]:visible").filter({ hasText: `@${HANDLE}` }).first().waitFor({ timeout: 10000 }).then(() => true, () => false), "and words from their bio");
+    await c.locator("[data-testid=creator-result]:visible").filter({ hasText: `@${HANDLE}` }).first().click();
+    await c.waitForURL(new RegExp(`/c/${HANDLE.replace(".", "\\.")}`)).then(() => check(true, "tap → their profile"), () => check(false, "tap → their profile", c.url()));
+  }
 
   section("Post a reel (real video, same pipeline as restaurants)");
   await c.goto("/creator", { waitUntil: "load" }); await settle(c);
@@ -197,6 +219,8 @@ const profileHidden = async (page, handle) => !(await (await page.request.get(`/
   await a.getByTestId("admin-creator").filter({ hasText: `@${HANDLE}` }).getByRole("button", { name: "Suspend" }).click();
   await a.waitForTimeout(1500);
   check((await reelHidden(v, reel.id)) && (await profileHidden(v, HANDLE)), "suspended: reels and profile hidden");
+  const found = await v.evaluate(async (h) => (await (await fetch(`/api/search?q=${encodeURIComponent(h)}&type=creators`)).json()).creators.map((x) => x.handle), HANDLE);
+  check(!found.includes(HANDLE), "suspended: not in search either", found);
   check(!(await reelHidden(v, (await db.reel.findFirst({ where: { creatorId: null, visibility: "PUBLISHED", status: "READY" } })).id)), "(a normal reel still shows: the check above is meaningful)");
 
   section("Arabic");

@@ -24,7 +24,8 @@ export default async function CreatorApplyPage() {
     { icon: ShoppingBag, text: t("People order the dish straight from your reel, and you see the orders you bring.") },
   ];
   return (
-    <div>
+    // Room for the bottom bar, so the last button is never hidden behind it.
+    <div className="pb-nav">
       <PageHeader title="Become a food creator" />
       <div className="container-app max-w-xl space-y-5 py-5">
         {c?.status === "PENDING" ? (

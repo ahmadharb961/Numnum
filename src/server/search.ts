@@ -7,7 +7,7 @@ import { attachDeals, publicReelWhere, reelCardSelect, toPublicReel } from "./fe
 
 export type SearchParams = {
   q?: string;
-  type?: "dishes" | "reels" | "restaurants";
+  type?: "dishes" | "reels" | "restaurants" | "creators";
   category?: string;
   cuisine?: string;
   area?: string;
@@ -36,7 +36,7 @@ export function parseSearchParams(sp: Record<string, string | string[] | undefin
   const type = s("type");
   return {
     q: s("q")?.slice(0, 80),
-    type: type === "reels" || type === "restaurants" ? type : "dishes",
+    type: type === "reels" || type === "restaurants" || type === "creators" ? type : "dishes",
     category: s("category"),
     cuisine: s("cuisine"),
     area: s("area"),
