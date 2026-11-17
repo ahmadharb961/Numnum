@@ -59,6 +59,7 @@ The demo seed loads pre-rendered photos and reels from `prisma/demo/` (regenerat
 | `admin@numnum.app` | `admin1234` |
 | `owner@burgerhouse.demo` (also `owner@manousheh.demo`, `owner@shawarma.demo`, `owner@forno.demo`, `owner@beanbar.demo`, `owner@ashta.demo`) | `demo1234` |
 | `customer@numnum.demo` | `demo1234` |
+| `mrfoodies@numnum.demo` (food creator "Mr. Foodies", `/c/mr.foodies`) | `demo1234` |
 
 Demo content is for development and demo environments only. In production, seed with `ADMIN_EMAIL` and `ADMIN_PASSWORD` and leave `SEED_DEMO` unset.
 

@@ -258,6 +258,31 @@ async function waitForStreamReels() {
   console.log("Some demo reels are still processing on Cloudflare; they go live within the hour.");
 }
 
+/**
+ * A demo food creator to try the creator features with: an approved account, not verified yet (so
+ * asking for the badge can be tried too). Created once; later deploys leave it as it is.
+ */
+async function ensureDemoCreator(pw: string) {
+  const email = "mrfoodies@numnum.demo";
+  const user = (await prisma.user.findUnique({ where: { email } })) ?? (await prisma.user.create({ data: { email, name: "Mr. Foodies", passwordHash: pw, roles: { create: { role: "CUSTOMER" } } } }));
+  if (await prisma.creator.findUnique({ where: { userId: user.id } })) return;
+  await prisma.creator.create({
+    data: {
+      userId: user.id,
+      handle: "mr.foodies",
+      displayName: "Mr. Foodies",
+      bio: "Eating my way through Beirut, one reel at a time 🍔",
+      instagram: "@mr.foodies",
+      area: "Beirut",
+      audienceSize: 25000,
+      avatarUrl: "/demo/mr-foodies.jpg",
+      status: "APPROVED",
+      approvedAt: new Date(),
+    },
+  });
+  console.log("Demo creator: mrfoodies@numnum.demo / demo1234 (numnum.me/c/mr.foodies)");
+}
+
 async function seedDemo(adminId: string) {
   const firstRun = !(await prisma.restaurant.findUnique({ where: { slug: "burger-house" } }));
   const mediaSetting = await prisma.platformSetting.findUnique({ where: { key: "demo_media_version" } });
@@ -276,6 +301,7 @@ async function seedDemo(adminId: string) {
   // Demo restaurants are always open so they can be shown (and ordered from) at any time.
   if (!firstRun) for (const c of created) await prisma.restaurant.update({ where: { id: c.r.id }, data: { openingHours: ALWAYS_OPEN } });
   await prisma.platformSetting.upsert({ where: { key: "demo_media_version" }, create: { key: "demo_media_version", value: DEMO_MEDIA_VERSION }, update: { value: DEMO_MEDIA_VERSION } });
+  await ensureDemoCreator(pw);
   if (!firstRun || created[0]?.r.slug !== "burger-house") {
     rmSync(tmp, { recursive: true, force: true });
     await waitForStreamReels();
