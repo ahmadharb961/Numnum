@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff, LifeBuoy, Heart, KeyRound } from "lucide-react";
+import { Bookmark, ChevronRight, LayoutDashboard, MapPin, Receipt, Shield, EyeOff, LifeBuoy, Heart, KeyRound, Clapperboard } from "lucide-react";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { PageHeader } from "@/components/customer/page-header";
@@ -23,16 +23,25 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AccountPage() {
   const t = await getT();
   const user = await requireUser("/account");
-  const [active, orderCount, addressCount, staffCount, followingCount] = await Promise.all([
+  const [active, orderCount, addressCount, staffCount, followingCount, creator] = await Promise.all([
     prisma.order.findMany({ where: { userId: user.id, status: { in: ACTIVE_STATUSES } }, orderBy: { createdAt: "desc" }, take: 3 }),
     prisma.order.count({ where: { userId: user.id } }),
     prisma.customerAddress.count({ where: { userId: user.id } }),
     prisma.restaurantStaff.count({ where: { userId: user.id } }),
     prisma.restaurantFollow.count({ where: { userId: user.id, restaurant: { status: "ACTIVE", blockedBy: { none: { userId: user.id } } } } }),
+    prisma.creator.findUnique({ where: { userId: user.id }, select: { status: true } }),
   ]);
+  // Food creators: apply, wait for review, then the studio.
+  const creatorLink =
+    creator?.status === "APPROVED" || creator?.status === "SUSPENDED"
+      ? { href: "/creator", icon: Clapperboard, label: "Creator studio", sub: "Your reels, tags and insights" }
+      : creator?.status === "PENDING"
+        ? { href: "/creator/apply", icon: Clapperboard, label: "Creator application", sub: "Being reviewed" }
+        : { href: "/creator/apply", icon: Clapperboard, label: "Become a food creator", sub: "Post reels, tag dishes, people order from your videos" };
   const workLinks = [
     ...(staffCount ? [{ href: "/dashboard", icon: LayoutDashboard, label: "Restaurant dashboard", sub: "Orders, menu, reels, insights" }] : []),
     ...(user.roles.includes("ADMIN") ? [{ href: "/admin", icon: Shield, label: "Admin panel", sub: "Restaurants, payments, settings" }] : []),
+    creatorLink,
   ];
   return (
     <main className="pb-nav">

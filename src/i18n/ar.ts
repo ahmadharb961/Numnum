@@ -4,5 +4,6 @@ import { AR2 } from "./ar/part2";
 import { AR3 } from "./ar/part3";
 import { AR4 } from "./ar/part4";
 import { AR5 } from "./ar/part5";
+import { AR6 } from "./ar/part6";
 
-export const AR: Record<string, string> = { ...AR1, ...AR2, ...AR3, ...AR4, ...AR5 };
+export const AR: Record<string, string> = { ...AR1, ...AR2, ...AR3, ...AR4, ...AR5, ...AR6 };

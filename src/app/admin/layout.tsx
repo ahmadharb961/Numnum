@@ -10,10 +10,11 @@ export const metadata: Metadata = { title: { default: "Admin", template: "%s · 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin();
   // The menu badges, all counted in one query (one database round trip on every admin page).
-  const [c] = await prisma.$queryRaw<Record<"pendingRestaurants" | "verifications" | "suspicious" | "pendingAdjustments" | "overdue" | "payments" | "disputes" | "reports" | "notifications", number>[]>`
+  const [c] = await prisma.$queryRaw<Record<"pendingRestaurants" | "verifications" | "creators" | "suspicious" | "pendingAdjustments" | "overdue" | "payments" | "disputes" | "reports" | "notifications", number>[]>`
     SELECT
       (SELECT count(*) FROM restaurants WHERE status = 'PENDING_APPROVAL')::int AS "pendingRestaurants",
       (SELECT count(*) FROM restaurants WHERE "verificationStatus" = 'PENDING')::int AS verifications,
+      (SELECT count(*) FROM creators WHERE status = 'PENDING' OR (status = 'APPROVED' AND verification = 'PENDING'))::int AS creators,
       (SELECT count(*) FROM orders WHERE suspicious)::int AS suspicious,
       (SELECT count(*) FROM commission_adjustments WHERE status = 'PENDING')::int AS "pendingAdjustments",
       (SELECT count(*) FROM invoices WHERE status = 'OVERDUE')::int AS overdue,

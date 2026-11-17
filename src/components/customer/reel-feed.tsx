@@ -1028,6 +1028,25 @@ const ReelSlide = memo(function ReelSlide({
       {/* Info + order (pointer-events-none on the full-width panel so it never covers the action rail) */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pe-20 *:pointer-events-auto">
         {reel.sponsored && <span className="mb-2 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur">{t("Sponsored")}</span>}
+        {/* A food creator's reel: who posted it first, then the restaurant whose dish it is. */}
+        {reel.creator && (
+          <Link prefetch={false} href={`/c/${reel.creator.handle}`} className="mb-1.5 flex w-fit max-w-full items-center gap-2 text-shadow" data-testid="reel-creator">
+            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-500 text-xs font-black ring-2 ring-white/80">
+              {reel.creator.avatarUrl && showImages ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={reel.creator.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                reel.creator.name[0]
+              )}
+            </span>
+            <span className="truncate text-[15px] font-bold" dir="ltr">
+              @{reel.creator.handle}
+            </span>
+            {reel.creator.verified && <VerifiedBadge />}
+            <span className="shrink-0 rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide backdrop-blur">{t("Creator")}</span>
+          </Link>
+        )}
+        {reel.paidPartnership && <span className="mb-1.5 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur" data-testid="paid-label">{t("Paid partnership")}</span>}
         <Link prefetch={false} href={`/r/${reel.restaurant.slug}`} onClick={(e) => openRestaurant(e, reel.restaurant.slug, onRestaurant, router)} className="flex items-center gap-1.5 text-[15px] font-bold text-shadow">
           {reel.restaurant.name}
           {reel.restaurant.verified && <VerifiedBadge />}

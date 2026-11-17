@@ -42,7 +42,12 @@ export async function followingFeed(userId: string, opts: { cursor?: number; lim
   const limit = Math.min(opts.limit ?? 8, 20);
   const cursor = opts.cursor ?? 0;
   const rows = await prisma.reel.findMany({
-    where: { ...publicReelWhere, restaurant: { ...(publicReelWhere.restaurant as object), followers: { some: { userId } }, ...(opts.blockedRestaurantIds?.length ? { id: { notIn: opts.blockedRestaurantIds } } : {}) } },
+    // Restaurants they follow (their own reels and creator reels on their dishes) and creators they follow.
+    where: {
+      ...publicReelWhere,
+      restaurant: { ...(publicReelWhere.restaurant as object), ...(opts.blockedRestaurantIds?.length ? { id: { notIn: opts.blockedRestaurantIds } } : {}) },
+      OR: [{ restaurant: { followers: { some: { userId } } } }, { creator: { followers: { some: { userId } } } }],
+    },
     select: reelCardSelect,
     orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
     skip: cursor,

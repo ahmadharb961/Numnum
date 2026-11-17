@@ -38,19 +38,21 @@ model User {
   locale          String? // "en" | "ar": language of the app, emails and notifications
   emailVerifiedAt DateTime? // set when they open the link in the confirmation email
 
-  roles         UserRole[]
-  blocks        UserBlock[]        @relation("blocker")
-  blockedBy     UserBlock[]        @relation("blockedUser")
-  orders        Order[]
-  addresses     CustomerAddress[]
-  pushSubs      PushSubscription[]
-  sessions      Session[]
-  staff         RestaurantStaff[]
-  itemReviews   ItemReview[]
-  restReviews   RestaurantReview[]
-  notifications Notification[]
-  auditLogs     AuditLog[]
-  follows       RestaurantFollow[]
+  roles          UserRole[]
+  blocks         UserBlock[]        @relation("blocker")
+  blockedBy      UserBlock[]        @relation("blockedUser")
+  orders         Order[]
+  addresses      CustomerAddress[]
+  pushSubs       PushSubscription[]
+  sessions       Session[]
+  staff          RestaurantStaff[]
+  itemReviews    ItemReview[]
+  restReviews    RestaurantReview[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  follows        RestaurantFollow[]
+  creator        Creator?
+  creatorFollows CreatorFollow[]
 
   @@map("users")
 }
@@ -203,6 +205,7 @@ model Restaurant {
   importJobs        MenuImport[]
   deals             Deal[]
   followers         RestaurantFollow[]
+  creatorBlocks     RestaurantCreatorBlock[]
   followerCount     Int                      @default(0)
   // Search: name, cuisine, area and the dishes it serves, normalized (see src/server/search-text.ts).
   searchName        String                   @default("")
@@ -488,41 +491,55 @@ enum ReelVisibility {
 }
 
 model Reel {
-  id              String         @id @default(cuid())
+  id              String            @id @default(cuid())
   restaurantId    String
   menuItemId      String
   videoAssetId    String
   videoUrl        String?
   posterUrl       String?
   caption         String?
-  status          ReelStatus     @default(PROCESSING)
+  status          ReelStatus        @default(PROCESSING)
   processingError String?
-  visibility      ReelVisibility @default(DRAFT)
+  visibility      ReelVisibility    @default(DRAFT)
   durationSec     Float?
-  featured        Boolean        @default(false)
-  sponsored       Boolean        @default(false)
-  autoPublish     Boolean        @default(false)
-  viewCount       Int            @default(0)
-  uniqueViewers   Int            @default(0)
-  likeCount       Int            @default(0)
-  shareCount      Int            @default(0)
-  saveCount       Int            @default(0)
-  productOpens    Int            @default(0)
-  addToCarts      Int            @default(0)
-  orderInits      Int            @default(0)
+  featured        Boolean           @default(false)
+  sponsored       Boolean           @default(false)
+  autoPublish     Boolean           @default(false)
+  viewCount       Int               @default(0)
+  uniqueViewers   Int               @default(0)
+  likeCount       Int               @default(0)
+  shareCount      Int               @default(0)
+  saveCount       Int               @default(0)
+  productOpens    Int               @default(0)
+  addToCarts      Int               @default(0)
+  orderInits      Int               @default(0)
   removedReason   String?
   publishedAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  restaurant      Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  menuItem        MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-  videoAsset      MediaAsset     @relation(fields: [videoAssetId], references: [id])
+  /// Posted by a food creator, tagging the restaurant's dish (null: the restaurant's own reel).
+  creatorId       String?
+  /// The restaurant's answer to the creator's tag; the reel is public only once ACCEPTED.
+  tagStatus       CreatorTagStatus?
+  tagRequestedAt  DateTime?
+  tagDecidedAt    DateTime?
+  tagNote         String?
+  /// Paid by, or food gifted by, the restaurant: shown as "Paid partnership".
+  paidPartnership Boolean           @default(false)
+  /// Pinned at the top of the creator's grid (up to 6).
+  pinnedAt        DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  restaurant      Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItem        MenuItem          @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  videoAsset      MediaAsset        @relation(fields: [videoAssetId], references: [id])
+  creator         Creator?          @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   views           ReelView[]
   likes           ReelLike[]
 
   @@index([visibility, status, publishedAt])
   @@index([restaurantId])
   @@index([menuItemId])
+  @@index([creatorId, publishedAt])
+  @@index([restaurantId, tagStatus])
   @@map("reels")
 }
 
@@ -1165,4 +1182,84 @@ model RestaurantFollow {
   @@id([userId, restaurantId])
   @@index([restaurantId])
   @@map("restaurant_follows")
+}
+
+enum CreatorStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  SUSPENDED
+}
+
+enum CreatorVerification {
+  NONE
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+enum CreatorTagStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REMOVED
+  EXPIRED
+}
+
+/// A food blogger: applies, is approved by an admin, then posts reels tagging restaurants' dishes.
+model Creator {
+  id                      String                   @id @default(cuid())
+  userId                  String                   @unique
+  handle                  String                   @unique
+  displayName             String
+  bio                     String?
+  avatarUrl               String?
+  instagram               String?
+  tiktok                  String?
+  /// Followers they reported on other platforms (shown to admins when reviewing).
+  audienceSize            Int?
+  area                    String?
+  status                  CreatorStatus            @default(PENDING)
+  decisionNote            String?
+  approvedAt              DateTime?
+  verification            CreatorVerification      @default(NONE)
+  verificationNote        String?
+  verificationRequestedAt DateTime?
+  verificationDecidedAt   DateTime?
+  followerCount           Int                      @default(0)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reels                   Reel[]
+  followers               CreatorFollow[]
+  blockedBy               RestaurantCreatorBlock[]
+
+  @@index([status, createdAt])
+  @@index([verification])
+  @@map("creators")
+}
+
+model CreatorFollow {
+  userId         String
+  creatorId      String
+  createdAt      DateTime  @default(now())
+  lastNotifiedAt DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creator        Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@id([userId, creatorId])
+  @@index([creatorId, userId])
+  @@map("creator_follows")
+}
+
+/// A restaurant that doesn't want a creator tagging it anymore.
+model RestaurantCreatorBlock {
+  restaurantId String
+  creatorId    String
+  createdAt    DateTime   @default(now())
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  creator      Creator    @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@id([restaurantId, creatorId])
+  @@map("restaurant_creator_blocks")
 }

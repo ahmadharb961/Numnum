@@ -23,7 +23,7 @@ export default async function ReelsPage() {
   const lang = await getLocale();
   const ctx = await requireRestaurant("MANAGER");
   await syncStreamReels({ restaurantId: ctx.restaurant.id }).catch((e) => console.error("stream sync", e));
-  const reels = await prisma.reel.findMany({ where: { restaurantId: ctx.restaurant.id }, orderBy: { createdAt: "desc" }, include: { menuItem: { select: { name: true } } } });
+  const reels = await prisma.reel.findMany({ where: { restaurantId: ctx.restaurant.id, creatorId: null }, orderBy: { createdAt: "desc" }, include: { menuItem: { select: { name: true } } } });
   const processing = reels.some((r) => r.status === "PROCESSING");
   return (
     <DashPage
