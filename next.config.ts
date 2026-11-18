@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Titles and meta tags go in the page's <head> from the first byte, for every visitor. Next's
+  // default streams them later, into the body, for browsers; React then sometimes finds the title
+  // somewhere it didn't expect while taking over the page and throws away part of it (error #418).
+  htmlLimitedBots: /.*/,
   serverExternalPackages: ["sharp", "@prisma/client"],
   experimental: {
     serverActions: { bodySizeLimit: "60mb" },
