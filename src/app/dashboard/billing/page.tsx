@@ -5,7 +5,7 @@ import { requireRestaurant } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { outstanding, restaurantBillingSummary } from "@/server/billing";
 import { DashPage, Section } from "@/components/dashboard/page";
-import { PayWhishButton } from "@/components/dashboard/pay-whish";
+import { HowToPay, PayWhishButton } from "@/components/dashboard/pay-whish";
 import { DisputeButton } from "@/components/dashboard/dispute-button";
 import { StatusBadge } from "@/components/dashboard/invoice-status";
 import { StatCard, EmptyState, Alert } from "@/components/ui/misc";
@@ -53,9 +53,10 @@ export default async function BillingPage() {
             <div className="tabular text-2xl font-black">{formatMoney(outstanding(payable))}</div>
             {payable.status === "PAYMENT_SUBMITTED" && <div className="text-sm text-sky-700">{t("Your payment is awaiting verification.")}</div>}
           </div>
-          <PayWhishButton invoice={{ id: payable.id, number: payable.number, outstandingCents: outstanding(payable) }} whish={s.settings.whish} />
+          <PayWhishButton invoice={{ id: payable.id, number: payable.number, outstandingCents: outstanding(payable) }} whish={s.settings.whish} restaurantName={r.displayName} />
         </div>
       )}
+      <HowToPay whish={s.settings.whish} restaurantName={r.displayName} rate={formatRate(rate)} dueDays={s.settings.invoiceDueDays} />
       {!r.agreementAcceptedAt && <Alert className="mb-5">You haven&apos;t accepted the commission agreement yet, so online ordering is off. <Link className="font-semibold underline" href="/dashboard/agreement">{t("Review agreement")}</Link></Alert>}
 
       <Section title={t("Invoices")}>

@@ -36,7 +36,7 @@ function AgreementTextEn({ platformName, rateBps, billableEvent, dueDays, disput
       <p>Commission entries accumulate during each calendar month (UTC). At the start of the following month we issue an itemized invoice listing every order reference, its date, item subtotal, rate and commission. Issued invoices are never silently changed — corrections are made through documented adjustments or credit notes.</p>
       <h3>6. Payment terms</h3>
       <p>
-        Invoices are due <b>{dueDays} days</b> after issue and are paid manually via Whish Money / Whish Pay to the recipient details shown in your dashboard, quoting the invoice number. After paying, submit the transfer reference and receipt in your dashboard. An invoice is marked paid only after {platformName} verifies that the funds were received.
+        Invoices are due <b>{dueDays} days</b> after issue and are paid manually via Whish Money / Whish Pay to the recipient details shown in your dashboard, with your restaurant name and the invoice number in the transfer note. After paying, submit the transfer reference and receipt in your dashboard. An invoice is marked paid only after {platformName} verifies that the funds were received.
       </p>
       <h3>7. Disputes</h3>
       <p>You can review every order reference in your statement and dispute an entry within <b>{disputeDays} days</b> of the entry or invoice date (for example: the order wasn&apos;t delivered, the customer refused to pay, or it was a duplicate or fake order). Disputed entries are excluded from invoicing until reviewed. Accepted disputes are voided or credited on your next invoice.</p>
@@ -74,7 +74,7 @@ function AgreementTextAr({ platformName, rateBps, billableEvent, dueDays, disput
       <h3>٥. دورة الفوترة</h3>
       <p>تتراكم قيود العمولة خلال كل شهر ميلادي (UTC). في بداية الشهر التالي نُصدر فاتورة مفصّلة تتضمن كل رقم طلب وتاريخه ومجموع أطباقه والنسبة والعمولة. لا تُعدَّل الفواتير الصادرة بصمت أبداً — تتم التصحيحات عبر تعديلات موثّقة أو إشعارات دائنة.</p>
       <h3>٦. شروط الدفع</h3>
-      <p>تستحق الفواتير بعد <b>{dueDays} يوماً</b> من إصدارها، وتُدفع يدوياً عبر Whish Money / Whish Pay إلى بيانات المستفيد الظاهرة في لوحة التحكم، مع ذكر رقم الفاتورة. بعد الدفع، أرسل مرجع التحويل والإيصال من لوحة التحكم. تُعلَّم الفاتورة كمدفوعة فقط بعد أن يتحقق {platformName} من وصول المبلغ.</p>
+      <p>تستحق الفواتير بعد <b>{dueDays} يوماً</b> من إصدارها، وتُدفع يدوياً عبر Whish Money / Whish Pay إلى بيانات المستفيد الظاهرة في لوحة التحكم، مع كتابة اسم المطعم ورقم الفاتورة في ملاحظة التحويل. بعد الدفع، أرسل مرجع التحويل والإيصال من لوحة التحكم. تُعلَّم الفاتورة كمدفوعة فقط بعد أن يتحقق {platformName} من وصول المبلغ.</p>
       <h3>٧. الاعتراضات</h3>
       <p>يمكنك مراجعة كل رقم طلب في كشفك والاعتراض على أي قيد خلال <b>{disputeDays} يوماً</b> من تاريخ القيد أو الفاتورة (مثلاً: لم يتم توصيل الطلب، رفض الزبون الدفع، أو كان طلباً مكرراً أو وهمياً). تُستثنى القيود المعترض عليها من الفوترة حتى مراجعتها. الاعتراضات المقبولة تُبطل أو تُضاف كرصيد في فاتورتك التالية.</p>
       <h3>٨. التأخر في الدفع</h3>
