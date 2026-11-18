@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "@/components/link";
 import { redirect } from "next/navigation";
-import { BadgeCheck, BarChart3, ExternalLink, Pencil, Plus, UserRound } from "lucide-react";
+import { BadgeCheck, BarChart3, ChevronRight, ExternalLink, Pencil, Plus, Store, UserRound } from "lucide-react";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { syncStreamReels } from "@/server/stream";
@@ -106,6 +106,16 @@ export default async function CreatorStudioPage() {
             <Plus className="h-5 w-5" /> {t("Post a reel")}
           </Link>
         )}
+        <Link prefetch href="/creator/restaurants" className="card flex items-center gap-3 p-4" data-testid="shoot-restaurants-link">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
+            <Store className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold">{t("Restaurants to shoot")}</span>
+            <span className="block text-xs text-ink-muted">{t("The restaurants on numnum you can film and tag")}</span>
+          </span>
+          <ChevronRight className="h-5 w-5 text-ink-muted rtl:-scale-x-100" />
+        </Link>
         {c.status === "APPROVED" && <VerificationRequest state={c.verification} />}
         <StudioReels reels={reels} pinMax={PIN_MAX} />
       </div>

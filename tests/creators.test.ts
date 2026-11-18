@@ -24,6 +24,7 @@ import {
   pinReel,
   removeTag,
   requestVerification,
+  restaurantsForCreator,
   retagReel,
   setCreatorBlocked,
   setCreatorFollow,
@@ -134,6 +135,24 @@ describe("reels, tags and the feed", () => {
     const { user: staffer } = await approvedCreator();
     await prisma.restaurantStaff.create({ data: { restaurantId: other.restaurant.id, userId: staffer.id, role: "STAFF" } });
     await expect(createCreatorReel(staffer.id, { videoAssetId: (await video(staffer.id)).id, menuItemId: other.burger.id })).rejects.toThrow(OWN_RESTAURANT);
+  });
+
+  it("'Restaurants to shoot' lists the restaurants a creator can tag (not blocked, not their own), with creator reels counted", async () => {
+    const a = await makeRestaurant({ name: "Alpha Grill" });
+    const b = await makeRestaurant({ name: "Beta Bakery" });
+    const blocked = await makeRestaurant({ name: "Gamma Blocks" });
+    const closed = await makeRestaurant({ name: "Delta Closed" });
+    await prisma.restaurant.update({ where: { id: closed.restaurant.id }, data: { status: "SUSPENDED" } });
+    const { user, creator } = await approvedCreator();
+    await setCreatorBlocked(blocked.restaurant.id, blocked.user.id, creator.id, true);
+    await prisma.restaurantStaff.create({ data: { restaurantId: b.restaurant.id, userId: user.id, role: "STAFF" } }); // works at Beta
+    const reel = await createCreatorReel(user.id, { videoAssetId: (await video(user.id)).id, menuItemId: a.burger.id });
+    await ready(reel.id);
+    await decideTag(a.restaurant.id, a.user.id, reel.id, true);
+    const list = await restaurantsForCreator(user.id);
+    expect(list.map((r) => r.displayName)).toEqual(["Alpha Grill"]);
+    expect(list[0]).toMatchObject({ slug: a.restaurant.slug, dishes: 2, creatorReels: 1 });
+    expect(await restaurantsForCreator((await makeCustomer()).id)).toEqual([]); // not a creator
   });
 
   it("a creator who starts working at the restaurant after tagging it can't be approved by it", async () => {

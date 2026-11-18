@@ -16,6 +16,7 @@ import {
   decideTag,
   decideVerification,
   deleteCreatorReel,
+  dishesToTag,
   pinReel,
   removeTag,
   requestVerification,
@@ -148,24 +149,10 @@ export async function pinReelAction(reelId: string, pin: boolean): Promise<Creat
   }
 }
 
-/** Dishes to tag, by dish or restaurant name (restaurants that blocked this creator are left out;
- *  dishes of a restaurant they work at are marked `own`: shown, but can't be tagged). */
+/** Dishes to tag, by dish or restaurant name (see dishesToTag). */
 export async function searchDishesAction(q: string) {
   const me = await requireUser("/creator");
-  const c = await prisma.creator.findUnique({ where: { userId: me.id }, select: { id: true } });
-  const term = String(q ?? "").trim().slice(0, 60);
-  if (!c || term.length < 2) return [];
-  const items = await prisma.menuItem.findMany({
-    where: {
-      archived: false,
-      restaurant: { status: "ACTIVE", creatorBlocks: { none: { creatorId: c.id } } },
-      OR: [{ name: { contains: term, mode: "insensitive" } }, { restaurant: { displayName: { contains: term, mode: "insensitive" } } }],
-    },
-    select: { id: true, name: true, priceCents: true, currency: true, restaurant: { select: { displayName: true, logoUrl: true, area: true, staff: { where: { userId: me.id }, select: { id: true }, take: 1 } } }, images: { where: { isMain: true }, take: 1, select: { asset: { select: { thumbUrl: true, url: true } } } } },
-    orderBy: [{ restaurant: { displayName: "asc" } }, { name: "asc" }],
-    take: 30,
-  });
-  return items.map((i) => ({ id: i.id, name: i.name, priceCents: i.priceCents, currency: i.currency, restaurant: i.restaurant.displayName, area: i.restaurant.area, logoUrl: i.restaurant.logoUrl, imageUrl: i.images[0]?.asset.thumbUrl ?? i.images[0]?.asset.url ?? null, own: i.restaurant.staff.length > 0 }));
+  return dishesToTag(me.id, q);
 }
 
 export async function followCreatorAction(creatorId: string, follow: boolean): Promise<{ ok: true; following: boolean; followerCount: number } | { ok: false; login: boolean; error?: string }> {
