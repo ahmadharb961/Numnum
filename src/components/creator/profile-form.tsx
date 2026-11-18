@@ -7,6 +7,8 @@ import { applyCreatorAction, checkHandleAction, updateCreatorProfileAction } fro
 import { uploadFile } from "@/components/dashboard/upload";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/misc";
+import { Sheet } from "@/components/ui/sheet";
+import { AvatarCropper } from "@/components/avatar-cropper";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n/client";
 
@@ -20,6 +22,7 @@ export function CreatorProfileForm({ mode, initial }: { mode: "apply" | "edit"; 
   const [v, setV] = useState(initial);
   const [avatar, setAvatar] = useState<{ id: string | null; url: string | null }>({ id: null, url: initial.avatarUrl });
   const [uploading, setUploading] = useState(false);
+  const [cropping, setCropping] = useState<File | null>(null); // a photo being placed in its circle
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -31,6 +34,7 @@ export function CreatorProfileForm({ mode, initial }: { mode: "apply" | "edit"; 
     try {
       const r = await uploadFile(f, "image", { params: { scope: "creator" } });
       setAvatar({ id: r.id, url: r.thumbUrl ?? r.url ?? null });
+      setCropping(null);
     } catch (e) {
       toast((e as Error).message, "error");
     } finally {
@@ -72,7 +76,21 @@ export function CreatorProfileForm({ mode, initial }: { mode: "apply" | "edit"; 
           </span>
         </button>
         <div className="text-sm text-ink-muted">{uploading ? t("Uploading…") : t("Add a clear photo of you: it shows on your profile and reels.")}</div>
-        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && pickAvatar(e.target.files[0])} />
+        <input
+          ref={file}
+          type="file"
+          accept="image/*"
+          hidden
+          data-testid="avatar-input"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = ""; // choosing the same photo again opens it again
+            if (f) setCropping(f);
+          }}
+        />
+        <Sheet open={!!cropping} onClose={() => !uploading && setCropping(null)} title="Place your photo">
+          {cropping && <AvatarCropper file={cropping} busy={uploading} onCancel={() => setCropping(null)} onDone={(photo) => void pickAvatar(photo)} />}
+        </Sheet>
       </div>
       {mode === "apply" ? (
         <Field label="Username" error={errors.handle} htmlFor="handle">

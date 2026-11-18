@@ -12,6 +12,7 @@ import { CreatorCard } from "@/components/creator/creator-card";
 import { rememberSearch } from "./search-controls";
 import { setCounts, setQuery, setSearching, useQuery } from "./search-state";
 import { useLocale, useT } from "@/i18n/client";
+import { usePullRefresh } from "@/lib/pull-refresh";
 import { localName } from "@/i18n/core";
 
 type Category = { slug: string; name: string; nameAr: string | null; emoji: string | null; imageUrl: string | null };
@@ -132,6 +133,16 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
     return () => ctl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  // Pull to refresh: forget what's remembered and load this tab's results again.
+  usePullRefresh(async () => {
+    cache.clear();
+    const v = await fetchResult(key).catch(() => null);
+    if (v) {
+      setMore([]);
+      setData(v);
+    }
+  });
 
   // Every category's results load quietly in the background (current tab and filters), so tapping a
   // category chip shows them at once instead of waiting for the server.

@@ -243,4 +243,9 @@ export const AR6: Record<string, string> = {
   "Film vertical, close to the food, in daylight or by a window.": "صوّر بشكل عمودي وقريباً من الطعام، في ضوء النهار أو بجانب نافذة.",
   "Catch the best moment: the cheese pull, the sauce, the first bite.": "التقط أجمل لحظة: الجبنة الذائبة، الصلصة، اللقمة الأولى.",
   "Say the dish and the restaurant's name, and keep it 15 to 60 seconds.": "اذكر اسم الطبق والمطعم، وليكن الفيديو بين 15 و60 ثانية.",
+  // Profile photo cropper, pull to refresh
+  "Place your photo": "ضع صورتك",
+  "Drag to move, pinch or use the slider to zoom.": "اسحب لتحريك الصورة، وقرّب بإصبعين أو بالشريط.",
+  "This photo can't be opened. Try another one (JPG or PNG).": "لا يمكن فتح هذه الصورة. جرّب صورة أخرى (JPG أو PNG).",
+  "Refreshing…": "جارٍ التحديث…",
 };

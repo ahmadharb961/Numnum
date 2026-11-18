@@ -88,7 +88,9 @@ async function pickDish(page, q, restaurant) {
   await c.goto("/account", { waitUntil: "load" }); await settle(c);
   await c.locator("a[href='/creator/apply']:visible").click();
   await c.waitForURL(/\/creator\/apply/); await settle(c);
-  await c.locator("input[type=file][accept='image/*']").setInputFiles(photo);
+  await c.getByTestId("avatar-input").setInputFiles(photo);
+  await c.getByTestId("avatar-cropper").waitFor(); // place it in the circle, then keep it
+  await c.getByTestId("crop-save").click();
   await c.waitForFunction(() => document.querySelector("[data-testid=creator-form] button img"), null, { timeout: 15000 });
   await c.fill("#handle", "admin");
   check(await c.getByTestId("handle-status").filter({ hasText: "Choose another username" }).waitFor({ timeout: 8000 }).then(() => true, () => false), "Username: a reserved name is refused as they type");

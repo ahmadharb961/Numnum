@@ -106,6 +106,8 @@ export function LinkWarmer() {
         const refresh = headers.has("rsc") && !headers.has("next-router-prefetch") && url.pathname === location.pathname;
         if (action) forgetScreenTimes();
         if (action || refresh) result.then(rewarm, () => {});
+        // Tell pull-to-refresh the refreshed page has arrived (body read, so it's in the page).
+        if (refresh) result.then((r) => r.clone().text()).then(() => setTimeout(() => window.dispatchEvent(new Event("nn:refreshed")), 50), () => {});
         // Any screen coming from the server (loaded in advance, opened, refreshed) is fresh now.
         if (headers.has("rsc") && !action) result.then((r) => r.ok && markScreenFetched(url), () => {});
       } catch {}
