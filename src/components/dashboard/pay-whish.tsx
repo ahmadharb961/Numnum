@@ -11,10 +11,11 @@ import { Alert, Field } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n/client";
+import { showWhishNumber, transferNote } from "@/lib/whish";
 
 type Whish = { recipientName: string; whishNumber: string; accountId: string; instructions: string };
 
-export function PayWhishButton({ invoice, whish, block }: { invoice: { id: string; number: string; outstandingCents: number }; whish: Whish; block?: boolean }) {
+export function PayWhishButton({ invoice, whish, restaurantName, block }: { invoice: { id: string; number: string; outstandingCents: number }; whish: Whish; restaurantName: string; block?: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"instructions" | "submit">("instructions");
@@ -24,21 +25,21 @@ export function PayWhishButton({ invoice, whish, block }: { invoice: { id: strin
         <Wallet className="h-5 w-5" /> {t("Pay via Whish")}
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title={step === "instructions" ? t("Pay via Whish") : t("Submit payment proof")}>
-        {step === "instructions" ? <Instructions invoice={invoice} whish={whish} onPaid={() => setStep("submit")} /> : <SubmitProof invoice={invoice} onDone={() => setOpen(false)} />}
+        {step === "instructions" ? <Instructions invoice={invoice} whish={whish} restaurantName={restaurantName} onPaid={() => setStep("submit")} /> : <SubmitProof invoice={invoice} onDone={() => setOpen(false)} />}
       </Sheet>
     </>
   );
 }
 
-function CopyRow({ label, value }: { label: string; value: string }) {
+function CopyRow({ label, value, shown, testId }: { label: string; value: string; shown?: string; testId?: string }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   if (!value) return null;
   return (
-    <div className="flex items-center justify-between gap-3 py-2.5">
+    <div className="flex items-center justify-between gap-3 py-2.5" data-testid={testId}>
       <div className="min-w-0">
         <div className="text-xs text-ink-muted">{t(label)}</div>
-        <div className="truncate font-mono font-semibold">{value}</div>
+        <div className="truncate font-mono font-semibold" dir="ltr">{shown ?? value}</div>
       </div>
       <button
         type="button"
@@ -55,7 +56,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Instructions({ invoice, whish, onPaid }: { invoice: { number: string; outstandingCents: number }; whish: Whish; onPaid: () => void }) {
+function Instructions({ invoice, whish, restaurantName, onPaid }: { invoice: { number: string; outstandingCents: number }; whish: Whish; restaurantName: string; onPaid: () => void }) {
   const t = useT();
   const configured = whish.whishNumber || whish.accountId;
   return (
@@ -69,18 +70,40 @@ function Instructions({ invoice, whish, onPaid }: { invoice: { number: string; o
       ) : (
         <div className="divide-y divide-black/5 rounded-2xl border border-black/10 px-4">
           <CopyRow label={t("Recipient")} value={whish.recipientName} />
-          <CopyRow label={t("Whish number")} value={whish.whishNumber} />
+          <CopyRow label={t("Whish number")} value={whish.whishNumber} shown={showWhishNumber(whish.whishNumber)} testId="whish-number" />
           <CopyRow label={t("Account ID")} value={whish.accountId} />
-          <CopyRow label={t("Payment reference (put in the transfer note)")} value={invoice.number} />
+          <CopyRow label={t("Transfer note (write it in Whish)")} value={transferNote(restaurantName, invoice.number)} testId="whish-note" />
           <CopyRow label={t("Amount (USD)")} value={(invoice.outstandingCents / 100).toFixed(2)} />
         </div>
       )}
       {whish.instructions && <p className="text-sm text-ink-soft">{whish.instructions}</p>}
       <Button size="lg" block onClick={onPaid} disabled={!configured}>
-        I&apos;ve made the payment
+        {t("I've made the payment")}
       </Button>
       <p className="text-center text-xs text-ink-muted">{t("Your invoice is marked paid only after our team confirms the funds were received.")}</p>
     </div>
+  );
+}
+
+/** Billing page: how and where the commission is paid, always in view (not only once an invoice is due). */
+export function HowToPay({ whish, restaurantName, rate, dueDays }: { whish: Whish; restaurantName: string; rate: string; dueDays: number }) {
+  const t = useT();
+  return (
+    <section className="card mb-5 p-5" data-testid="how-to-pay">
+      <h2 className="flex items-center gap-2 font-extrabold">
+        <Wallet className="h-5 w-5 text-brand-600" /> {t("How you pay numnum")}
+      </h2>
+      <ol className="mt-3 space-y-2 text-sm text-ink-soft">
+        <li>{t("1. You pay {rate} commission on your completed orders. On the 1st of each month you get an invoice for last month.", { rate })}</li>
+        <li>{t("2. Pay it within {days} days with Whish to {name}.", { days: dueDays, name: whish.recipientName || "numnum" })}</li>
+        <li>{t("3. Write your restaurant name in the Whish transfer note, so we know the payment is yours.")}</li>
+      </ol>
+      <div className="mt-3 divide-y divide-black/5 rounded-2xl border border-black/10 px-4">
+        <CopyRow label={t("Whish number")} value={whish.whishNumber} shown={showWhishNumber(whish.whishNumber)} testId="how-whish-number" />
+        <CopyRow label={t("Transfer note (write it in Whish)")} value={transferNote(restaurantName)} testId="how-whish-note" />
+      </div>
+      <p className="mt-3 text-xs text-ink-muted">{t("After paying, tap “Pay via Whish” on the invoice, then “I've made the payment” to send us the receipt.")}</p>
+    </section>
   );
 }
 

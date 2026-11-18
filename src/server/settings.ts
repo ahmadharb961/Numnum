@@ -1,8 +1,12 @@
 import "server-only";
+import { NUMNUM_WHISH_NAME, NUMNUM_WHISH_NUMBER } from "@/lib/whish";
 import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { DEFAULT_RANK_WEIGHTS, type RankWeights } from "@/lib/ranking";
+
+// The instructions numnum shipped with first (invoice number only); see loadSettings.
+const OLD_WHISH_INSTRUCTIONS = "Send the exact amount due via Whish Money and include the invoice number in the transfer note.";
 
 export type BillableEvent = "ACCEPTED" | "COMPLETED";
 
@@ -61,7 +65,7 @@ export const DEFAULT_SETTINGS: Settings = {
   disputeWindowDays: 14,
   lbpPerUsd: 89500,
   supportedCurrencies: ["USD", "LBP"],
-  whish: { recipientName: "", whishNumber: "", accountId: "", instructions: "Send the exact amount due via Whish Money and include the invoice number in the transfer note." },
+  whish: { recipientName: NUMNUM_WHISH_NAME, whishNumber: NUMNUM_WHISH_NUMBER, accountId: "", instructions: "Send the exact amount due with Whish and write your restaurant name and the invoice number in the transfer note, so we can match your payment." },
   reminders: { onIssue: true, daysBeforeDue: 3, onDue: true, daysAfterDue: [3, 7] },
   overduePolicy: { autoApply: false, restrictPromotionAfterDays: 7, restrictReelsAfterDays: 15, suspendAfterDays: 30 },
   requireRestaurantApproval: true,
@@ -101,7 +105,26 @@ async function loadSettings(): Promise<Settings> {
   for (const r of rows) {
     if (r.key in DEFAULT_SETTINGS) s = { ...s, [r.key]: merge((DEFAULT_SETTINGS as Record<string, unknown>)[r.key], r.value) };
   }
-  return s;
+  return { ...s, whish: realWhish(s.whish) };
+}
+
+// The demo data used to save placeholder payment details ("numnum Demo Account", 70 000 000).
+const DEMO_WHISH = { recipientName: "numnum Demo Account", whishNumber: "70000000", accountId: "NUMNUM-DEMO" };
+
+/**
+ * Restaurants must always see where to really pay: an empty or placeholder number, name or account
+ * falls back to numnum's own, and the first instructions (invoice number only) become the current
+ * ones (restaurant name too). Anything an admin saved on purpose is kept.
+ */
+export function realWhish(w: WhishSettings): WhishSettings {
+  const number = w.whishNumber.replace(/\D/g, "");
+  return {
+    ...w,
+    whishNumber: !number || number === DEMO_WHISH.whishNumber ? NUMNUM_WHISH_NUMBER : w.whishNumber.trim(),
+    recipientName: !w.recipientName.trim() || w.recipientName.trim() === DEMO_WHISH.recipientName ? NUMNUM_WHISH_NAME : w.recipientName.trim(),
+    accountId: w.accountId.trim() === DEMO_WHISH.accountId ? "" : w.accountId.trim(),
+    instructions: !w.instructions.trim() || w.instructions.trim() === OLD_WHISH_INSTRUCTIONS ? DEFAULT_SETTINGS.whish.instructions : w.instructions,
+  };
 }
 
 /** Platform settings: shared by layout, page and metadata, and kept in memory for 30 s. */

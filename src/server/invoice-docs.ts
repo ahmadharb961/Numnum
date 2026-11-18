@@ -1,4 +1,6 @@
 import "server-only";
+import { showWhishNumber, transferNote } from "@/lib/whish";
+import { realWhish } from "./settings";
 import Papa from "papaparse";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { Invoice, InvoiceLine, Payment } from "@prisma/client";
@@ -46,7 +48,10 @@ export async function invoicePdf(inv: FullInvoice, platformName: string): Promis
     page.drawText(s, { x: o.right ? x - f.widthOfTextAtSize(s, size) : x, y: yy, size, font: f, color: o.color ?? ink });
   };
   const snap = inv.restaurantSnapshot as Record<string, string | null>;
-  const pay = inv.paymentInstructions as Record<string, string>;
+  // Copied onto the invoice when it was issued; older invoices with no or placeholder details get numnum's.
+  const saved = (inv.paymentInstructions ?? {}) as Record<string, string>;
+  const real = realWhish({ recipientName: saved.recipientName ?? "", whishNumber: saved.whishNumber ?? "", accountId: saved.accountId ?? "", instructions: saved.instructions ?? "" });
+  const pay: Record<string, string> = { ...real, whishNumber: showWhishNumber(real.whishNumber) };
 
   drawLogo(page, M, y + 22, 40, brand);
   text("COMMISSION INVOICE", W - M, y + 4, { size: 12, f: bold, right: true });
@@ -98,7 +103,7 @@ export async function invoicePdf(inv: FullInvoice, platformName: string): Promis
 
   text("PAYMENT INSTRUCTIONS (WHISH MONEY / WHISH PAY)", M, y, { size: 8, f: bold, color: muted });
   y -= 14;
-  for (const l of [pay.recipientName && `Recipient: ${pay.recipientName}`, pay.whishNumber && `Whish number: ${pay.whishNumber}`, pay.accountId && `Account ID: ${pay.accountId}`, `Reference: ${inv.number}`].filter(Boolean) as string[]) {
+  for (const l of [pay.recipientName && `Recipient: ${pay.recipientName}`, pay.whishNumber && `Whish number: ${pay.whishNumber}`, pay.accountId && `Account ID: ${pay.accountId}`, `Transfer note (write it in Whish): ${transferNote(snap.displayName || snap.businessName || "", inv.number)}`].filter(Boolean) as string[]) {
     text(l, M, y);
     y -= 13;
   }

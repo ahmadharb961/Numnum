@@ -288,7 +288,6 @@ async function seedDemo(adminId: string) {
   const firstRun = !(await prisma.restaurant.findUnique({ where: { slug: "burger-house" } }));
   const mediaSetting = await prisma.platformSetting.findUnique({ where: { key: "demo_media_version" } });
   const refreshMedia = !firstRun && Number(mediaSetting?.value ?? 0) < DEMO_MEDIA_VERSION;
-  if (firstRun) await updateSetting("whish", { recipientName: "numnum Demo Account", whishNumber: "70 000 000", accountId: "NUMNUM-DEMO", instructions: DEFAULT_SETTINGS.whish.instructions }, adminId);
   if (!streamConfigured() && spawnSync("ffmpeg", ["-version"]).status !== 0) console.log("No Cloudflare Stream or ffmpeg — demo restaurants will have no reels");
 
   const tmp = mkdtempSync(path.join(os.tmpdir(), "nnseed-"));

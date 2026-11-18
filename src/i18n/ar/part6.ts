@@ -273,4 +273,14 @@ export const AR6: Record<string, string> = {
   "You can change it once every 3 months. Your old username keeps leading to your profile for 3 months.": "يمكنك تغييره مرة كل 3 أشهر. يبقى اسمك القديم يوصل إلى ملفك لمدة 3 أشهر.",
   "You can change your username again on {date}.": "يمكنك تغيير اسم المستخدم مجدداً في {date}.",
   "Your current username": "اسم المستخدم الحالي",
+  // Paying the commission with Whish
+  "Transfer note (write it in Whish)": "ملاحظة التحويل (اكتبها في Whish)",
+  "How you pay numnum": "كيف تدفع لـ numnum",
+  "1. You pay {rate} commission on your completed orders. On the 1st of each month you get an invoice for last month.": "1. تدفع عمولة {rate} على طلباتك المكتملة. في الأول من كل شهر تصلك فاتورة الشهر الماضي.",
+  "2. Pay it within {days} days with Whish to {name}.": "2. ادفعها خلال {days} أيام عبر Whish إلى {name}.",
+  "3. Write your restaurant name in the Whish transfer note, so we know the payment is yours.": "3. اكتب اسم مطعمك في ملاحظة التحويل على Whish، لنعرف أن الدفعة منك.",
+  "After paying, tap “Pay via Whish” on the invoice, then “I've made the payment” to send us the receipt.": "بعد الدفع، اضغط «ادفع عبر Whish» على الفاتورة، ثم «لقد دفعت» لإرسال الإيصال إلينا.",
+  "Send it with Whish to {name} · {number}, and write your restaurant name ({restaurant}) in the transfer note.": "أرسلها عبر Whish إلى {name} · {number}، واكتب اسم مطعمك ({restaurant}) في ملاحظة التحويل.",
+  "Send the exact amount due with Whish and write your restaurant name and the invoice number in the transfer note, so we can match your payment.": "أرسل المبلغ المستحق بالضبط عبر Whish واكتب اسم مطعمك ورقم الفاتورة في ملاحظة التحويل، لنتمكن من مطابقة دفعتك.",
+  "I've made the payment": "لقد دفعت",
 };

@@ -74,7 +74,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </dl>
         </Section>
         <div className="space-y-3">
-          {due > 0 && <PayWhishButton block invoice={{ id: inv.id, number: inv.number, outstandingCents: due }} whish={settings.whish} />}
+          {due > 0 && <PayWhishButton block invoice={{ id: inv.id, number: inv.number, outstandingCents: due }} whish={settings.whish} restaurantName={ctx.restaurant.displayName} />}
           {withinWindow && inv.status !== "PAID" && (
             <div className="card p-4 text-sm">
               {t("Something wrong with this invoice?")} <DisputeButton invoiceId={inv.id} label={t("Dispute invoice")} />

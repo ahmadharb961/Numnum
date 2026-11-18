@@ -72,7 +72,7 @@ export function welcomeEmail(d: WelcomeData, locale: string | null | undefined) 
   const app = appUrl();
   const first = d.ownerName.split(" ")[0];
   const whish = d.whishNumber
-    ? t("Send it with Whish to {name} · {number}, with the invoice number in the note.", { name: esc(d.whishName || "numnum"), number: ltr(esc(formatPhone(d.whishNumber.replace(/\D/g, "")) || d.whishNumber)) })
+    ? t("Send it with Whish to {name} · {number}, and write your restaurant name ({restaurant}) in the transfer note.", { name: esc(d.whishName || "numnum"), number: ltr(esc(formatPhone(d.whishNumber.replace(/\D/g, "")) || d.whishNumber)), restaurant: `<b>${esc(d.restaurantName)}</b>` })
     : t("Send it with Whish: the details are on every invoice in your dashboard.");
   // The phone step follows the store links: the numnum app once it's in the stores, else the web dashboard
   // on the home screen (same rule as the dashboard's own setup screen).
