@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { useRouter } from "next/navigation";
 import { prefetchPage, registerAppNavigate } from "@/lib/prefetch";
@@ -46,6 +46,8 @@ export function useKeepLoaded(hrefs: string[], ready = true) {
  */
 export function LinkWarmer() {
   const router = useRouter();
+  // See "nudge" below.
+  const [, setNudge] = useState(0);
   useEffect(() => {
     registerAppNavigate((href) => router.push(href));
     return () => registerAppNavigate(null);
@@ -95,6 +97,22 @@ export function LinkWarmer() {
       }
     };
 
+    // React can lose track of a screen it is about to show and never show it: when a piece of the
+    // new screen finishes loading at the very moment React is putting that screen together, React
+    // misses the "ready" signal and waits for good (a bug in React itself). The screen then never
+    // changes: buttons stay busy, a tap on a link does nothing. Any small update makes React look
+    // again, so once a screen, refresh or action has fully arrived we make one (this component
+    // renders nothing, so it costs nothing), right away and once more a moment later.
+    const nudge = () => {
+      for (const ms of [30, 400]) {
+        const t = setTimeout(() => {
+          timers.delete(t);
+          setNudge((n) => n + 1);
+        }, ms);
+        timers.add(t);
+      }
+    };
+
     // Refreshes and server actions both go through fetch: watch for them (without changing them).
     const original = window.fetch;
     const wrapped: typeof fetch = function (this: unknown, input, init) {
@@ -106,8 +124,16 @@ export function LinkWarmer() {
         const refresh = headers.has("rsc") && !headers.has("next-router-prefetch") && url.pathname === location.pathname;
         if (action) forgetScreenTimes();
         if (action || refresh) result.then(rewarm, () => {});
-        // Tell pull-to-refresh the refreshed page has arrived (body read, so it's in the page).
-        if (refresh) result.then((r) => r.clone().text()).then(() => setTimeout(() => window.dispatchEvent(new Event("nn:refreshed")), 50), () => {});
+        // A screen being shown (opened, refreshed) or an action's answer: once it has fully arrived
+        // (read from a copy, so the page's own reading isn't touched), nudge React, and tell
+        // pull-to-refresh the refreshed page is in.
+        if (action || (headers.has("rsc") && !headers.has("next-router-prefetch")))
+          result
+            .then((r) => r.clone().text())
+            .then(() => {
+              nudge();
+              if (refresh) setTimeout(() => window.dispatchEvent(new Event("nn:refreshed")), 50);
+            }, () => {});
         // Any screen coming from the server (loaded in advance, opened, refreshed) is fresh now.
         if (headers.has("rsc") && !action) result.then((r) => r.ok && markScreenFetched(url), () => {});
       } catch {}

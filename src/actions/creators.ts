@@ -60,7 +60,7 @@ export async function applyCreatorAction(input: unknown): Promise<CreatorResult>
   }
 }
 
-export async function checkHandleAction(handle: string): Promise<{ handle: string; available: boolean; error?: string }> {
+export async function checkHandleAction(handle: string): Promise<{ handle: string; available: boolean; current?: boolean; error?: string }> {
   const me = await requireUser("/creator/apply");
   if (!rateLimit(`creator-handle:${me.id}`, 120, 10 * 60_000).ok) return { handle: String(handle ?? ""), available: false, error: "Too many attempts. Try again in a few minutes." };
   return checkHandle(me.id, String(handle ?? "").slice(0, 40));
@@ -69,8 +69,10 @@ export async function checkHandleAction(handle: string): Promise<{ handle: strin
 export async function updateCreatorProfileAction(input: unknown): Promise<CreatorResult> {
   const me = await requireUser("/creator");
   try {
+    const before = await prisma.creator.findUnique({ where: { userId: me.id }, select: { handle: true } });
     const c = await updateCreatorProfile(me.id, input);
     refreshCreator(c.handle);
+    if (before && before.handle !== c.handle) revalidatePath(`/c/${before.handle}`); // now redirects
     return { ok: true, message: "Profile saved" };
   } catch (e) {
     return fail(e);

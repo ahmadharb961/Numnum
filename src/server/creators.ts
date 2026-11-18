@@ -54,7 +54,7 @@ export const applySchema = z.object({
   avatarAssetId: z.string().optional().nullable(),
 });
 
-export const profileSchema = applySchema.omit({ handle: true });
+export const profileSchema = applySchema.omit({ handle: true }).extend({ handle: z.string().optional() });
 
 async function avatarUrl(userId: string, assetId: string | null | undefined) {
   if (!assetId) return undefined;
@@ -64,13 +64,67 @@ async function avatarUrl(userId: string, assetId: string | null | undefined) {
 
 // ───── Applying, approval, verification ─────
 
+export const HANDLE_COOLDOWN_DAYS = 90; // a creator can change their username once every 3 months
+const ALIAS_DAYS = 90; // an old username redirects (and stays theirs) for 3 months
+
+/** Is this username someone else's: their username, or another creator's old one still reserved? */
+async function handleTaken(handle: string, exceptCreatorId: string | null) {
+  const [current, alias] = await Promise.all([
+    prisma.creator.findFirst({ where: { handle, ...(exceptCreatorId ? { NOT: { id: exceptCreatorId } } : {}) }, select: { id: true } }),
+    prisma.creatorHandleAlias.findFirst({ where: { handle, createdAt: { gt: new Date(Date.now() - ALIAS_DAYS * 86400_000) }, ...(exceptCreatorId ? { NOT: { creatorId: exceptCreatorId } } : {}) }, select: { handle: true } }),
+  ]);
+  return !!(current || alias);
+}
+
 /** Live check while typing a username: the cleaned-up form, and whether it's free. */
-export async function checkHandle(userId: string, raw: string): Promise<{ handle: string; available: boolean; error?: string }> {
+export async function checkHandle(userId: string, raw: string): Promise<{ handle: string; available: boolean; current?: boolean; error?: string }> {
   const parsed = handleSchema.safeParse(raw);
   const cleaned = String(raw ?? "").trim().toLowerCase().replace(/^@/, "");
   if (!parsed.success) return { handle: cleaned, available: false, error: parsed.error.issues[0]?.message ?? "Choose another username" };
-  const taken = await prisma.creator.findFirst({ where: { handle: parsed.data, NOT: { userId } }, select: { id: true } });
+  const mine = await prisma.creator.findUnique({ where: { userId }, select: { id: true, handle: true } });
+  if (mine?.handle === parsed.data) return { handle: parsed.data, available: true, current: true };
+  const taken = await handleTaken(parsed.data, mine?.id ?? null);
   return { handle: parsed.data, available: !taken, ...(taken ? { error: "This username is taken" } : {}) };
+}
+
+/** When the creator may change their username again (null: now). */
+export function nextHandleChange(c: { handleChangedAt: Date | null }, now = new Date()): Date | null {
+  if (!c.handleChangedAt) return null;
+  const next = new Date(c.handleChangedAt.getTime() + HANDLE_COOLDOWN_DAYS * 86400_000);
+  return next > now ? next : null;
+}
+
+/**
+ * Changes a creator's username. The creator: once every 3 months. An admin (byAdminId): any time,
+ * without using up the creator's change. The old username redirects for 3 months and stays theirs.
+ */
+export async function changeCreatorHandle(creatorId: string, raw: string, opts: { byAdminId?: string } = {}) {
+  const parsed = handleSchema.safeParse(raw);
+  if (!parsed.success) throw new CreatorError(parsed.error.issues[0]?.message ?? "Choose another username", "handle");
+  const handle = parsed.data;
+  const c = await prisma.creator.findUnique({ where: { id: creatorId } });
+  if (!c) throw new CreatorError("Creator not found");
+  if (c.handle === handle) return c;
+  if (!opts.byAdminId) {
+    const next = nextHandleChange(c);
+    if (next) throw new CreatorError(`You can change your username again on ${next.toISOString().slice(0, 10)}`, "handle");
+  }
+  if (await handleTaken(handle, c.id)) throw new CreatorError("This username is taken", "handle");
+  const updated = await prisma.$transaction(async (tx) => {
+    // Their old username keeps working (redirects) and stays theirs for a while.
+    await tx.creatorHandleAlias.upsert({ where: { handle: c.handle }, create: { handle: c.handle, creatorId: c.id }, update: { creatorId: c.id, createdAt: new Date() } });
+    await tx.creatorHandleAlias.deleteMany({ where: { handle } }); // taking back one of their own old usernames
+    return tx.creator.update({ where: { id: c.id }, data: { handle, ...creatorSearchFields({ ...c, handle }), ...(opts.byAdminId ? {} : { handleChangedAt: new Date() }) } });
+  });
+  await audit({ actorId: opts.byAdminId ?? c.userId, action: opts.byAdminId ? "creator.handle_admin_change" : "creator.handle_change", entityType: "creator", entityId: c.id, data: { from: c.handle, to: handle } });
+  return updated;
+}
+
+/** The creator an old username now points to (within the 3 months), for redirects. */
+export async function handleRedirect(oldHandle: string): Promise<string | null> {
+  const a = await prisma.creatorHandleAlias.findUnique({ where: { handle: oldHandle.toLowerCase() }, select: { createdAt: true, creator: { select: { handle: true, status: true } } } });
+  if (!a || a.createdAt.getTime() < Date.now() - ALIAS_DAYS * 86400_000 || a.creator.status !== "APPROVED") return null;
+  return a.creator.handle;
 }
 
 /** Apply to become a creator (or apply again after a decline). */
@@ -78,8 +132,7 @@ export async function applyAsCreator(userId: string, raw: unknown) {
   const input = applySchema.parse(raw);
   const existing = await prisma.creator.findUnique({ where: { userId } });
   if (existing && existing.status !== "DECLINED") throw new CreatorError(existing.status === "PENDING" ? "Your application is being reviewed" : "You're already a creator");
-  const taken = await prisma.creator.findFirst({ where: { handle: input.handle, NOT: { userId } }, select: { id: true } });
-  if (taken) throw new CreatorError("This username is taken", "handle");
+  if (await handleTaken(input.handle, existing?.id ?? null)) throw new CreatorError("This username is taken", "handle");
   const avatar = await avatarUrl(userId, input.avatarAssetId);
   const data = { handle: input.handle, displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), status: "PENDING" as const, decisionNote: null, ...creatorSearchFields(input) };
   const c = existing ? await prisma.creator.update({ where: { id: existing.id }, data }) : await prisma.creator.create({ data: { ...data, userId } });
@@ -112,7 +165,9 @@ export async function updateCreatorProfile(userId: string, raw: unknown) {
   const c = await prisma.creator.findUnique({ where: { userId } });
   if (!c || c.status !== "APPROVED") throw new CreatorError("Only approved creators can edit their profile");
   const avatar = await avatarUrl(userId, input.avatarAssetId);
-  return prisma.creator.update({ where: { id: c.id }, data: { displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), ...creatorSearchFields({ handle: c.handle, ...input }) } });
+  // A new username first (it can be refused: taken, or changed less than 3 months ago).
+  const handle = input.handle != null && input.handle.trim() && input.handle.trim().toLowerCase().replace(/^@/, "") !== c.handle ? (await changeCreatorHandle(c.id, input.handle)).handle : c.handle;
+  return prisma.creator.update({ where: { id: c.id }, data: { displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), ...creatorSearchFields({ ...input, handle }) } });
 }
 
 /** The creator asks for the verified badge. */

@@ -23,8 +23,9 @@ export function AccountActions(p: Props) {
       const r = await fn();
       if (r.ok) {
         setMsg({ ok: true, text: r.message ?? "Done" });
-        after?.();
-        router.refresh();
+        // No refresh when the action moves on (delete redirects): it would race that navigation.
+        if (after) after();
+        else router.refresh();
       } else if (r.field) setFieldErr({ [r.field]: r.error ?? "" });
       else setMsg({ ok: false, text: r.error ?? "Something went wrong" });
     });
@@ -88,10 +89,7 @@ export function AccountActions(p: Props) {
               data-testid="account-delete"
               onClick={() => {
                 if (!window.confirm(`Delete ${p.name}'s account for good?`)) return;
-                run(
-                  () => deleteAccountAdminAction(p.id),
-                  () => router.push("/admin/customers"),
-                );
+                run(() => deleteAccountAdminAction(p.id), () => {}); // the action redirects to the list
               }}
             >
               <Trash2 className="h-4 w-4" /> Delete account

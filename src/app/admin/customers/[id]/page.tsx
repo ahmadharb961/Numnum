@@ -5,6 +5,7 @@ import { getAccount } from "@/server/admin-people";
 import { DashPage } from "@/components/dashboard/page";
 import { AccountBadges } from "@/components/admin/account-badges";
 import { AccountActions } from "@/components/admin/account-actions";
+import { AdminHandleForm } from "@/components/admin/admin-handle-form";
 import { Badge } from "@/components/ui/misc";
 import { formatPhone } from "@/lib/phone";
 import { formatMoney } from "@/lib/money";
@@ -77,6 +78,7 @@ export default async function AdminAccountPage({ params }: { params: Promise<{ i
                 · {a.creator.displayName} · {a.creator.status.toLowerCase()}
                 {a.creator.verification === "APPROVED" ? " · verified" : ""}
               </p>
+              <AdminHandleForm creatorId={a.creator.id} handle={a.creator.handle} />
               <p className="mt-1 text-sm text-ink-muted">
                 {a.creator.followerCount} followers · {a.creator._count.reels} reels ·{" "}
                 <Link href="/admin/creators" className="text-brand-600 hover:underline">

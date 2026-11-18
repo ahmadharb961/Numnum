@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { RestaurantStatus, VerificationStatus } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { requireAdmin } from "@/server/auth";
@@ -18,6 +19,7 @@ import { parseAmount } from "@/lib/money";
 import { slugify } from "@/lib/slug";
 import type { ActionResult } from "./menu";
 import { AccountError, adminDeleteAccount, setAccountDisabled, updateAccount } from "@/server/admin-people";
+import { changeCreatorHandle, checkHandle, CreatorError } from "@/server/creators";
 import { sendPasswordReset } from "@/server/password-reset";
 import { createCustomerByAdmin, createRestaurantByAdmin, setCommissionForRestaurants, type AdminCustomerInput, type AdminFormResult, type AdminRestaurantInput } from "@/server/admin-accounts";
 
@@ -493,11 +495,13 @@ export async function deleteAccountAdminAction(id: string): Promise<AccountResul
   const { user } = await admin();
   try {
     await adminDeleteAccount(user.id, id);
-    revalidatePath("/admin/customers");
-    return { ok: true, message: "Account deleted" };
   } catch (e) {
     return accountFail(e);
   }
+  revalidatePath("/admin/customers");
+  // Back to the list, done by the server together with the action (a client-side push after it can
+  // be dropped while the deleted person's page refreshes).
+  redirect("/admin/customers");
 }
 
 export async function sendPasswordResetAdminAction(id: string): Promise<AccountResult> {
@@ -507,4 +511,30 @@ export async function sendPasswordResetAdminAction(id: string): Promise<AccountR
   await sendPasswordReset(u.email);
   await audit({ actorId: user.id, action: "user.password_reset_sent", entityType: "user", entityId: id });
   return { ok: true, message: `Password reset link sent to ${u.email}` };
+}
+
+/** Admin: is this username free for that creator? (live, as the admin types) */
+export async function adminCheckHandleAction(creatorId: string, handle: string) {
+  await admin();
+  const c = await prisma.creator.findUnique({ where: { id: creatorId }, select: { userId: true } });
+  if (!c) return { handle, available: false, error: "Creator not found" };
+  return checkHandle(c.userId, String(handle ?? "").slice(0, 40));
+}
+
+/** Admin: change a creator's username any time (doesn't use up the creator's own 3-month change). */
+export async function adminChangeCreatorHandleAction(creatorId: string, handle: string): Promise<AccountResult> {
+  const { user } = await admin();
+  try {
+    const before = await prisma.creator.findUnique({ where: { id: creatorId }, select: { handle: true, userId: true } });
+    const c = await changeCreatorHandle(creatorId, handle, { byAdminId: user.id });
+    if (before) {
+      revalidatePath(`/c/${before.handle}`);
+      refreshAccount(before.userId);
+    }
+    revalidatePath(`/c/${c.handle}`);
+    revalidatePath("/admin/creators");
+    return { ok: true, message: `Username changed to @${c.handle}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Something went wrong", field: e instanceof CreatorError ? e.field : undefined };
+  }
 }
