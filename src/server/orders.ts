@@ -1,4 +1,5 @@
 import "server-only";
+import { celebrateFirstCreatorOrders } from "./creators";
 import { liveDeals } from "./deals";
 import { applyDeals, dealSummaryOf, showDealSummary } from "@/lib/deals";
 import { z } from "zod";
@@ -341,6 +342,7 @@ export async function createOrder(raw: unknown, meta: { deviceKey: string | null
       meta.userId && input.fulfillment === "DELIVERY" && c.saveAddress && !c.addressId && c.address ? saveAddress(meta.userId, c, mapsUrl) : null,
     ]);
     for (const r of after) if (r.status === "rejected") console.error("After placing order", reference, r.reason);
+    if (reelIds.length) void celebrateFirstCreatorOrders(reelIds);
     // Phone notification to every staff device (never blocks the order).
     void pushToRestaurantStaff(restaurant.id, (t) => ({
       title: `🔔 ${t("New order · {total}", { total: formatMoney(totalCents, currency) })}`,

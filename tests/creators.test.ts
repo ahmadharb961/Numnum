@@ -14,6 +14,8 @@ import { publicReelWhere } from "@/server/feed";
 import { followingFeed } from "@/server/follows";
 import {
   applyAsCreator,
+  celebrateFirstCreatorOrders,
+  followerName,
   createCreatorReel,
   creatorReelReady,
   creatorWelcomeEmail,
@@ -277,6 +279,66 @@ describe("reels, tags and the feed", () => {
     expect((await followingFeed(fan.id)).reels).toHaveLength(0);
     await suspendCreator(admin.id, creator.id, false);
     expect(await isPublic(reel.id)).toBe(true);
+  });
+});
+
+describe("the creator journey: followers, reminders, first order", () => {
+  beforeEach(async () => {
+    await resetDb();
+    emails.length = 0;
+  });
+  const followNotes = (userId: string) => prisma.notification.findMany({ where: { audience: "USER", userId, type: "creator_new_follower" } });
+
+  it("a new follower notifies the creator at once, once (unfollow + follow again doesn't repeat it)", async () => {
+    const { user, creator } = await approvedCreator();
+    const fan = await prisma.user.create({ data: { email: `fan${++v}@test.dev`, passwordHash: "x", name: "Rana Haddad", roles: { create: { role: "CUSTOMER" } } } });
+    await setCreatorFollow(fan.id, creator.id, true);
+    let notes = await followNotes(user.id);
+    expect(notes).toHaveLength(1);
+    expect(notes[0].title).toContain("Rana H.");
+    expect(notes[0].link).toBe(`/creator/followers?f=${fan.id}`);
+    await setCreatorFollow(fan.id, creator.id, false);
+    await setCreatorFollow(fan.id, creator.id, true);
+    expect(await followNotes(user.id)).toHaveLength(1);
+    const other = await makeCustomer();
+    await setCreatorFollow(other.id, creator.id, true);
+    notes = await followNotes(user.id);
+    expect(notes).toHaveLength(2);
+    expect(followerName("Rana Haddad")).toBe("Rana H.");
+    expect(followerName("Ziad")).toBe("Ziad");
+    expect(followerName("  Maya  El Khoury ")).toBe("Maya K.");
+  });
+
+  it("an unanswered tag: the restaurant is reminded once after 3 days, and it expires after 7", async () => {
+    const f = await makeRestaurant();
+    const { user } = await approvedCreator();
+    const reel = await createCreatorReel(user.id, { videoAssetId: (await video(user.id)).id, menuItemId: f.burger.id });
+    await ready(reel.id);
+    const reminders = () => prisma.notification.count({ where: { restaurantId: f.restaurant.id, type: "creator_tag_reminder" } });
+    const at = (await prisma.reel.findUniqueOrThrow({ where: { id: reel.id } })).tagRequestedAt!;
+    await expireCreatorTags(new Date(at.getTime() + 2 * 86400_000));
+    expect(await reminders()).toBe(0); // not yet
+    await expireCreatorTags(new Date(at.getTime() + 3 * 86400_000 + 60_000));
+    await expireCreatorTags(new Date(at.getTime() + 4 * 86400_000));
+    expect(await reminders()).toBe(1); // once
+    const n = await prisma.notification.findFirstOrThrow({ where: { restaurantId: f.restaurant.id, type: "creator_tag_reminder" } });
+    expect(n.body).toContain('"n":4'); // 4 days left
+    await expireCreatorTags(new Date(at.getTime() + 7 * 86400_000 + 60_000));
+    expect((await prisma.reel.findUniqueOrThrow({ where: { id: reel.id } })).tagStatus).toBe("EXPIRED");
+    expect(await prisma.notification.count({ where: { userId: user.id, type: "creator_tag_expired" } })).toBe(1);
+  });
+
+  it("a creator's reel bringing its first order is celebrated once", async () => {
+    const f = await makeRestaurant();
+    const { user } = await approvedCreator();
+    const reel = await createCreatorReel(user.id, { videoAssetId: (await video(user.id)).id, menuItemId: f.burger.id });
+    await prisma.reel.update({ where: { id: reel.id }, data: { orderInits: 1 } });
+    await celebrateFirstCreatorOrders([reel.id]);
+    await celebrateFirstCreatorOrders([reel.id]);
+    expect(await prisma.notification.count({ where: { userId: user.id, type: "creator_first_order" } })).toBe(1);
+    await prisma.reel.update({ where: { id: reel.id }, data: { orderInits: 2 } });
+    await celebrateFirstCreatorOrders([reel.id]);
+    expect(await prisma.notification.count({ where: { userId: user.id, type: "creator_first_order" } })).toBe(1);
   });
 });
 

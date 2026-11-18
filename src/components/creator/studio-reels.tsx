@@ -28,6 +28,8 @@ export type StudioReel = {
   likes: number;
   orders: number;
   paidPartnership: boolean;
+  /** Days before an unanswered tag expires (counted on the server). */
+  daysLeft: number | null;
 };
 
 export function StudioReels({ reels, pinMax }: { reels: StudioReel[]; pinMax: number }) {
@@ -83,7 +85,7 @@ function Row({ r, canPin }: { r: StudioReel; canPin: boolean }) {
       : r.status === "FAILED"
         ? { text: t("The video couldn't be processed. Delete it and upload it again."), tone: "text-red-600" }
         : r.tagStatus === "PENDING"
-          ? { text: t("Waiting for {restaurant} to approve", { restaurant: r.restaurant }), tone: "text-amber-700" }
+          ? { text: r.daysLeft != null ? t("Waiting for {restaurant} to approve · {n} days left", { restaurant: r.restaurant, n: r.daysLeft }) : t("Waiting for {restaurant} to approve", { restaurant: r.restaurant }), tone: "text-amber-700" }
           : r.tagStatus === "ACCEPTED"
             ? r.live
               ? { text: t("Live"), tone: "text-emerald-700" }
