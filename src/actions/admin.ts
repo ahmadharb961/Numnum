@@ -17,6 +17,8 @@ import { movePhotosToCloudflare, photoCounts } from "@/server/cf-images";
 import { parseAmount } from "@/lib/money";
 import { slugify } from "@/lib/slug";
 import type { ActionResult } from "./menu";
+import { AccountError, adminDeleteAccount, setAccountDisabled, updateAccount } from "@/server/admin-people";
+import { sendPasswordReset } from "@/server/password-reset";
 import { createCustomerByAdmin, createRestaurantByAdmin, setCommissionForRestaurants, type AdminCustomerInput, type AdminFormResult, type AdminRestaurantInput } from "@/server/admin-accounts";
 
 async function admin() {
@@ -454,4 +456,55 @@ export async function bulkCommissionAction(ids: string[], rate: string | null) {
     revalidatePath("/admin/restaurants");
     return { changed: changed.length };
   }, "Commission updated");
+}
+
+// ───── Accounts (Admin → Customers) ─────
+
+type AccountResult = { ok: true; message: string } | { ok: false; error: string; field?: string };
+const accountFail = (e: unknown): AccountResult => ({ ok: false, error: e instanceof Error ? e.message : "Something went wrong", field: e instanceof AccountError ? e.field : undefined });
+const refreshAccount = (id: string) => {
+  revalidatePath("/admin/customers");
+  revalidatePath(`/admin/customers/${id}`);
+};
+
+export async function updateAccountAction(id: string, input: { name: string; phone: string }): Promise<AccountResult> {
+  const { user } = await admin();
+  try {
+    await updateAccount(user.id, id, input);
+    refreshAccount(id);
+    return { ok: true, message: "Saved" };
+  } catch (e) {
+    return accountFail(e);
+  }
+}
+
+export async function setAccountDisabledAction(id: string, disabled: boolean): Promise<AccountResult> {
+  const { user } = await admin();
+  try {
+    await setAccountDisabled(user.id, id, disabled);
+    refreshAccount(id);
+    return { ok: true, message: disabled ? "Account disabled: they can't log in" : "Account enabled" };
+  } catch (e) {
+    return accountFail(e);
+  }
+}
+
+export async function deleteAccountAdminAction(id: string): Promise<AccountResult> {
+  const { user } = await admin();
+  try {
+    await adminDeleteAccount(user.id, id);
+    revalidatePath("/admin/customers");
+    return { ok: true, message: "Account deleted" };
+  } catch (e) {
+    return accountFail(e);
+  }
+}
+
+export async function sendPasswordResetAdminAction(id: string): Promise<AccountResult> {
+  const { user } = await admin();
+  const u = await prisma.user.findUnique({ where: { id }, select: { email: true } });
+  if (!u) return { ok: false, error: "Account not found" };
+  await sendPasswordReset(u.email);
+  await audit({ actorId: user.id, action: "user.password_reset_sent", entityType: "user", entityId: id });
+  return { ok: true, message: `Password reset link sent to ${u.email}` };
 }

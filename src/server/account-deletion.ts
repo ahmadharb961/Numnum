@@ -4,6 +4,7 @@ import { verifyPassword } from "./auth";
 import { audit } from "./audit";
 import { notifyAdmins } from "./notifications";
 import { recomputeItemRating, recomputeRestaurantRating } from "./reviews";
+import { deleteStreamVideo, streamUidOf } from "./stream";
 
 // "Delete my account" (required by the App Store and Google Play). Personal data is removed;
 // past orders stay for the restaurant's records and commission invoices, without the person's
@@ -39,7 +40,17 @@ export async function deleteAccount(userId: string, password: string): Promise<{
             : "Admin accounts can't be deleted from the app.",
     };
 
+  await eraseAccount(userId, null);
+  return { ok: true };
+}
+
+/**
+ * Removes an account (the person's own request, or an admin's). Call deletionBlocker first.
+ * Orders stay without personal details; a food creator's reels go too (and their stored videos).
+ */
+export async function eraseAccount(userId: string, actorId: string | null) {
   const key = `u:${userId}`;
+  const creatorVideos = await prisma.reel.findMany({ where: { creator: { userId } }, select: { videoAsset: { select: { storageKey: true } } } });
   const [itemReviews, restaurantReviews, likes] = await Promise.all([
     prisma.itemReview.findMany({ where: { userId }, select: { menuItemId: true } }),
     prisma.restaurantReview.findMany({ where: { userId }, select: { restaurantId: true } }),
@@ -63,8 +74,12 @@ export async function deleteAccount(userId: string, password: string): Promise<{
 
   for (const id of new Set(itemReviews.map((r) => r.menuItemId))) await recomputeItemRating(id);
   for (const id of new Set(restaurantReviews.map((r) => r.restaurantId))) await recomputeRestaurantRating(id);
-  await audit({ actorId: null, action: "user.self_delete", entityType: "user", entityId: userId, data: { reviews: itemReviews.length + restaurantReviews.length } });
-  return { ok: true };
+  // The creator's reels went with the account; their videos at Cloudflare go too (no storage bill).
+  for (const r of creatorVideos) {
+    const uid = streamUidOf(r.videoAsset.storageKey);
+    if (uid && uid !== "pending") await deleteStreamVideo(uid).catch((e) => console.error("stream delete", e));
+  }
+  await audit({ actorId, action: actorId ? "user.admin_delete" : "user.self_delete", entityType: "user", entityId: userId, data: { reviews: itemReviews.length + restaurantReviews.length, creatorReels: creatorVideos.length } });
 }
 
 /** Restaurant owners: ask numnum to close the restaurant (and then the account). */
