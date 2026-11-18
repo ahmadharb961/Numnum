@@ -148,7 +148,8 @@ export async function pinReelAction(reelId: string, pin: boolean): Promise<Creat
   }
 }
 
-/** Dishes to tag, by dish or restaurant name (restaurants that blocked this creator are left out). */
+/** Dishes to tag, by dish or restaurant name (restaurants that blocked this creator are left out;
+ *  dishes of a restaurant they work at are marked `own`: shown, but can't be tagged). */
 export async function searchDishesAction(q: string) {
   const me = await requireUser("/creator");
   const c = await prisma.creator.findUnique({ where: { userId: me.id }, select: { id: true } });
@@ -160,11 +161,11 @@ export async function searchDishesAction(q: string) {
       restaurant: { status: "ACTIVE", creatorBlocks: { none: { creatorId: c.id } } },
       OR: [{ name: { contains: term, mode: "insensitive" } }, { restaurant: { displayName: { contains: term, mode: "insensitive" } } }],
     },
-    select: { id: true, name: true, priceCents: true, currency: true, restaurant: { select: { displayName: true, logoUrl: true, area: true } }, images: { where: { isMain: true }, take: 1, select: { asset: { select: { thumbUrl: true, url: true } } } } },
+    select: { id: true, name: true, priceCents: true, currency: true, restaurant: { select: { displayName: true, logoUrl: true, area: true, staff: { where: { userId: me.id }, select: { id: true }, take: 1 } } }, images: { where: { isMain: true }, take: 1, select: { asset: { select: { thumbUrl: true, url: true } } } } },
     orderBy: [{ restaurant: { displayName: "asc" } }, { name: "asc" }],
     take: 30,
   });
-  return items.map((i) => ({ id: i.id, name: i.name, priceCents: i.priceCents, currency: i.currency, restaurant: i.restaurant.displayName, area: i.restaurant.area, logoUrl: i.restaurant.logoUrl, imageUrl: i.images[0]?.asset.thumbUrl ?? i.images[0]?.asset.url ?? null }));
+  return items.map((i) => ({ id: i.id, name: i.name, priceCents: i.priceCents, currency: i.currency, restaurant: i.restaurant.displayName, area: i.restaurant.area, logoUrl: i.restaurant.logoUrl, imageUrl: i.images[0]?.asset.thumbUrl ?? i.images[0]?.asset.url ?? null, own: i.restaurant.staff.length > 0 }));
 }
 
 export async function followCreatorAction(creatorId: string, follow: boolean): Promise<{ ok: true; following: boolean; followerCount: number } | { ok: false; login: boolean; error?: string }> {

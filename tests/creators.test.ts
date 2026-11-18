@@ -30,6 +30,7 @@ import {
   suspendCreator,
   updateCreatorProfile,
   DAILY_REELS,
+  OWN_RESTAURANT,
   PIN_MAX,
 } from "@/server/creators";
 import { makeCustomer, makeRestaurant, resetDb } from "./helpers";
@@ -112,6 +113,39 @@ describe("reels, tags and the feed", () => {
   beforeEach(async () => {
     await resetDb();
     emails.length = 0;
+  });
+
+  it("a restaurant's own people can't tag it as creators (their food goes in the restaurant's own reels)", async () => {
+    const own = await makeRestaurant();
+    const other = await makeRestaurant();
+    // The owner is also a food creator, with the same account.
+    const c = await applyAsCreator(own.user.id, { handle: `owner.eats${++v}`, displayName: "Owner Eats" });
+    await decideCreator((await makeCustomer()).id, c.id, true);
+    await expect(createCreatorReel(own.user.id, { videoAssetId: (await video(own.user.id)).id, menuItemId: own.burger.id })).rejects.toThrow(OWN_RESTAURANT);
+    expect(await prisma.reel.count({ where: { creatorId: c.id } })).toBe(0);
+    // Other restaurants are fine.
+    const reel = await createCreatorReel(own.user.id, { videoAssetId: (await video(own.user.id)).id, menuItemId: other.burger.id });
+    expect(reel.restaurantId).toBe(other.restaurant.id);
+    // Declined there, they can't re-tag it onto their own restaurant either.
+    await ready(reel.id);
+    await decideTag(other.restaurant.id, other.user.id, reel.id, false, "Not our dish");
+    await expect(retagReel(own.user.id, reel.id, own.burger.id, false)).rejects.toThrow(OWN_RESTAURANT);
+    // Staff (not only owners) count too.
+    const { user: staffer } = await approvedCreator();
+    await prisma.restaurantStaff.create({ data: { restaurantId: other.restaurant.id, userId: staffer.id, role: "STAFF" } });
+    await expect(createCreatorReel(staffer.id, { videoAssetId: (await video(staffer.id)).id, menuItemId: other.burger.id })).rejects.toThrow(OWN_RESTAURANT);
+  });
+
+  it("a creator who starts working at the restaurant after tagging it can't be approved by it", async () => {
+    const f = await makeRestaurant();
+    const { user } = await approvedCreator();
+    const reel = await createCreatorReel(user.id, { videoAssetId: (await video(user.id)).id, menuItemId: f.burger.id });
+    await ready(reel.id);
+    await prisma.restaurantStaff.create({ data: { restaurantId: f.restaurant.id, userId: user.id, role: "STAFF" } });
+    await expect(decideTag(f.restaurant.id, f.user.id, reel.id, true)).rejects.toThrow(/works at your restaurant/);
+    expect(await isPublic(reel.id)).toBe(false);
+    await decideTag(f.restaurant.id, f.user.id, reel.id, false); // declining still works
+    expect((await prisma.reel.findUniqueOrThrow({ where: { id: reel.id } })).tagStatus).toBe("DECLINED");
   });
 
   it("a reel waits for the restaurant, which is asked once; accepting puts it live with the creator", async () => {
