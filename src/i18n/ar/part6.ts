@@ -269,4 +269,8 @@ export const AR6: Record<string, string> = {
   "Waiting for {restaurant} to approve · {n} days left": "بانتظار موافقة {restaurant} · بقي {n} أيام",
   "Your reel of {dish} got its first order 🎉": "فيديو {dish} حصل على أول طلب 🎉",
   "Someone ordered from {restaurant} after watching it. Keep them coming!": "طلب أحدهم من {restaurant} بعد مشاهدته. استمر!",
+  // Changing the username
+  "You can change it once every 3 months. Your old username keeps leading to your profile for 3 months.": "يمكنك تغييره مرة كل 3 أشهر. يبقى اسمك القديم يوصل إلى ملفك لمدة 3 أشهر.",
+  "You can change your username again on {date}.": "يمكنك تغيير اسم المستخدم مجدداً في {date}.",
+  "Your current username": "اسم المستخدم الحالي",
 };

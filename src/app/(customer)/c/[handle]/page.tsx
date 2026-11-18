@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { BadgeCheck, Instagram, MapPin, Music2, Pin, UserRound } from "lucide-react";
 import { prisma } from "@/server/db";
 import { getCurrentUser } from "@/server/auth";
 import { publicReelWhere } from "@/server/feed";
-import { creatorGridOrder } from "@/server/creators";
+import { creatorGridOrder, handleRedirect } from "@/server/creators";
 import { PageHeader } from "@/components/customer/page-header";
 import { ReelThumb } from "@/components/customer/cards";
 import { FollowCreatorButton } from "@/components/creator/follow-creator";
@@ -27,7 +27,12 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
 export default async function CreatorProfilePage({ params }: { params: Promise<{ handle: string }> }) {
   const t = await getT();
   const c = await load((await params).handle);
-  if (!c) notFound();
+  if (!c) {
+    // An old username (changed in the last 3 months): to the creator's profile under the new one.
+    const moved = await handleRedirect((await params).handle);
+    if (moved) permanentRedirect(`/c/${moved}`);
+    notFound();
+  }
   const me = await getCurrentUser();
   const [reels, follow] = await Promise.all([
     prisma.reel.findMany({ where: { ...publicReelWhere, creatorId: c.id }, orderBy: creatorGridOrder, select: { id: true, posterUrl: true, viewCount: true, pinnedAt: true, menuItem: { select: { name: true } } } }),

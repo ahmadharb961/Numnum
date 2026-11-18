@@ -15,7 +15,7 @@ import { useT } from "@/i18n/client";
 export type CreatorProfileValues = { handle: string; displayName: string; bio: string; instagram: string; tiktok: string; audienceSize: string; area: string; avatarUrl: string | null };
 
 /** Apply to become a creator (mode "apply"), or edit the profile once approved (mode "edit"). */
-export function CreatorProfileForm({ mode, initial }: { mode: "apply" | "edit"; initial: CreatorProfileValues }) {
+export function CreatorProfileForm({ mode, initial, handleLockedUntil = null }: { mode: "apply" | "edit"; initial: CreatorProfileValues; handleLockedUntil?: string | null }) {
   const t = useT();
   const router = useRouter();
   const toast = useToast();
@@ -92,8 +92,8 @@ export function CreatorProfileForm({ mode, initial }: { mode: "apply" | "edit"; 
           {cropping && <AvatarCropper file={cropping} busy={uploading} onCancel={() => setCropping(null)} onDone={(photo) => void pickAvatar(photo)} />}
         </Sheet>
       </div>
-      {mode === "apply" ? (
-        <Field label="Username" error={errors.handle} htmlFor="handle">
+      {mode === "apply" || !handleLockedUntil ? (
+        <Field label="Username" error={errors.handle} htmlFor="handle" hint={mode === "edit" ? "You can change it once every 3 months. Your old username keeps leading to your profile for 3 months." : undefined}>
           <span className="relative block">
             <AtSign className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
             <input id="handle" value={v.handle} onChange={(e) => setV((x) => ({ ...x, handle: e.target.value.replace(/\s+/g, "").toLowerCase() }))} required autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="rana.eats" className="input ps-9" dir="ltr" maxLength={25} />
@@ -101,9 +101,10 @@ export function CreatorProfileForm({ mode, initial }: { mode: "apply" | "edit"; 
           <HandleStatus handle={v.handle} />
         </Field>
       ) : (
-        <div className="text-sm">
+        <div className="text-sm" data-testid="handle-locked">
           <span className="text-ink-muted">{t("Username")}: </span>
           <b dir="ltr">@{v.handle}</b>
+          <p className="mt-1 text-xs text-ink-muted">{t("You can change your username again on {date}.", { date: handleLockedUntil })}</p>
         </div>
       )}
       <Field label="Name shown on your profile" error={errors.displayName} htmlFor="displayName">
@@ -139,14 +140,14 @@ export function CreatorProfileForm({ mode, initial }: { mode: "apply" | "edit"; 
 /** As they type: the profile address, and whether the username is free (checked after a short pause). */
 function HandleStatus({ handle }: { handle: string }) {
   const t = useT();
-  const [state, setState] = useState<{ for: string; available: boolean; error?: string } | null>(null);
+  const [state, setState] = useState<{ for: string; available: boolean; current?: boolean; error?: string } | null>(null);
   const clean = handle.trim().replace(/^@/, "");
   useEffect(() => {
     if (clean.length < 3) return setState(null);
     let live = true;
     const timer = setTimeout(async () => {
       const r = await checkHandleAction(clean).catch(() => null);
-      if (live && r) setState({ for: clean, available: r.available, error: r.error });
+      if (live && r) setState({ for: clean, available: r.available, current: r.current, error: r.error });
     }, 350);
     return () => {
       live = false;
@@ -161,7 +162,7 @@ function HandleStatus({ handle }: { handle: string }) {
       </span>
       {current &&
         (current.available ? (
-          <span className="ms-2 font-semibold text-emerald-700">✓ {t("Available")}</span>
+          <span className="ms-2 font-semibold text-emerald-700">✓ {t(current.current ? "Your current username" : "Available")}</span>
         ) : (
           <span className="ms-2 font-semibold text-red-600">{t(current.error ?? "This username is taken")}</span>
         ))}

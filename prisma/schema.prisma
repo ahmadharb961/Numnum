@@ -1231,6 +1231,8 @@ model Creator {
   /// Normalized for search (same spelling rules as dishes and restaurants, see search-match.ts).
   searchName              String                   @default("")
   searchText              String                   @default("")
+  handleChangedAt         DateTime? // the creator last changed their username (once every 3 months)
+  oldHandles              CreatorHandleAlias[]
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1241,6 +1243,18 @@ model Creator {
   @@index([status, createdAt])
   @@index([verification])
   @@map("creators")
+}
+
+/// A creator's previous username: its profile links redirect to the new one, and nobody else can
+/// take it, for 3 months after the change.
+model CreatorHandleAlias {
+  handle    String   @id
+  creatorId String
+  createdAt DateTime @default(now())
+  creator   Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@map("creator_handle_aliases")
 }
 
 model CreatorFollow {

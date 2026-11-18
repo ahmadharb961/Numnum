@@ -1,8 +1,8 @@
 import type { Viewport } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/server/db";
 import { attachDeals, publicReelWhere, reelCardSelect, toPublicReel } from "@/server/feed";
-import { creatorGridOrder } from "@/server/creators";
+import { handleRedirect, creatorGridOrder } from "@/server/creators";
 import { likedAndSaved } from "@/server/engagement";
 import { followedRestaurantIds } from "@/server/follows";
 import { getCurrentUser } from "@/server/auth";
@@ -19,7 +19,11 @@ export default async function CreatorReelsViewer({ params }: { params: Promise<{
   const { handle, reelId } = await params;
   const reels = await prisma.reel.findMany({ where: { ...publicReelWhere, creator: { handle: handle.toLowerCase(), status: "APPROVED" } }, select: reelCardSelect, orderBy: creatorGridOrder });
   const idx = reels.findIndex((r) => r.id === reelId);
-  if (idx === -1) notFound();
+  if (idx === -1) {
+    const moved = await handleRedirect(handle);
+    if (moved) permanentRedirect(`/c/${moved}/reels/${reelId}`);
+    notFound();
+  }
   const settings = await getSettings();
   const me = await getCurrentUser();
   // Restaurants this viewer blocked are left out.

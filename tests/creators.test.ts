@@ -14,6 +14,10 @@ import { publicReelWhere } from "@/server/feed";
 import { followingFeed } from "@/server/follows";
 import {
   applyAsCreator,
+  changeCreatorHandle,
+  checkHandle,
+  handleRedirect,
+  nextHandleChange,
   celebrateFirstCreatorOrders,
   followerName,
   createCreatorReel,
@@ -339,6 +343,51 @@ describe("the creator journey: followers, reminders, first order", () => {
     await prisma.reel.update({ where: { id: reel.id }, data: { orderInits: 2 } });
     await celebrateFirstCreatorOrders([reel.id]);
     expect(await prisma.notification.count({ where: { userId: user.id, type: "creator_first_order" } })).toBe(1);
+  });
+});
+
+describe("changing the username", () => {
+  beforeEach(resetDb);
+
+  it("once every 3 months; the old one redirects and stays theirs; an admin can change it any time", async () => {
+    const { user, creator } = await approvedCreator("rana.eats");
+    const other = await makeCustomer();
+    // The live check: their own username is "current", another free one is available.
+    expect(await checkHandle(user.id, "rana.eats")).toMatchObject({ available: true, current: true });
+    expect(await checkHandle(user.id, "rana.bites")).toMatchObject({ available: true });
+
+    const changed = await changeCreatorHandle(creator.id, "@Rana.Bites");
+    expect(changed.handle).toBe("rana.bites");
+    expect(changed.handleChangedAt).not.toBeNull();
+    expect(changed.searchName).toContain("rana");
+    // The old username: redirects, and nobody else can take it.
+    expect(await handleRedirect("rana.eats")).toBe("rana.bites");
+    expect(await checkHandle(other.id, "rana.eats")).toMatchObject({ available: false, error: "This username is taken" });
+    await expect(applyAsCreator(other.id, { handle: "rana.eats", displayName: "Someone Else" })).rejects.toThrow(/taken/);
+    // Not again within 3 months (a profile save with a new username too).
+    await expect(changeCreatorHandle(creator.id, "rana.third")).rejects.toThrow(/again on/);
+    await expect(updateCreatorProfile(user.id, { handle: "rana.third", displayName: "Rana" })).rejects.toThrow(/again on/);
+    expect(nextHandleChange(changed)!.getTime()).toBeGreaterThan(Date.now() + 89 * 86400_000);
+    // A profile save keeping the same username is fine.
+    await updateCreatorProfile(user.id, { handle: "rana.bites", displayName: "Rana B" });
+
+    // An admin: any time, without using up the creator's change.
+    const admin = await makeCustomer();
+    const byAdmin = await changeCreatorHandle(creator.id, "rana.official.lb", { byAdminId: admin.id });
+    expect(byAdmin.handle).toBe("rana.official.lb");
+    expect(byAdmin.handleChangedAt!.getTime()).toBe(changed.handleChangedAt!.getTime());
+    expect(await handleRedirect("rana.bites")).toBe("rana.official.lb");
+    expect(await handleRedirect("rana.eats")).toBe("rana.official.lb"); // every old one points to the current
+    expect(await prisma.auditLog.count({ where: { entityId: creator.id, action: { in: ["creator.handle_change", "creator.handle_admin_change"] } } })).toBe(2);
+
+    // After 3 months: the creator can change again, and old usernames are free for others.
+    await prisma.creator.update({ where: { id: creator.id }, data: { handleChangedAt: new Date(Date.now() - 91 * 86400_000) } });
+    await prisma.creatorHandleAlias.updateMany({ data: { createdAt: new Date(Date.now() - 91 * 86400_000) } });
+    expect(await handleRedirect("rana.eats")).toBeNull();
+    expect(await checkHandle(other.id, "rana.eats")).toMatchObject({ available: true });
+    // They can take back one of their own old usernames.
+    expect((await changeCreatorHandle(creator.id, "rana.bites")).handle).toBe("rana.bites");
+    expect(await prisma.creatorHandleAlias.findUnique({ where: { handle: "rana.bites" } })).toBeNull();
   });
 });
 
