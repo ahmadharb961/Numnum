@@ -333,8 +333,28 @@ export async function pinReel(userId: string, reelId: string, pin: boolean) {
 }
 
 /** Tags the restaurant didn't answer within TAG_DAYS expire (the creator can tag again). Never throws. */
+const REMIND_AFTER_DAYS = 3;
+
+/**
+ * Hourly (cron): a restaurant that hasn't answered a creator's tag after 3 days is reminded once;
+ * after TAG_DAYS the tag expires and the creator is told. Never throws.
+ */
 export async function expireCreatorTags(now = new Date()) {
   try {
+    const due = await prisma.reel.findMany({
+      where: { tagStatus: "PENDING", tagRemindedAt: null, tagRequestedAt: { lt: new Date(now.getTime() - REMIND_AFTER_DAYS * 86400_000), gte: new Date(now.getTime() - TAG_DAYS * 86400_000) } },
+      select: { id: true, restaurantId: true, tagRequestedAt: true, creator: { select: { handle: true } }, menuItem: { select: { name: true } } },
+      take: 500,
+    });
+    for (const r of due) {
+      const { count } = await prisma.reel.updateMany({ where: { id: r.id, tagRemindedAt: null }, data: { tagRemindedAt: now } });
+      if (!count || !r.creator) continue;
+      const left = Math.max(1, Math.ceil((r.tagRequestedAt!.getTime() + TAG_DAYS * 86400_000 - now.getTime()) / 86400_000));
+      const title = { k: "@{handle} is waiting for your answer", v: { handle: r.creator.handle } };
+      const body = { k: "Approve or decline their reel of {dish}: {n} days left before it expires.", v: { dish: r.menuItem.name, n: left } };
+      await notifyRestaurant(r.restaurantId, { type: "creator_tag_reminder", title, body, link: "/dashboard/creator-reels" });
+      void pushToRestaurantStaff(r.restaurantId, (t) => ({ title: t(title.k, title.v), body: t(body.k, body.v), url: "/dashboard/creator-reels", tag: `creator-tag-${r.id}` })).catch(() => 0);
+    }
     const old = await prisma.reel.findMany({ where: { tagStatus: "PENDING", tagRequestedAt: { lt: new Date(now.getTime() - TAG_DAYS * 86400_000) } }, select: { id: true, creator: { select: { userId: true } }, restaurant: { select: { displayName: true } } }, take: 500 });
     for (const r of old) {
       const { count } = await prisma.reel.updateMany({ where: { id: r.id, tagStatus: "PENDING" }, data: { tagStatus: "EXPIRED", tagDecidedAt: now } });
@@ -350,12 +370,14 @@ export async function expireCreatorTags(now = new Date()) {
 // ───── Following creators ─────
 
 export async function setCreatorFollow(userId: string, creatorId: string, follow: boolean): Promise<{ following: boolean; followerCount: number }> {
-  return prisma.$transaction(async (tx) => {
+  let isNew = false;
+  const result = await prisma.$transaction(async (tx) => {
     const c = await tx.creator.findFirst({ where: { id: creatorId, status: "APPROVED" }, select: { id: true, userId: true } });
     if (!c) throw new CreatorError("Creator not found");
     if (c.userId === userId) throw new CreatorError("You can't follow yourself");
     const existing = await tx.creatorFollow.findUnique({ where: { userId_creatorId: { userId, creatorId } } });
     if (follow && !existing) {
+      isNew = true;
       await tx.creatorFollow.create({ data: { userId, creatorId } });
       await tx.creator.update({ where: { id: creatorId }, data: { followerCount: { increment: 1 } } });
     } else if (!follow && existing) {
@@ -365,6 +387,39 @@ export async function setCreatorFollow(userId: string, creatorId: string, follow
     const { followerCount } = await tx.creator.findUniqueOrThrow({ where: { id: creatorId }, select: { followerCount: true } });
     return { following: follow, followerCount };
   });
+  if (isNew) await notifyNewFollower(creatorId, userId);
+  return result;
+}
+
+/** "Rana Haddad" → "Rana H." (how a follower is shown to the creator). */
+export function followerName(name: string) {
+  const [first, ...rest] = name.trim().split(/\s+/);
+  const last = rest.length ? rest[rest.length - 1] : "";
+  return last ? `${first} ${last[0].toUpperCase()}.` : first;
+}
+
+const REFOLLOW_QUIET_MS = 7 * 86400_000; // unfollow + follow again: no second notification for a week
+const FOLLOW_PUSH_GAP_MS = 2 * 60_000; // a burst of follows: one push, the rest wait in the inbox
+
+/**
+ * The creator hears about a new follower at once: in Notifications, and on the phone. Never throws.
+ */
+export async function notifyNewFollower(creatorId: string, followerId: string) {
+  try {
+    const c = await prisma.creator.findUnique({ where: { id: creatorId }, select: { userId: true, user: { select: { locale: true } } } });
+    const f = await prisma.user.findUnique({ where: { id: followerId }, select: { name: true } });
+    if (!c || !f) return;
+    const link = `/creator/followers?f=${followerId}`; // also how a repeat is recognised
+    const recent = await prisma.notification.findFirst({ where: { audience: "USER", userId: c.userId, type: "creator_new_follower", link, createdAt: { gt: new Date(Date.now() - REFOLLOW_QUIET_MS) } }, select: { id: true } });
+    if (recent) return;
+    const lastPush = await prisma.notification.findFirst({ where: { audience: "USER", userId: c.userId, type: "creator_new_follower", createdAt: { gt: new Date(Date.now() - FOLLOW_PUSH_GAP_MS) } }, select: { id: true } });
+    // The name is isolated so "Rana H." keeps its full stop in place inside Arabic text.
+    const title = { k: "{name} started following you", v: { name: `\u2068${followerName(f.name)}\u2069` } };
+    await notifyUser(c.userId, { type: "creator_new_follower", title, link });
+    if (!lastPush) void pushInLanguages([{ id: c.userId, locale: c.user.locale }], (t) => ({ title: t(title.k, title.v), body: t("Tap to see your followers."), url: "/creator/followers", tag: `followers-${creatorId}` })).catch(() => 0);
+  } catch (e) {
+    console.error("notifyNewFollower", e);
+  }
 }
 
 /** Followers hear about a creator's new live reel: at most one notification per NOTIFY_GAP, in batches. Never throws. */
@@ -451,4 +506,25 @@ export async function dishesToTag(userId: string, q: string) {
     take: 30,
   });
   return items.map((i) => ({ id: i.id, name: i.name, priceCents: i.priceCents, currency: i.currency, restaurant: i.restaurant.displayName, area: i.restaurant.area, logoUrl: i.restaurant.logoUrl, imageUrl: i.images[0]?.asset.thumbUrl ?? i.images[0]?.asset.url ?? null, own: i.restaurant.staff.length > 0 }));
+}
+
+/**
+ * A creator's reel just brought its first order: tell the creator (once per reel). Called after an
+ * order is placed from reels; never throws.
+ */
+export async function celebrateFirstCreatorOrders(reelIds: string[]) {
+  try {
+    const firsts = await prisma.reel.findMany({ where: { id: { in: reelIds }, creatorId: { not: null }, orderInits: 1 }, select: { id: true, menuItem: { select: { name: true } }, restaurant: { select: { displayName: true } }, creator: { select: { userId: true, user: { select: { locale: true } } } } } });
+    for (const r of firsts) {
+      if (!r.creator) continue;
+      const link = `/creator/insights?reel=${r.id}`;
+      if (await prisma.notification.findFirst({ where: { audience: "USER", userId: r.creator.userId, type: "creator_first_order", link }, select: { id: true } })) continue;
+      const title = { k: "Your reel of {dish} got its first order 🎉", v: { dish: r.menuItem.name } };
+      const body = { k: "Someone ordered from {restaurant} after watching it. Keep them coming!", v: { restaurant: r.restaurant.displayName } };
+      await notifyUser(r.creator.userId, { type: "creator_first_order", title, body, link });
+      void pushInLanguages([{ id: r.creator.userId, locale: r.creator.user.locale }], (t) => ({ title: t(title.k, title.v), body: t(body.k, body.v), url: link, tag: `first-order-${r.id}` })).catch(() => 0);
+    }
+  } catch (e) {
+    console.error("celebrateFirstCreatorOrders", e);
+  }
 }

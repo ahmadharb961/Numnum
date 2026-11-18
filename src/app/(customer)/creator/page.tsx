@@ -5,8 +5,10 @@ import { BadgeCheck, BarChart3, ChevronRight, ExternalLink, Pencil, Plus, Store,
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { syncStreamReels } from "@/server/stream";
-import { PIN_MAX } from "@/server/creators";
+import { PIN_MAX, TAG_DAYS } from "@/server/creators";
 import { PageHeader } from "@/components/customer/page-header";
+import { NotificationsBell } from "@/components/notifications-bell";
+import { unreadUserCount } from "@/server/user-notifications";
 import { StudioReels, VerificationRequest, type StudioReel } from "@/components/creator/studio-reels";
 import { Alert } from "@/components/ui/misc";
 import { buttonClass } from "@/components/ui/button";
@@ -25,10 +27,11 @@ export default async function CreatorStudioPage() {
   if (!c || c.status === "PENDING" || c.status === "DECLINED") redirect("/creator/apply");
   // Videos still processing on Cloudflare move on (no webhook needed).
   await syncStreamReels({ creatorId: c.id }).catch(() => 0);
+  const unread = await unreadUserCount(me.id);
   const rows = await prisma.reel.findMany({
     where: { creatorId: c.id },
     orderBy: [{ pinnedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
-    select: { id: true, posterUrl: true, status: true, tagStatus: true, tagNote: true, visibility: true, pinnedAt: true, viewCount: true, likeCount: true, orderInits: true, paidPartnership: true, menuItem: { select: { name: true } }, restaurant: { select: { displayName: true } } },
+    select: { id: true, posterUrl: true, status: true, tagStatus: true, tagNote: true, tagRequestedAt: true, visibility: true, pinnedAt: true, viewCount: true, likeCount: true, orderInits: true, paidPartnership: true, menuItem: { select: { name: true } }, restaurant: { select: { displayName: true } } },
   });
   const reels: StudioReel[] = rows.map((r) => ({
     id: r.id,
@@ -45,12 +48,13 @@ export default async function CreatorStudioPage() {
     likes: r.likeCount,
     orders: r.orderInits,
     paidPartnership: r.paidPartnership,
+    daysLeft: r.tagStatus === "PENDING" && r.tagRequestedAt ? Math.max(1, Math.ceil((r.tagRequestedAt.getTime() + TAG_DAYS * 86400_000 - Date.now()) / 86400_000)) : null,
   }));
   const live = reels.filter((r) => r.live);
   const totals = { views: live.reduce((s, r) => s + r.views, 0), orders: live.reduce((s, r) => s + r.orders, 0) };
   return (
     <div className="pb-nav">
-      <PageHeader title="Creator studio" />
+      <PageHeader title="Creator studio" right={<NotificationsBell unread={unread} label={t("Notifications")} className="hover:bg-black/5" />} />
       <div className="container-app max-w-2xl space-y-5 py-5">
         {c.status === "SUSPENDED" && (
           <Alert tone="red">
@@ -78,8 +82,11 @@ export default async function CreatorStudioPage() {
             </div>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <Link prefetch href="/creator/followers" className="rounded-2xl bg-cream py-3 transition active:scale-95" data-testid="studio-followers">
+              <div className="text-2xl font-black tabular">{compactNumber(c.followerCount)}</div>
+              <div className="text-xs font-semibold text-brand-600">{t("followers")} ›</div>
+            </Link>
             {[
-              [compactNumber(c.followerCount), t("followers")],
               [compactNumber(totals.views), t("views")],
               [compactNumber(totals.orders), t("orders")],
             ].map(([n, l]) => (

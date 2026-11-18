@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "@/components/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, UserPlus } from "lucide-react";
@@ -42,9 +43,15 @@ export function FollowCreatorButton({ creatorId, handle, initialFollowing, initi
           {t(following ? "Following" : "Follow")}
         </button>
       )}
-      <span className="text-sm text-ink-muted" data-testid="creator-followers">
-        {t(count === 1 ? "{n} follower" : "{n} followers", { n: compactNumber(count) })}
-      </span>
+      {self ? (
+        <Link href="/creator/followers" className="text-sm font-semibold text-brand-600" data-testid="creator-followers">
+          {t(count === 1 ? "{n} follower" : "{n} followers", { n: compactNumber(count) })} ›
+        </Link>
+      ) : (
+        <span className="text-sm text-ink-muted" data-testid="creator-followers">
+          {t(count === 1 ? "{n} follower" : "{n} followers", { n: compactNumber(count) })}
+        </span>
+      )}
     </div>
   );
 }

@@ -14,6 +14,8 @@ import { formatPhone } from "@/lib/phone";
 import { formatMoney } from "@/lib/money";
 import { STATUS_META, ACTIVE_STATUSES } from "@/lib/order-status";
 import { KeepLoaded } from "@/components/link-warmer";
+import { NotificationsBell } from "@/components/notifications-bell";
+import { unreadUserCount } from "@/server/user-notifications";
 import { getT } from "@/i18n/server";
 import { LanguageSwitcher } from "@/components/language-switcher";
 
@@ -28,13 +30,15 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AccountPage() {
   const t = await getT();
   const user = await requireUser("/account");
-  const [active, orderCount, addressCount, staffCount, followingCount, creator] = await Promise.all([
+  const [active, orderCount, addressCount, staffCount, followingCount, creator, unread, followingCreators] = await Promise.all([
     prisma.order.findMany({ where: { userId: user.id, status: { in: ACTIVE_STATUSES } }, orderBy: { createdAt: "desc" }, take: 3 }),
     prisma.order.count({ where: { userId: user.id } }),
     prisma.customerAddress.count({ where: { userId: user.id } }),
     prisma.restaurantStaff.count({ where: { userId: user.id } }),
     prisma.restaurantFollow.count({ where: { userId: user.id, restaurant: { status: "ACTIVE", blockedBy: { none: { userId: user.id } } } } }),
     prisma.creator.findUnique({ where: { userId: user.id }, select: { status: true } }),
+    unreadUserCount(user.id),
+    prisma.creatorFollow.count({ where: { userId: user.id, creator: { status: "APPROVED" } } }),
   ]);
   type Tile = { href: string; icon: LucideIcon; label: string; sub: string; tone: string };
   // Food creators: apply, wait for review, then the studio.
@@ -50,7 +54,7 @@ export default async function AccountPage() {
     creatorTile,
     { href: "/account/orders", icon: ShoppingBag, label: "My orders", sub: t(orderCount === 1 ? "{n} order" : "{n} orders", { n: orderCount }), tone: TONES.amber },
     { href: "/account/addresses", icon: MapPin, label: "Saved addresses", sub: t("{n} saved", { n: addressCount }), tone: TONES.red },
-    { href: "/account/following", icon: Heart, label: "Following", sub: t(followingCount === 1 ? "{n} restaurant" : "{n} restaurants", { n: followingCount }), tone: TONES.pink },
+    { href: "/account/following", icon: Heart, label: "Following", sub: [t(followingCount === 1 ? "{n} restaurant" : "{n} restaurants", { n: followingCount }), followingCreators ? t(followingCreators === 1 ? "{n} creator" : "{n} creators", { n: followingCreators }) : null].filter(Boolean).join(" · "), tone: TONES.pink },
     { href: "/saved", icon: Bookmark, label: "Saved dishes & restaurants", sub: "Reels, dishes, restaurants", tone: TONES.violet },
     { href: "/account/blocked", icon: EyeOff, label: "Blocked", sub: "Restaurants and people you hid", tone: TONES.blue },
     { href: "/account/password", icon: KeyRound, label: "Change password", sub: "Keep your account secure", tone: TONES.green },
@@ -62,10 +66,11 @@ export default async function AccountPage() {
   return (
     <main className="pb-nav">
       <header className="relative overflow-hidden bg-gradient-to-br from-brand-600 via-brand-500 to-brand-400 text-white" style={{ paddingTop: "var(--safe-top)" }} data-testid="account-hero">
-        <div className="container-app pb-16 pt-8">
+        <div className="container-app flex items-start justify-between gap-3 pb-16 pt-8">
           <h1 className="text-[1.9rem] font-black leading-tight tracking-tight">
             {t("Hi, {name}", { name: greetingName(user.name) })} <span aria-hidden>👋</span>
           </h1>
+          <NotificationsBell unread={unread} label={t("Notifications")} className="relative z-10 -me-1 mt-0.5 shrink-0 bg-white/20 text-white backdrop-blur" />
         </div>
         {/* The wave the page flows out of */}
         <svg className="absolute inset-x-0 -bottom-px h-12 w-full text-cream" viewBox="0 0 400 48" preserveAspectRatio="none" aria-hidden>
@@ -98,7 +103,7 @@ export default async function AccountPage() {
         </section>
         <nav className="grid grid-cols-6 gap-2.5" data-testid="account-tiles">
           {/* A short menu: every screen in it is ready at once, even the ones further down. */}
-          <KeepLoaded hrefs={tiles.map((l) => l.href)} />
+          <KeepLoaded hrefs={[...tiles.map((l) => l.href), "/account/notifications"]} />
           {tiles.map((l, i) => (
             <Link prefetch key={l.href} href={l.href} className={cn("card flex min-w-0 flex-col items-center rounded-3xl px-2 pb-4 pt-5 text-center transition active:scale-[0.97]", span(i))}>
               <span className={cn("grid h-16 w-16 place-items-center rounded-2xl", l.tone)}>

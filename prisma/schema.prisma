@@ -521,6 +521,7 @@ model Reel {
   tagStatus       CreatorTagStatus?
   tagRequestedAt  DateTime?
   tagDecidedAt    DateTime?
+  tagRemindedAt   DateTime? // the restaurant was reminded about an unanswered tag
   tagNote         String?
   /// Paid by, or food gifted by, the restaurant: shown as "Paid partnership".
   paidPartnership Boolean           @default(false)

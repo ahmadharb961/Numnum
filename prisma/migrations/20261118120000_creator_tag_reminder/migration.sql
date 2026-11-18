@@ -1,0 +1,1 @@
+ALTER TABLE "reels" ADD COLUMN "tagRemindedAt" TIMESTAMP(3);

@@ -2,7 +2,7 @@
 
 import Link from "@/components/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Bookmark, Compass, Home, ShoppingBag, Store, User } from "lucide-react";
+import { Bell, Bookmark, Compass, Home, ShoppingBag, Store, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "./cart";
 import { LocationChip } from "./location-picker";
@@ -19,7 +19,8 @@ const NAV = [
   { href: "/restaurants", label: "Restaurants", icon: Store, match: (p: string) => p.startsWith("/restaurants") || p.startsWith("/r/") },
   { href: "/saved", label: "Saved", icon: Bookmark, match: (p: string) => p.startsWith("/saved") },
   { href: "/cart", label: "Cart", icon: ShoppingBag, match: (p: string) => p.startsWith("/cart") || p.startsWith("/checkout") },
-  { href: "/account", label: "Account", icon: User, match: (p: string) => p.startsWith("/account") || p.startsWith("/order/") },
+  { href: "/account/notifications", label: "Notifications", icon: Bell, match: (p: string) => p.startsWith("/account/notifications") },
+  { href: "/account", label: "Account", icon: User, match: (p: string) => p.startsWith("/account") && !p.startsWith("/account/notifications") || p.startsWith("/order/") },
 ];
 
 const FILTERS: [label: string, param: string][] = [
