@@ -16,7 +16,7 @@
     "billing:run": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/run-billing.ts",
     "postinstall": "prisma generate",
     "worker": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/worker.ts",
-    "test:e2e": "node e2e/customer-strict.js && node e2e/admin-verify.js && node e2e/broadcast.js && node e2e/restaurant-signup.js && node e2e/order-dispute.js && node e2e/store-requirements.js && node e2e/native-push.js && node e2e/store-links.js && node e2e/launch-check.js && node e2e/features.js && node e2e/business.js && node e2e/deals-follow-share.js && node e2e/follow-sync.js && node e2e/speed.js && node e2e/explore-width.js && node e2e/account-layout.js && node e2e/reel-cover.js && node e2e/creator-own-restaurant.js && node e2e/creator-restaurants.js && node e2e/avatar-pull.js && node e2e/creator-journey.js",
+    "test:e2e": "node e2e/customer-strict.js && node e2e/admin-verify.js && node e2e/broadcast.js && node e2e/restaurant-signup.js && node e2e/order-dispute.js && node e2e/store-requirements.js && node e2e/native-push.js && node e2e/store-links.js && node e2e/launch-check.js && node e2e/features.js && node e2e/business.js && node e2e/deals-follow-share.js && node e2e/follow-sync.js && node e2e/speed.js && node e2e/explore-width.js && node e2e/account-layout.js && node e2e/reel-cover.js && node e2e/creator-own-restaurant.js && node e2e/creator-restaurants.js && node e2e/avatar-pull.js && node e2e/creator-journey.js && node e2e/admin-customers.js",
     "build:local": "prisma generate && next build",
     "db:setup": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs prisma/seed.ts",
     "demo:media": "tsx --tsconfig tsconfig.json --require ./scripts/cli-shim.cjs scripts/demo-media.ts"
