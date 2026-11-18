@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { RestaurantStatus, VerificationStatus } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { requireAdmin } from "@/server/auth";
@@ -494,11 +495,13 @@ export async function deleteAccountAdminAction(id: string): Promise<AccountResul
   const { user } = await admin();
   try {
     await adminDeleteAccount(user.id, id);
-    revalidatePath("/admin/customers");
-    return { ok: true, message: "Account deleted" };
   } catch (e) {
     return accountFail(e);
   }
+  revalidatePath("/admin/customers");
+  // Back to the list, done by the server together with the action (a client-side push after it can
+  // be dropped while the deleted person's page refreshes).
+  redirect("/admin/customers");
 }
 
 export async function sendPasswordResetAdminAction(id: string): Promise<AccountResult> {
