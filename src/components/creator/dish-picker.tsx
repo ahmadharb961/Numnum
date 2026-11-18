@@ -6,19 +6,24 @@ import { searchDishesAction } from "@/actions/creators";
 import { formatMoney } from "@/lib/money";
 import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
+import Link from "@/components/link";
 
 export type PickedDish = { id: string; name: string; priceCents: number; currency: string; restaurant: string; area: string | null; logoUrl: string | null; imageUrl: string | null; own?: boolean };
 
 /** Search a dish by its name or the restaurant's, then pick the exact dish shown in the reel. */
-export function DishPicker({ value, onChange, error }: { value: PickedDish | null; onChange: (d: PickedDish | null) => void; error?: string }) {
+export function DishPicker({ value, onChange, error, initialQuery = "", initialDishes }: { value: PickedDish | null; onChange: (d: PickedDish | null) => void; error?: string; initialQuery?: string; initialDishes?: PickedDish[] }) {
   const t = useT();
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<PickedDish[]>([]);
+  const [q, setQ] = useState(initialQuery);
+  // Opened from "Post a reel here": that restaurant's dishes came with the page, no search to wait for.
+  const [results, setResults] = useState<PickedDish[]>(initialDishes ?? []);
+  const preloaded = useRef(initialDishes ? initialQuery.trim() : null);
   const [loading, setLoading] = useState(false);
   const seq = useRef(0);
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) return setResults([]);
+    if (preloaded.current === term) return; // already have these
+    preloaded.current = null;
     const n = ++seq.current;
     setLoading(true);
     const timer = setTimeout(async () => {
@@ -53,6 +58,12 @@ export function DishPicker({ value, onChange, error }: { value: PickedDish | nul
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Search a dish or a restaurant")} className="input ps-9" data-testid="dish-search" />
       </span>
       {error && <p className="mt-1 text-xs font-medium text-red-600">{t(error)}</p>}
+      <p className="mt-1.5 text-xs text-ink-muted">
+        {t("Only restaurants on numnum can be tagged.")}{" "}
+        <Link href="/creator/restaurants" className="font-semibold text-brand-600" data-testid="see-restaurants">
+          {t("See them")}
+        </Link>
+      </p>
       {q.trim().length >= 2 && (
         <ul className="mt-2 max-h-72 divide-y divide-black/5 overflow-y-auto rounded-2xl border border-black/5 bg-white">
           {results.map((d) => (

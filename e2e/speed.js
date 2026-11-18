@@ -110,6 +110,11 @@ const shown = () => !document.querySelector('div[hidden][id^="S:"]') && !documen
       await tap(p, p.locator(`a[href="${href}"]:visible`).first(), new RegExp(`^${href.replace(".", "\\.")}`), `Studio → ${name}`);
       await tap(p, back(p), /^\/creator$/, `${name} → back arrow`);
     }
+    await on(p, "/creator");
+    await tap(p, p.getByTestId("shoot-restaurants-link"), /^\/creator\/restaurants$/, "Studio → Restaurants to shoot");
+    await tap(p, p.locator("[data-testid=shoot-menu]:visible").first(), /^\/r\//, "Restaurants to shoot → See the menu");
+    await tap(p, back(p), /^\/creator\/restaurants$/, "Menu → back arrow to the list");
+    await tap(p, p.locator("[data-testid=shoot-post]:visible").first(), /^\/creator\/new\?q=/, "Restaurants to shoot → Post a reel here", () => p.getByTestId("dish-result").first().waitFor({ timeout: 5000 }));
     await on(p, "/account");
     await tap(p, p.locator('a[href="/creator"]:visible').first(), /^\/creator$/, "Account → Creator studio");
     await p.context().close();

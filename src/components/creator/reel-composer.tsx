@@ -16,7 +16,7 @@ import { useT } from "@/i18n/client";
  * Posts a creator reel. The video goes through the very same upload as restaurants' reels
  * (resumable, straight to Cloudflare Stream where it's set up), so it plays just as fast.
  */
-export function ReelComposer({ stream, dailyLeft }: { stream: boolean; dailyLeft: number }) {
+export function ReelComposer({ stream, dailyLeft, initialQuery = "", initialDishes }: { stream: boolean; dailyLeft: number; initialQuery?: string; initialDishes?: PickedDish[] }) {
   const t = useT();
   const router = useRouter();
   const toast = useToast();
@@ -93,6 +93,7 @@ export function ReelComposer({ stream, dailyLeft }: { stream: boolean; dailyLeft
       {error && <Alert tone="red">{error}</Alert>}
       <div className="card p-4">
         <div className="mb-2 text-sm font-bold">{t("1. Your video")}</div>
+        <ReelTips />
         {preview ? (
           <div className="flex items-center gap-4">
             <video src={preview} className="h-40 w-[90px] shrink-0 rounded-xl bg-black object-cover" muted playsInline autoPlay loop />
@@ -130,7 +131,7 @@ export function ReelComposer({ stream, dailyLeft }: { stream: boolean; dailyLeft
       </div>
       <div className="card p-4">
         <div className="mb-2 text-sm font-bold">{t("2. Tag the dish")}</div>
-        <DishPicker value={dish} onChange={setDish} error={fieldErr.menuItemId} />
+        <DishPicker value={dish} onChange={setDish} error={fieldErr.menuItemId} initialQuery={initialQuery} initialDishes={initialDishes} />
         <p className="mt-2 text-xs text-ink-muted">{t("The restaurant is asked to approve the tag. Your reel goes live once they accept.")}</p>
       </div>
       <div className="card space-y-4 p-4">
@@ -153,5 +154,29 @@ export function ReelComposer({ stream, dailyLeft }: { stream: boolean; dailyLeft
       </Button>
       <p className="text-center text-xs text-ink-muted">{t("{n} more reels today", { n: dailyLeft })}</p>
     </div>
+  );
+}
+
+/** What makes a food reel sell, in four lines (collapsed after the first look). */
+function ReelTips() {
+  const t = useT();
+  const tips = [
+    ["⚡", "Show the dish in the first 2 seconds: people decide fast."],
+    ["📱", "Film vertical, close to the food, in daylight or by a window."],
+    ["🤤", "Catch the best moment: the cheese pull, the sauce, the first bite."],
+    ["🗣️", "Say the dish and the restaurant's name, and keep it 15 to 60 seconds."],
+  ];
+  return (
+    <details className="group mb-3 rounded-2xl bg-cream px-3 py-2" data-testid="reel-tips">
+      <summary className="cursor-pointer list-none text-sm font-bold text-brand-600 [&::-webkit-details-marker]:hidden">💡 {t("Tips for a reel that sells")}</summary>
+      <ul className="mt-2 space-y-1.5 pb-1">
+        {tips.map(([icon, text]) => (
+          <li key={text} className="flex gap-2 text-sm text-ink-soft">
+            <span aria-hidden>{icon}</span>
+            <span>{t(text)}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

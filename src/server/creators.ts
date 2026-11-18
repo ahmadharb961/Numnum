@@ -403,3 +403,52 @@ export async function notifyCreatorFollowers(creatorId: string, reelId: string) 
 
 /** Reels on a creator's public profile: pinned first (newest pin first), then newest. */
 export const creatorGridOrder: Prisma.ReelOrderByWithRelationInput[] = [{ pinnedAt: { sort: "desc", nulls: "last" } }, { publishedAt: "desc" }, { id: "desc" }];
+
+/**
+ * Restaurants a creator can film and tag: active, with a menu, not blocking them, and not one they
+ * work at. Busiest first (the page puts the nearest first when it knows where the creator is).
+ */
+export async function restaurantsForCreator(userId: string) {
+  const c = await prisma.creator.findUnique({ where: { userId }, select: { id: true } });
+  if (!c) return [];
+  const rows = await prisma.restaurant.findMany({
+    where: { status: "ACTIVE", menuItems: { some: { archived: false } }, creatorBlocks: { none: { creatorId: c.id } }, staff: { none: { userId } } },
+    select: {
+      id: true,
+      slug: true,
+      displayName: true,
+      logoUrl: true,
+      cuisine: true,
+      area: true,
+      city: true,
+      latitude: true,
+      longitude: true,
+      verificationStatus: true,
+      _count: { select: { menuItems: { where: { archived: false } }, reels: { where: { creatorId: { not: null }, tagStatus: "ACCEPTED" } } } },
+    },
+    orderBy: [{ totalReelViews: "desc" }, { displayName: "asc" }],
+    take: 500,
+  });
+  return rows.map(({ _count, ...r }) => ({ ...r, dishes: _count.menuItems, creatorReels: _count.reels }));
+}
+
+/**
+ * Dishes a creator can tag, by dish or restaurant name (restaurants that blocked them are left out;
+ * dishes of a restaurant they work at are marked `own`: shown, but can't be tagged).
+ */
+export async function dishesToTag(userId: string, q: string) {
+  const c = await prisma.creator.findUnique({ where: { userId }, select: { id: true } });
+  const term = String(q ?? "").trim().slice(0, 60);
+  if (!c || term.length < 2) return [];
+  const items = await prisma.menuItem.findMany({
+    where: {
+      archived: false,
+      restaurant: { status: "ACTIVE", creatorBlocks: { none: { creatorId: c.id } } },
+      OR: [{ name: { contains: term, mode: "insensitive" } }, { restaurant: { displayName: { contains: term, mode: "insensitive" } } }],
+    },
+    select: { id: true, name: true, priceCents: true, currency: true, restaurant: { select: { displayName: true, logoUrl: true, area: true, staff: { where: { userId }, select: { id: true }, take: 1 } } }, images: { where: { isMain: true }, take: 1, select: { asset: { select: { thumbUrl: true, url: true } } } } },
+    orderBy: [{ restaurant: { displayName: "asc" } }, { name: "asc" }],
+    take: 30,
+  });
+  return items.map((i) => ({ id: i.id, name: i.name, priceCents: i.priceCents, currency: i.currency, restaurant: i.restaurant.displayName, area: i.restaurant.area, logoUrl: i.restaurant.logoUrl, imageUrl: i.images[0]?.asset.thumbUrl ?? i.images[0]?.asset.url ?? null, own: i.restaurant.staff.length > 0 }));
+}
