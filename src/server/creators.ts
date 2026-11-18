@@ -202,6 +202,15 @@ export const reelInputSchema = z.object({
   posterAssetId: z.string().min(1).nullish(), // the cover they picked (a frame or a photo)
 });
 
+/**
+ * A creator can't tag a restaurant they own or work at: customers would take it for an independent
+ * recommendation. Their own food goes in the restaurant's own reels (dashboard).
+ */
+export const OWN_RESTAURANT = "You can't tag your own restaurant. Post it from your dashboard instead.";
+async function worksAt(userId: string, restaurantId: string) {
+  return !!(await prisma.restaurantStaff.findFirst({ where: { userId, restaurantId }, select: { id: true } }));
+}
+
 /** Posts a reel tagging a restaurant's dish; it waits for the restaurant before going public. */
 export async function createCreatorReel(userId: string, raw: unknown) {
   const input = reelInputSchema.parse(raw);
@@ -216,6 +225,7 @@ export async function createCreatorReel(userId: string, raw: unknown) {
   if (!item) throw new CreatorError("Choose the dish in your reel", "menuItemId");
   if (await prisma.reel.findFirst({ where: { videoAssetId: asset.id }, select: { id: true } })) throw new CreatorError("This video is already used by another reel");
   if (await prisma.restaurantCreatorBlock.findUnique({ where: { restaurantId_creatorId: { restaurantId: item.restaurantId, creatorId: c.id } } })) throw new CreatorError("This restaurant doesn't accept tags from you", "menuItemId");
+  if (await worksAt(userId, item.restaurantId)) throw new CreatorError(OWN_RESTAURANT, "menuItemId");
   // Their own image only. Kept when the video finishes processing (it replaces the automatic one).
   const poster = input.posterAssetId ? await prisma.mediaAsset.findFirst({ where: { id: input.posterAssetId, uploadedById: userId, restaurantId: null, kind: "IMAGE" }, select: { url: true } }) : null;
   const reel = await prisma.reel.create({
@@ -254,6 +264,8 @@ export async function decideTag(restaurantId: string, userId: string, reelId: st
   const r = await prisma.reel.findFirst({ where: { id: reelId, restaurantId, creatorId: { not: null }, tagStatus: "PENDING" }, include: { creator: { include: { user: { select: { locale: true } } } }, restaurant: { select: { displayName: true } }, menuItem: { select: { name: true } } } });
   if (!r || !r.creator) throw new CreatorError("This tag was already answered");
   if (accept && r.status !== "READY") throw new CreatorError("Wait for the video to finish processing");
+  // Someone who works here now (e.g. hired after tagging) can't be a "creator" for this restaurant.
+  if (accept && (await worksAt(r.creator.userId, restaurantId))) throw new CreatorError("This creator works at your restaurant, so their reel can't go live as a creator reel.");
   await prisma.reel.update({ where: { id: r.id }, data: { tagStatus: accept ? "ACCEPTED" : "DECLINED", tagDecidedAt: new Date(), tagNote: accept ? null : note?.trim().slice(0, 300) || null } });
   if (accept) await publishCreatorReel(r.id);
   await audit({ actorId: userId, action: accept ? "creator.tag_accept" : "creator.tag_decline", entityType: "reel", entityId: r.id, data: { note } });
@@ -293,6 +305,7 @@ export async function retagReel(userId: string, reelId: string, menuItemId: stri
   const item = await prisma.menuItem.findFirst({ where: { id: menuItemId, archived: false, restaurant: { status: "ACTIVE" } }, select: { id: true, restaurantId: true } });
   if (!item) throw new CreatorError("Choose the dish in your reel", "menuItemId");
   if (await prisma.restaurantCreatorBlock.findUnique({ where: { restaurantId_creatorId: { restaurantId: item.restaurantId, creatorId: c.id } } })) throw new CreatorError("This restaurant doesn't accept tags from you", "menuItemId");
+  if (await worksAt(userId, item.restaurantId)) throw new CreatorError(OWN_RESTAURANT, "menuItemId");
   await prisma.reel.update({ where: { id: r.id }, data: { restaurantId: item.restaurantId, menuItemId: item.id, paidPartnership, tagStatus: "PENDING", tagRequestedAt: null, tagDecidedAt: null, tagNote: null, visibility: "DRAFT", pinnedAt: null } });
   await creatorReelReady(r.id);
 }

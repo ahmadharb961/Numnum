@@ -215,4 +215,8 @@ export const AR6: Record<string, string> = {
   "Choose the moment": "اختر اللحظة",
   "Use this frame": "استخدم هذه اللقطة",
   "You'll pay with {paid} — change: {change}": "ستدفع {paid} — الباقي: {change}",
+  // A restaurant's own people can't tag it as creators
+  "You can't tag your own restaurant. Post it from your dashboard instead.": "لا يمكنك وضع وسم على مطعمك. انشر الفيديو من لوحة التحكم بدلاً من ذلك.",
+  "Your restaurant: post it from your dashboard": "مطعمك: انشره من لوحة التحكم",
+  "This creator works at your restaurant, so their reel can't go live as a creator reel.": "صانع المحتوى هذا يعمل في مطعمك، لذلك لا يمكن نشر الفيديو كفيديو صانع محتوى.",
 };
