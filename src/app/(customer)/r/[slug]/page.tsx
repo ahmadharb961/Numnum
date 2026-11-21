@@ -260,9 +260,10 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           )}
         </div>
         <div className="mt-3 flex items-start justify-between gap-3">
-          <h1 className="flex min-w-0 items-center gap-2 text-[28px] font-black leading-tight tracking-tight">
-            <span className="min-w-0 break-words">{r.displayName}</span>
-            {r.verificationStatus === "APPROVED" && <VerifiedBadge className="shrink-0 [&_svg]:h-6 [&_svg]:w-6" />}
+          {/* The tick follows the last word, even when a long name wraps onto two lines. */}
+          <h1 className="min-w-0 break-words text-[28px] font-black leading-tight tracking-tight">
+            {r.displayName}
+            {r.verificationStatus === "APPROVED" && <VerifiedBadge className="ms-1.5 inline-flex align-[-3px] [&_svg]:h-6 [&_svg]:w-6" />}
           </h1>
           <FollowButton restaurantId={r.id} initial={following} initialCount={r.followerCount} showCount={false} large className="shrink-0" />
         </div>

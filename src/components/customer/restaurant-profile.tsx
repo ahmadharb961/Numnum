@@ -57,7 +57,24 @@ export function ProfileTabs({ slug, sections, reels, orderingEnabled, about, rev
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
-    return () => window.removeEventListener("hashchange", fromHash);
+    // Links within this page (a menu section, a tab, the stats) scroll in place without adding a
+    // step to Back: Back leaves the restaurant, as people expect, instead of walking the sections.
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      const a = (e.target as Element | null)?.closest?.('a[href^="#"]');
+      const id = a?.getAttribute("href")?.slice(1);
+      if (!a || !id) return;
+      e.preventDefault();
+      if (TABS.some(([k]) => k === id)) {
+        setTab(id as Tab);
+        requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      } else document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    document.addEventListener("click", onClick);
+    return () => {
+      window.removeEventListener("hashchange", fromHash);
+      document.removeEventListener("click", onClick);
+    };
   }, []);
   // Each dish loads in the background as it scrolls into view, so its sheet opens at once when tapped.
   useEffect(() => {
