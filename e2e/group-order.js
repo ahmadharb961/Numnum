@@ -47,7 +47,11 @@ let ip = 60;
   await addDish(h, "Double Smash Burger");
   await h.goto("/cart", { waitUntil: "load" }); await settle(h);
   await h.getByTestId("start-group").click();
-  await h.fill("#group-name", "Ahmad");
+  // Typed one key at a time, like a phone keyboard: the field keeps focus (it used to lose it after one letter).
+  await h.locator("#group-name").click();
+  await h.locator("#group-name").fill("");
+  await h.locator("#group-name").pressSequentially("Ahmad", { delay: 60 });
+  check((await h.locator("#group-name").inputValue()) === "Ahmad" && (await h.evaluate(() => document.activeElement?.id)) === "group-name", "typing the name letter by letter keeps the keyboard on the field", await h.locator("#group-name").inputValue());
   await h.getByTestId("create-group").click();
   await h.getByTestId("share-whatsapp").waitFor({ timeout: 8000 }).catch(async () => { await h.screenshot({ path: `${SHOTS}/group-create-fail.png` }); console.log("toast:", await h.locator("[role=status], [role=alert]").allInnerTexts()); });
   const wa = await h.getByTestId("share-whatsapp").getAttribute("href").catch(() => null);
