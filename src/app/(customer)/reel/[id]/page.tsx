@@ -33,7 +33,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const deal = reel.deal ? dealText(reel.deal, reel.item.currency, reel.deal.onDish ? reel.item.name : null) : null;
   const description = [formatMoney(reel.dealPriceCents ?? reel.item.priceCents, reel.item.currency), deal && t(deal.k, deal.v), reel.caption || reel.item.description || t("Watch and order on numnum")].filter(Boolean).join(" · ");
   // WhatsApp and other apps show this picture and text when the link is shared.
-  const image = { url: `/og/reel/${reel.id}.jpg`, width: 1200, height: 630, alt: title };
+  // Vertical (9:16), so WhatsApp shows a tall preview like an Instagram reel. "?v=9x16": apps that
+  // cached the old wide picture for this link fetch the new one.
+  const image = { url: `/og/reel/${reel.id}.jpg?v=9x16`, width: 720, height: 1280, alt: title };
   return {
     title,
     description,

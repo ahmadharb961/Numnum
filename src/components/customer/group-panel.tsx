@@ -37,13 +37,22 @@ export function useGroupState(code: string | null) {
   useEffect(() => {
     if (!code) return;
     void refresh();
-    const tick = setInterval(() => document.visibilityState === "visible" && void refresh(), 4000);
+    // Live: every 2 seconds while on screen, and at once when coming back to the app or tab
+    // (phones pause timers in the background).
+    const tick = setInterval(() => document.visibilityState === "visible" && void refresh(), 2000);
+    const back = () => document.visibilityState === "visible" && void refresh();
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
+    window.addEventListener("pageshow", back);
     const onState = (e: Event) => setState((e as CustomEvent<GroupState>).detail);
     const onError = (e: Event) => setError((e as CustomEvent<string>).detail);
     window.addEventListener("nn:group", onState);
     window.addEventListener("nn:group-error", onError);
     return () => {
       clearInterval(tick);
+      document.removeEventListener("visibilitychange", back);
+      window.removeEventListener("focus", back);
+      window.removeEventListener("pageshow", back);
       window.removeEventListener("nn:group", onState);
       window.removeEventListener("nn:group-error", onError);
     };
