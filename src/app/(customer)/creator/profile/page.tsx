@@ -26,7 +26,7 @@ export default async function CreatorProfileEditPage() {
       <PageHeader title="Edit profile" />
       <div className="container-app max-w-xl py-5">
         <div className="card p-5">
-          <CreatorProfileForm mode="edit" initial={{ handle: c.handle, displayName: c.displayName, bio: c.bio ?? "", instagram: c.instagram ?? "", tiktok: c.tiktok ?? "", audienceSize: c.audienceSize != null ? String(c.audienceSize) : "", area: c.area ?? "", avatarUrl: c.avatarUrl }} handleLockedUntil={lockedUntil} />
+          <CreatorProfileForm mode="edit" initial={{ handle: c.handle, displayName: c.displayName, bio: c.bio ?? "", instagram: c.instagram ?? "", tiktok: c.tiktok ?? "", audienceSize: c.audienceSize != null ? String(c.audienceSize) : "", area: c.area ?? "", avatarUrl: c.avatarUrl, bannerUrl: c.bannerUrl }} handleLockedUntil={lockedUntil} />
         </div>
       </div>
     </div>

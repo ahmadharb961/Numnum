@@ -59,7 +59,7 @@ async function pull(page, dy) {
   console.log("\nProfile photo, placed by hand");
   await p.goto("/creator/profile", { waitUntil: "load" }); await settle(p);
   const before = (await db.creator.findFirst({ where: { handle: "mr.foodies" }, select: { avatarUrl: true } })).avatarUrl;
-  const avatar = "[data-testid=creator-form] button img";
+  const avatar = "[data-testid=avatar-button] img";
   const oldSrc = await p.locator(`${avatar} >> visible=true`).first().getAttribute("src").catch(() => null);
   await p.getByTestId("avatar-input").setInputFiles(PHOTO);
   await p.getByTestId("avatar-cropper").waitFor();

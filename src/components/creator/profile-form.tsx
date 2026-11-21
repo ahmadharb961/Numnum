@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AtSign, Camera, UserRound } from "lucide-react";
+import { AtSign, Camera, ImagePlus, UserRound } from "lucide-react";
 import { applyCreatorAction, checkHandleAction, updateCreatorProfileAction } from "@/actions/creators";
 import { uploadFile } from "@/components/dashboard/upload";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { AvatarCropper } from "@/components/avatar-cropper";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n/client";
 
-export type CreatorProfileValues = { handle: string; displayName: string; bio: string; instagram: string; tiktok: string; audienceSize: string; area: string; avatarUrl: string | null };
+export type CreatorProfileValues = { handle: string; displayName: string; bio: string; instagram: string; tiktok: string; audienceSize: string; area: string; avatarUrl: string | null; bannerUrl: string | null };
 
 /** Apply to become a creator (mode "apply"), or edit the profile once approved (mode "edit"). */
 export function CreatorProfileForm({ mode, initial, handleLockedUntil = null }: { mode: "apply" | "edit"; initial: CreatorProfileValues; handleLockedUntil?: string | null }) {
@@ -23,6 +23,9 @@ export function CreatorProfileForm({ mode, initial, handleLockedUntil = null }: 
   const [avatar, setAvatar] = useState<{ id: string | null; url: string | null }>({ id: null, url: initial.avatarUrl });
   const [uploading, setUploading] = useState(false);
   const [cropping, setCropping] = useState<File | null>(null); // a photo being placed in its circle
+  const [banner, setBanner] = useState<{ id: string | null; url: string | null }>({ id: null, url: initial.bannerUrl });
+  const [bannerCrop, setBannerCrop] = useState<File | null>(null); // a banner being placed in its frame
+  const bannerFile = useRef<HTMLInputElement>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -42,12 +45,35 @@ export function CreatorProfileForm({ mode, initial, handleLockedUntil = null }: 
     }
   }
 
+  async function pickBanner(f: File) {
+    setUploading(true);
+    try {
+      const r = await uploadFile(f, "image", { params: { scope: "creator" } });
+      setBanner({ id: r.id, url: r.url ?? r.thumbUrl ?? null });
+      setBannerCrop(null);
+      setErrors((x) => ({ ...x, banner: "" }));
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setErrors({});
+    // Both pictures are required: said right away, before anything is sent.
+    const missing: Record<string, string> = {};
+    if (!banner.url) missing.banner = t("Add a banner for the top of your profile");
+    if (!avatar.url) missing.avatar = t("Add your profile photo");
+    if (Object.keys(missing).length) {
+      setErrors(missing);
+      document.getElementById("creator-pictures")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     start(async () => {
-      const input = { ...v, audienceSize: v.audienceSize.trim() ? v.audienceSize.replace(/[^\d]/g, "") : null, avatarAssetId: avatar.id };
+      const input = { ...v, audienceSize: v.audienceSize.trim() ? v.audienceSize.replace(/[^\d]/g, "") : null, avatarAssetId: avatar.id, bannerAssetId: banner.id };
       const r = mode === "apply" ? await applyCreatorAction(input) : await updateCreatorProfileAction(input);
       if (!r.ok) {
         setError(r.error);
@@ -63,19 +89,45 @@ export function CreatorProfileForm({ mode, initial, handleLockedUntil = null }: 
   return (
     <form onSubmit={submit} className="space-y-4" data-testid="creator-form">
       {error && <Alert tone="red">{error}</Alert>}
-      <div className="flex items-center gap-4">
-        <button type="button" onClick={() => file.current?.click()} className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-50 text-brand-500 ring-2 ring-white shadow active:scale-95" aria-label={t("Profile photo")}>
-          {avatar.url ? (
+      {/* Banner (2:1) with the profile photo on it, as on the profile. Both are required. */}
+      <div id="creator-pictures" className="pb-2">
+        <button
+          type="button"
+          onClick={() => bannerFile.current?.click()}
+          className={`relative block aspect-[2/1] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-brand-100 to-brand-200 active:scale-[0.99] ${errors.banner ? "ring-2 ring-red-500" : ""}`}
+          aria-label={t("Banner")}
+          data-testid="banner-button"
+        >
+          {banner.url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatar.url} alt="" className="h-full w-full object-cover" />
+            <img src={banner.url} alt="" className="h-full w-full object-cover" data-testid="banner-preview" />
           ) : (
-            <UserRound className="h-9 w-9" />
+            <span className="flex h-full flex-col items-center justify-center gap-1 text-brand-700">
+              <ImagePlus className="h-8 w-8" />
+              <span className="text-sm font-bold">{t("Add a banner")}</span>
+            </span>
           )}
-          <span className="absolute bottom-0 end-0 grid h-7 w-7 place-items-center rounded-full bg-brand-500 text-white ring-2 ring-white">
-            <Camera className="h-3.5 w-3.5" />
-          </span>
+          {banner.url && (
+            <span className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-xs font-bold text-white backdrop-blur">
+              <Camera className="h-3.5 w-3.5" /> {t("Change")}
+            </span>
+          )}
         </button>
-        <div className="text-sm text-ink-muted">{uploading ? t("Uploading…") : t("Add a clear photo of you: it shows on your profile and reels.")}</div>
+        <div className="-mt-12 flex flex-col items-center">
+          <button type="button" onClick={() => file.current?.click()} className={`relative grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-50 text-brand-500 shadow-md ring-4 active:scale-95 ${errors.avatar ? "ring-red-500" : "ring-white"}`} aria-label={t("Profile photo")} data-testid="avatar-button">
+            {avatar.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatar.url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <UserRound className="h-10 w-10" />
+            )}
+            <span className="absolute bottom-0.5 end-0.5 grid h-7 w-7 place-items-center rounded-full bg-brand-500 text-white ring-2 ring-white">
+              <Camera className="h-3.5 w-3.5" />
+            </span>
+          </button>
+          <p className="mt-2 text-center text-sm text-ink-muted">{uploading ? t("Uploading…") : t("Your banner and a clear photo of you are required: they show on your profile and reels.")}</p>
+          {(errors.banner || errors.avatar) && <p className="mt-1 text-center text-sm font-semibold text-red-600" data-testid="pictures-error">{errors.banner || errors.avatar}</p>}
+        </div>
         <input
           ref={file}
           type="file"
@@ -88,8 +140,33 @@ export function CreatorProfileForm({ mode, initial, handleLockedUntil = null }: 
             if (f) setCropping(f);
           }}
         />
+        <input
+          ref={bannerFile}
+          type="file"
+          accept="image/*"
+          hidden
+          data-testid="banner-input"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) setBannerCrop(f);
+          }}
+        />
         <Sheet open={!!cropping} onClose={() => !uploading && setCropping(null)} title="Place your photo">
-          {cropping && <AvatarCropper file={cropping} busy={uploading} onCancel={() => setCropping(null)} onDone={(photo) => void pickAvatar(photo)} />}
+          {cropping && (
+            <AvatarCropper
+              file={cropping}
+              busy={uploading}
+              onCancel={() => setCropping(null)}
+              onDone={(photo) => {
+                setErrors((x) => ({ ...x, avatar: "" }));
+                void pickAvatar(photo);
+              }}
+            />
+          )}
+        </Sheet>
+        <Sheet open={!!bannerCrop} onClose={() => !uploading && setBannerCrop(null)} title="Place your banner">
+          {bannerCrop && <AvatarCropper file={bannerCrop} busy={uploading} aspect={2} out={1500} round={false} onCancel={() => setBannerCrop(null)} onDone={(photo) => void pickBanner(photo)} />}
         </Sheet>
       </div>
       {mode === "apply" || !handleLockedUntil ? (

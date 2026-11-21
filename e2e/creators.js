@@ -100,6 +100,18 @@ async function pickDish(page, q, restaurant) {
   await c.fill("#instagram", "@e2e.eats");
   await c.fill("#audienceSize", "12000");
   await c.fill("#area", "Beirut");
+  // A banner is required too: sending without one says so, and nothing is sent.
+  await c.getByRole("button", { name: "Send my application" }).click();
+  check(await c.getByTestId("pictures-error").filter({ hasText: "banner" }).waitFor({ timeout: 5000 }).then(() => true, () => false), "a banner is required: “Add a banner for the top of your profile”");
+  check(!(await db.creator.findUnique({ where: { handle: HANDLE } })), "and nothing was sent without it");
+  await c.getByTestId("banner-input").setInputFiles(photo);
+  await c.getByTestId("avatar-cropper").waitFor();
+  const frame = await c.getByTestId("crop-area").boundingBox();
+  check(frame && Math.abs(frame.width / frame.height - 2) < 0.05, "the banner is placed in a wide 2:1 frame (drag and zoom, like the photo)", frame && frame.width / frame.height);
+  await c.waitForFunction(() => document.querySelector("[data-testid=crop-area]")?.hasAttribute("data-ready"));
+  await c.getByTestId("crop-zoom").fill("1.5");
+  await c.getByTestId("crop-save").click();
+  await c.getByTestId("banner-preview").waitFor({ timeout: 15000 });
   await c.getByRole("button", { name: "Send my application" }).click({ timeout: 15000 }).catch(async (e) => { await c.screenshot({ path: (process.env.SHOTS || "/tmp") + "/creators-apply.png", fullPage: true }); console.log("debug", c.url(), (await c.locator("body").innerText()).slice(0, 400)); throw e; });
   // Saved (the page moves on by itself; /creator sends a pending applicant back to this page).
   for (let i = 0; i < 50 && !(await db.creator.findUnique({ where: { handle: HANDLE } })); i++) await new Promise((r) => setTimeout(r, 200));

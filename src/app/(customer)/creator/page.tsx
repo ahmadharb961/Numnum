@@ -61,6 +61,17 @@ export default async function CreatorStudioPage() {
             {t("Your creator account is suspended: your reels are hidden.")} {c.decisionNote ? t("Reason: {reason}", { reason: c.decisionNote }) : ""}
           </Alert>
         )}
+        {(!c.bannerUrl || !c.avatarUrl) && (
+          // Both pictures are required on a creator profile.
+          <Link href="/creator/profile" className="flex items-center gap-3 rounded-2xl bg-brand-50 p-4 ring-1 ring-brand-200 active:scale-[0.99]" data-testid="add-pictures">
+            <span className="text-2xl">🖼️</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-extrabold">{t(!c.bannerUrl && !c.avatarUrl ? "Add your banner and profile photo" : !c.bannerUrl ? "Add a banner to your profile" : "Add your profile photo")}</span>
+              <span className="block text-sm text-ink-soft">{t("They're required: the first thing people see on your profile.")}</span>
+            </span>
+            <span className="text-xl font-black text-brand-600 rtl:-scale-x-100">›</span>
+          </Link>
+        )}
         <section className="card p-5">
           <div className="flex items-center gap-4">
             <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-50 text-brand-500">

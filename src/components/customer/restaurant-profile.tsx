@@ -215,8 +215,14 @@ export function SaveToggle({ type, refId, initial, className, heart }: { type: "
   );
 }
 
-/** Follow / Following button with the follower count (restaurant page). */
-export function FollowButton({ restaurantId, initial, initialCount, className }: { restaurantId: string; initial: boolean; initialCount: number; className?: string }) {
+/** The follower count in the restaurant's stats: changes at once when you follow (here or on a reel). */
+export function FollowerCount({ restaurantId, initial, initialCount }: { restaurantId: string; initial: boolean; initialCount: number }) {
+  const { count = initialCount } = useFollowState(restaurantId, initial, initialCount);
+  return <span data-testid="follower-count">{compactNumber(count)}</span>;
+}
+
+/** Follow / Following button, with the follower count beside it unless shown elsewhere (restaurant page). */
+export function FollowButton({ restaurantId, initial, initialCount, className, showCount = true, large }: { restaurantId: string; initial: boolean; initialCount: number; className?: string; showCount?: boolean; large?: boolean }) {
   const t = useT();
   const { requireLogin, askLogin } = useLoginGate();
   // Shared with the reels: following from a reel shows here at once, and the other way round.
@@ -228,7 +234,7 @@ export function FollowButton({ restaurantId, initial, initialCount, className }:
         disabled={busy}
         aria-pressed={following}
         data-testid="restaurant-follow"
-        className={cn("inline-flex h-10 items-center gap-1.5 rounded-full px-5 text-sm font-bold transition active:scale-95", following ? "bg-black/5 text-ink" : "bg-brand-500 text-white shadow-sm shadow-brand-500/30")}
+        className={cn("inline-flex items-center gap-1.5 rounded-full font-bold transition active:scale-95", large ? "h-12 px-6 text-base" : "h-10 px-5 text-sm", following ? "bg-black/5 text-ink" : "bg-brand-500 text-white shadow-md shadow-brand-500/30")}
         onClick={async () => {
           if (!requireLogin("follow")) return;
           setBusy(true);
@@ -237,12 +243,14 @@ export function FollowButton({ restaurantId, initial, initialCount, className }:
           if (r === "login") askLogin("follow");
         }}
       >
-        {following ? <Check className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+        {following ? <Check className={large ? "h-5 w-5" : "h-4 w-4"} /> : <UserPlus className={large ? "h-5 w-5" : "h-4 w-4"} />}
         {following ? t("Following") : t("Follow")}
       </button>
-      <span className="text-sm text-ink-muted" data-testid="follower-count">
-        {t(count === 1 ? "{n} follower" : "{n} followers", { n: compactNumber(count) })}
-      </span>
+      {showCount && (
+        <span className="text-sm text-ink-muted" data-testid="follower-count">
+          {t(count === 1 ? "{n} follower" : "{n} followers", { n: compactNumber(count) })}
+        </span>
+      )}
     </div>
   );
 }

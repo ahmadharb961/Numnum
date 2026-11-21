@@ -5,7 +5,7 @@ import { preloadMap } from "@/components/map-picker";
 import Link from "@/components/link";
 import { useKeepLoaded } from "@/components/link-warmer";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink, BadgePercent, Clapperboard } from "lucide-react";
+import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink, BadgePercent, Clapperboard, Contact, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/actions/auth";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -20,7 +20,7 @@ export function DashboardNav({ restaurantName, slug, role, memberships, currentI
   const [open, setOpen] = useState(false);
   const rank = { STAFF: 1, MANAGER: 2, OWNER: 3 }[role];
   const groups: { title: string; items: NavItem[] }[] = [
-    { title: "", items: [{ href: "/dashboard", label: "Overview", icon: BarChart3 }, { href: "/dashboard/orders", label: "Orders", icon: ClipboardList, badge: pendingOrders }, { href: "/dashboard/insights", label: "Insights", icon: LineChart, minRole: "MANAGER" }] },
+    { title: "", items: [{ href: "/dashboard", label: "Overview", icon: BarChart3 }, { href: "/dashboard/orders", label: "Orders", icon: ClipboardList, badge: pendingOrders }, { href: "/dashboard/insights", label: "Insights", icon: LineChart, minRole: "MANAGER" }, { href: "/dashboard/customers", label: "Customers", icon: Contact, minRole: "MANAGER" }] },
     {
       title: "Menu",
       items: [
@@ -30,7 +30,7 @@ export function DashboardNav({ restaurantName, slug, role, memberships, currentI
         { href: "/dashboard/menu/photos", label: "Photos", icon: ImageIcon, minRole: "MANAGER" },
       ],
     },
-    { title: "Content", items: [{ href: "/dashboard/reels", label: "Reels", icon: Film, minRole: "MANAGER" }, { href: "/dashboard/creator-reels", label: "Creator reels", icon: Clapperboard, minRole: "MANAGER", badge: creatorTags }, { href: "/dashboard/deals", label: "Deals", icon: BadgePercent, minRole: "MANAGER" }, { href: "/dashboard/reviews", label: "Reviews", icon: MessageSquareText }] },
+    { title: "Content", items: [{ href: "/dashboard/reels", label: "Reels", icon: Film, minRole: "MANAGER" }, { href: "/dashboard/creator-reels", label: "Creator reels", icon: Clapperboard, minRole: "MANAGER", badge: creatorTags }, { href: "/dashboard/find-creators", label: "Find creators", icon: Sparkles, minRole: "MANAGER" }, { href: "/dashboard/deals", label: "Deals", icon: BadgePercent, minRole: "MANAGER" }, { href: "/dashboard/reviews", label: "Reviews", icon: MessageSquareText }] },
     {
       title: "Account",
       items: [

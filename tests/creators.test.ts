@@ -52,9 +52,17 @@ async function ready(reelId: string) {
   await prisma.reel.update({ where: { id: reelId }, data: { status: "READY", videoUrl: "/media/x.mp4" } });
   await creatorReelReady(reelId);
 }
+// Creators need a profile photo and a banner: uploads of the applicant's own.
+async function pics(userId: string) {
+  const img = (k: string) => prisma.mediaAsset.create({ data: { restaurantId: null, kind: "IMAGE", storageKey: `img/${k}-${userId}.webp`, url: `/media/i/${k}-${userId}.webp`, thumbUrl: `/media/i/${k}-${userId}-t.webp`, mimeType: "image/webp", sizeBytes: 1, uploadedById: userId } });
+  const [a, b] = await Promise.all([img("avatar"), img("banner")]);
+  return { avatarAssetId: a.id, bannerAssetId: b.id };
+}
+const apply = async (userId: string, input: Record<string, unknown>) => applyAsCreator(userId, { ...(await pics(userId)), ...input });
+
 async function approvedCreator(handle = `rana${++v}`) {
   const u = await makeCustomer();
-  const c = await applyAsCreator(u.id, { handle, displayName: "Rana Eats", bio: "Burgers in Beirut", instagram: "@rana", audienceSize: "12000", area: "Beirut" });
+  const c = await apply(u.id, { handle, displayName: "Rana Eats", bio: "Burgers in Beirut", instagram: "@rana", audienceSize: "12000", area: "Beirut" });
   const admin = await makeCustomer();
   await decideCreator(admin.id, c.id, true);
   return { user: u, creator: c, admin };
@@ -66,17 +74,30 @@ describe("applying and approval", () => {
     await resetDb();
     emails.length = 0;
   });
+  it("a profile photo and a banner are both required", async () => {
+    const u = await makeCustomer();
+    await expect(applyAsCreator(u.id, { handle: "no.pics", displayName: "No Pics" })).rejects.toThrow(/profile photo/);
+    const { avatarAssetId, bannerAssetId } = await pics(u.id);
+    await expect(applyAsCreator(u.id, { handle: "no.pics", displayName: "No Pics", avatarAssetId })).rejects.toThrow(/banner/);
+    const c = await applyAsCreator(u.id, { handle: "no.pics", displayName: "No Pics", avatarAssetId, bannerAssetId });
+    expect(c.avatarUrl).toMatch(/avatar/);
+    expect(c.bannerUrl).toBe(`/media/i/banner-${u.id}.webp`); // the full-size banner, not a thumbnail
+    // Someone else's upload can't be used.
+    const other = await makeCustomer();
+    await expect(applyAsCreator(other.id, { handle: "steal.pics", displayName: "Steal", avatarAssetId, bannerAssetId })).rejects.toThrow(/profile photo/);
+  });
+
 
   it("checks the handle, keeps one application per person, and admins approve with a welcome email", async () => {
     const u = await makeCustomer();
-    await expect(applyAsCreator(u.id, { handle: "a", displayName: "Rana" })).rejects.toThrow();
-    await expect(applyAsCreator(u.id, { handle: "admin", displayName: "Rana" })).rejects.toThrow();
-    const c = await applyAsCreator(u.id, { handle: "@Rana.Eats", displayName: "Rana Haddad" });
+    await expect(apply(u.id, { handle: "a", displayName: "Rana" })).rejects.toThrow();
+    await expect(apply(u.id, { handle: "admin", displayName: "Rana" })).rejects.toThrow();
+    const c = await apply(u.id, { handle: "@Rana.Eats", displayName: "Rana Haddad" });
     expect(c.handle).toBe("rana.eats");
     expect(c.status).toBe("PENDING");
-    await expect(applyAsCreator(u.id, { handle: "rana2", displayName: "Rana" })).rejects.toThrow(/being reviewed/);
+    await expect(apply(u.id, { handle: "rana2", displayName: "Rana" })).rejects.toThrow(/being reviewed/);
     const other = await makeCustomer();
-    await expect(applyAsCreator(other.id, { handle: "rana.eats", displayName: "X Y" })).rejects.toThrow(/taken/);
+    await expect(apply(other.id, { handle: "rana.eats", displayName: "X Y" })).rejects.toThrow(/taken/);
     expect(await prisma.notification.count({ where: { audience: "ADMIN", type: "creator_application" } })).toBe(1);
 
     await decideCreator(other.id, c.id, true);
@@ -98,11 +119,11 @@ describe("applying and approval", () => {
 
   it("a declined applicant gets the reason and can apply again", async () => {
     const u = await makeCustomer();
-    const c = await applyAsCreator(u.id, { handle: "rana.eats", displayName: "Rana Haddad" });
+    const c = await apply(u.id, { handle: "rana.eats", displayName: "Rana Haddad" });
     await decideCreator(u.id, c.id, false, "Add your Instagram");
     await flush();
     expect(emails.find((e) => e.to === u.email)?.text).toContain("Add your Instagram");
-    const again = await applyAsCreator(u.id, { handle: "rana.eats", displayName: "Rana Haddad", instagram: "@rana" });
+    const again = await apply(u.id, { handle: "rana.eats", displayName: "Rana Haddad", instagram: "@rana" });
     expect(again.status).toBe("PENDING");
   });
 
@@ -126,7 +147,7 @@ describe("reels, tags and the feed", () => {
     const own = await makeRestaurant();
     const other = await makeRestaurant();
     // The owner is also a food creator, with the same account.
-    const c = await applyAsCreator(own.user.id, { handle: `owner.eats${++v}`, displayName: "Owner Eats" });
+    const c = await apply(own.user.id, { handle: `owner.eats${++v}`, displayName: "Owner Eats" });
     await decideCreator((await makeCustomer()).id, c.id, true);
     await expect(createCreatorReel(own.user.id, { videoAssetId: (await video(own.user.id)).id, menuItemId: own.burger.id })).rejects.toThrow(OWN_RESTAURANT);
     expect(await prisma.reel.count({ where: { creatorId: c.id } })).toBe(0);
@@ -228,7 +249,7 @@ describe("reels, tags and the feed", () => {
   it("only approved creators post, with their own uploaded video, up to DAILY_REELS a day", async () => {
     const f = await makeRestaurant();
     const pending = await makeCustomer();
-    await applyAsCreator(pending.id, { handle: "waiting", displayName: "Wait Ing" });
+    await apply(pending.id, { handle: "waiting", displayName: "Wait Ing" });
     await expect(createCreatorReel(pending.id, { videoAssetId: (await video(pending.id)).id, menuItemId: f.burger.id })).rejects.toThrow(/approved creators/);
     const { user } = await approvedCreator();
     const someoneElse = await makeCustomer();
@@ -363,7 +384,7 @@ describe("changing the username", () => {
     // The old username: redirects, and nobody else can take it.
     expect(await handleRedirect("rana.eats")).toBe("rana.bites");
     expect(await checkHandle(other.id, "rana.eats")).toMatchObject({ available: false, error: "This username is taken" });
-    await expect(applyAsCreator(other.id, { handle: "rana.eats", displayName: "Someone Else" })).rejects.toThrow(/taken/);
+    await expect(apply(other.id, { handle: "rana.eats", displayName: "Someone Else" })).rejects.toThrow(/taken/);
     // Not again within 3 months (a profile save with a new username too).
     await expect(changeCreatorHandle(creator.id, "rana.third")).rejects.toThrow(/again on/);
     await expect(updateCreatorProfile(user.id, { handle: "rana.third", displayName: "Rana" })).rejects.toThrow(/again on/);
@@ -399,7 +420,7 @@ describe("search finds creators", () => {
     const { user, creator, admin } = await approvedCreator("mr.foodies");
     await updateCreatorProfile(user.id, { displayName: "Mr. Foodies", bio: "Shawarma hunter" });
     const pendingUser = await makeCustomer();
-    await applyAsCreator(pendingUser.id, { handle: "foodies.pending", displayName: "Pending Foodies" });
+    await apply(pendingUser.id, { handle: "foodies.pending", displayName: "Pending Foodies" });
     const find = async (q: string) => (await exploreSearch({ q, type: "creators" }, null)).creators!.map((c) => c.handle);
     expect(await find("foodies")).toEqual(["mr.foodies"]);
     expect(await find("mr foodies")).toEqual(["mr.foodies"]);

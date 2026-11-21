@@ -57,7 +57,7 @@ export default async function CreatorApplyPage() {
             <div className="card p-5">
               <CreatorProfileForm
                 mode="apply"
-                initial={{ handle: c?.handle ?? "", displayName: c?.displayName ?? me.name, bio: c?.bio ?? "", instagram: c?.instagram ?? "", tiktok: c?.tiktok ?? "", audienceSize: c?.audienceSize != null ? String(c.audienceSize) : "", area: c?.area ?? "", avatarUrl: c?.avatarUrl ?? null }}
+                initial={{ handle: c?.handle ?? "", displayName: c?.displayName ?? me.name, bio: c?.bio ?? "", instagram: c?.instagram ?? "", tiktok: c?.tiktok ?? "", audienceSize: c?.audienceSize != null ? String(c.audienceSize) : "", area: c?.area ?? "", avatarUrl: c?.avatarUrl ?? null, bannerUrl: c?.bannerUrl ?? null }}
               />
             </div>
           </>

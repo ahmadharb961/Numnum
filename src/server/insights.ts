@@ -92,6 +92,7 @@ export type ReelPerf = {
   id: string;
   name: string;
   restaurantName: string;
+  restaurantSlug: string;
   currency: string;
   creator: string | null;
   posterUrl: string | null;
@@ -128,7 +129,7 @@ export async function creatorReelsPerformance(creatorId: string, range: Insights
 async function perf(where: Prisma.ReelWhereInput, range: InsightsRange, restaurantId: string | null): Promise<ReelPerf[]> {
   const reels = await prisma.reel.findMany({
     where,
-    select: { id: true, posterUrl: true, visibility: true, publishedAt: true, menuItem: { select: { name: true } }, restaurant: { select: { displayName: true, currency: true } }, creator: { select: { handle: true } } },
+    select: { id: true, posterUrl: true, visibility: true, publishedAt: true, menuItem: { select: { name: true } }, restaurant: { select: { displayName: true, slug: true, currency: true } }, creator: { select: { handle: true } } },
   });
   if (!reels.length) return [];
   const ids = reels.map((r) => r.id);
@@ -156,6 +157,7 @@ async function perf(where: Prisma.ReelWhereInput, range: InsightsRange, restaura
         id: r.id,
         name: r.menuItem.name,
         restaurantName: r.restaurant.displayName,
+        restaurantSlug: r.restaurant.slug,
         currency: r.restaurant.currency,
         /** Posted by a food creator (their handle), or null for the restaurant's own reel. */
         creator: r.creator?.handle ?? null,

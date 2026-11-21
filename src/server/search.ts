@@ -24,6 +24,8 @@ export type SearchParams = {
   nearIds?: string[];
   /** restaurants the viewer blocked (never shown) */
   blockedIds?: string[];
+  /** LBP per USD, so a price filter in dollars also finds dishes priced in LBP (set by the search). */
+  lbpPerUsd?: number;
 };
 
 export function parseSearchParams(sp: Record<string, string | string[] | undefined>): SearchParams {

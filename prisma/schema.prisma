@@ -114,6 +114,46 @@ model AppDevice {
   @@map("app_devices")
 }
 
+/// A group order: the host shares a link (WhatsApp), friends add their meals under their name, and
+/// the host places one order for everyone. Each member's items live here until then.
+model GroupCart {
+  id           String            @id @default(cuid())
+  /// The short code in the shared link (numnum.me/g/<code>).
+  code         String            @unique
+  restaurantId String
+  hostUserId   String?
+  hostDevice   String
+  /// OPEN: friends add items · LOCKED: the host is checking out · ORDERED · CANCELED
+  status       String            @default("OPEN")
+  orderId      String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  expiresAt    DateTime
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  members      GroupCartMember[]
+
+  @@index([expiresAt])
+  @@map("group_carts")
+}
+
+model GroupCartMember {
+  id          String    @id @default(cuid())
+  groupCartId String
+  name        String
+  /// The browser that joined (the nn_did cookie): only it can change this member's items.
+  deviceKey   String
+  userId      String?
+  isHost      Boolean   @default(false)
+  /// The member's cart lines (same shape as the cart in the browser).
+  lines       Json      @default("[]")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  groupCart   GroupCart @relation(fields: [groupCartId], references: [id], onDelete: Cascade)
+
+  @@unique([groupCartId, deviceKey])
+  @@map("group_cart_members")
+}
+
 model CustomerAddress {
   id        String   @id @default(cuid())
   userId    String
@@ -228,6 +268,7 @@ model Restaurant {
   searchName        String                   @default("")
   searchText        String                   @default("")
   searchedAt        DateTime?
+  groupCarts        GroupCart[]
 
   @@index([status])
   @@index([area])
@@ -1232,6 +1273,10 @@ model Creator {
   displayName             String
   bio                     String?
   avatarUrl               String?
+  /// The wide picture at the top of the profile (2:1), placed by the creator.
+  bannerUrl               String?
+  /// The creator shows their results (orders from their reels) to restaurants: public results page.
+  shareResults            Boolean   @default(false)
   instagram               String?
   tiktok                  String?
   /// Followers they reported on other platforms (shown to admins when reviewing).

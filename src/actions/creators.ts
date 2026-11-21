@@ -6,6 +6,7 @@ import { prisma } from "@/server/db";
 import { getCurrentUser, requireAdmin, requireRestaurant, requireUser } from "@/server/auth";
 import { streamConfigured } from "@/server/stream";
 import { rateLimit } from "@/server/rate-limit";
+import { clearResultsCache } from "@/server/creator-results";
 import {
   applyAsCreator,
   approvedCreator,
@@ -241,4 +242,16 @@ export async function decideVerificationAction(creatorId: string, approve: boole
   } catch (e) {
     return fail(e);
   }
+}
+
+/** Show (or hide) my results to restaurants: the public results page and Find creators. */
+export async function setShareResultsAction(share: boolean): Promise<CreatorResult<{ handle: string }>> {
+  const me = await requireUser("/creator/insights");
+  const c = await prisma.creator.findUnique({ where: { userId: me.id }, select: { id: true, handle: true, status: true } });
+  if (!c || c.status !== "APPROVED") return { ok: false, error: "Only approved creators can share their results" };
+  await prisma.creator.update({ where: { id: c.id }, data: { shareResults: share } });
+  clearResultsCache();
+  revalidatePath(`/c/${c.handle}`);
+  revalidatePath("/creator/insights");
+  return { ok: true, data: { handle: c.handle }, message: share ? "Your results are shared with restaurants" : "Your results are private" };
 }

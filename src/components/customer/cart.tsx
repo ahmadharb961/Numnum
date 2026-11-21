@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { selectionSignature, type Selections } from "@/lib/customization";
+import { syncMyLines } from "./group-store";
 
 export type CartLine = {
   key: string;
@@ -72,6 +73,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (next && next.lines.length) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       else localStorage.removeItem(STORAGE_KEY);
     } catch {}
+    // In a group order, my cart is my share of it: send the change to the group.
+    syncMyLines(next?.restaurantId ?? null, next?.lines ?? []);
   }, []);
 
   const add: CartCtx["add"] = useCallback(
