@@ -31,6 +31,12 @@ const SHOTS = process.env.SHOTS || "/tmp";
     const h1 = await p.locator("h1").first().boundingBox();
     const follow = await p.getByTestId("restaurant-follow").boundingBox();
     check(h1 && follow && Math.abs(h1.y + h1.height / 2 - (follow.y + follow.height / 2)) < 30 && follow.x > h1.x, "the name with the Follow button on its right");
+    // Section buttons and stats scroll in place: Back then leaves the restaurant (no extra steps).
+    const before = await p.evaluate(() => history.length);
+    for (const chip of await p.locator("a[href^='#sec-']").all()) await chip.click();
+    await p.locator("[data-testid=restaurant-stats] a").first().click();
+    check((await p.evaluate(() => history.length)) === before && !new URL(p.url()).hash, "tapping menu sections and stats adds no Back steps", [before, await p.evaluate(() => history.length), p.url()]);
+    await p.evaluate(() => window.scrollTo(0, 0));
     const meta = await p.getByTestId("restaurant-meta").innerText();
     check(meta.includes("•") && meta.includes("Hamra"), "cuisine • area under the name", meta);
     const stats = (await p.getByTestId("restaurant-stats").innerText()).replace(/\s+/g, " ");
