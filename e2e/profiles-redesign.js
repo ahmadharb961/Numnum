@@ -51,7 +51,8 @@ const SHOTS = process.env.SHOTS || "/tmp";
       made.push(s.id);
     }
     await p.goto(`/c/${foodies.handle}`, { waitUntil: "load" }); await settle(p);
-    check((await p.locator("header").first().innerText()).includes(`@${foodies.handle}`), "top bar: @mr.foodies");
+    check((await p.getByTestId("creator-topbar-handle").innerText()).includes(`@${foodies.handle}`), "top bar on the banner: @mr.foodies");
+    check(await p.locator("[data-testid=creator-banner] img").evaluate((i) => i.complete && i.naturalWidth > 0).catch(() => false), "his banner across the top");
     const cstats = (await p.getByTestId("creator-stats").innerText()).replace(/\s+/g, " ");
     check(/reels/.test(cstats) && /followers/.test(cstats) && /reel views/.test(cstats), "three stats: reels, followers, reel views", cstats);
     check((await p.getByTestId("creator-profile").innerText()).includes("FOOD CREATOR") || (await p.getByTestId("creator-profile").innerText()).toLowerCase().includes("food creator"), "@handle with the FOOD CREATOR badge");

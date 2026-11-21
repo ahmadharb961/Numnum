@@ -5,19 +5,20 @@ import { ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/client";
 
-const OUT = 640; // saved photo: 640 × 640
 const MAX_ZOOM = 4;
 
 /**
- * Place a profile photo in its circle, like Instagram: drag to move it, pinch (or the slider) to
- * zoom. Only what's inside the circle is kept, as a square photo.
+ * Place a photo in its frame, like Instagram: drag to move it, pinch (or the slider) to zoom. Only
+ * what's inside the frame is kept. A profile photo is a circle (saved 640 × 640); a banner is a
+ * wide 2:1 frame (saved 1500 × 750), so the creator chooses exactly what shows.
  */
-export function AvatarCropper({ file, onCancel, onDone, busy }: { file: File; onCancel: () => void; onDone: (photo: File) => void; busy?: boolean }) {
+export function AvatarCropper({ file, onCancel, onDone, busy, aspect = 1, out = 640, round = true }: { file: File; onCancel: () => void; onDone: (photo: File) => void; busy?: boolean; aspect?: number; out?: number; round?: boolean }) {
   const t = useT();
   const box = useRef<HTMLDivElement>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [error, setError] = useState(false);
-  const [size, setSize] = useState(300); // the square frame, in screen px
+  const [size, setSize] = useState(300); // the frame's width, in screen px
+  const fh = size / aspect; // and height
   const [zoom, setZoom] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 }); // photo centre, from the frame centre (screen px)
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -33,21 +34,21 @@ export function AvatarCropper({ file, onCancel, onDone, busy }: { file: File; on
   }, [file]);
 
   useEffect(() => {
-    const measure = () => setSize(Math.min(320, (box.current?.parentElement?.clientWidth ?? 320) - 8));
+    const measure = () => setSize(Math.min(aspect > 1 ? 480 : 320, (box.current?.parentElement?.clientWidth ?? 320) - 8));
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
 
   // At zoom 1 the photo just covers the frame; it can never leave a gap inside it.
-  const base = img ? Math.max(size / img.naturalWidth, size / img.naturalHeight) : 1;
+  const base = img ? Math.max(size / img.naturalWidth, fh / img.naturalHeight) : 1;
   const w = img ? img.naturalWidth * base * zoom : size;
-  const h = img ? img.naturalHeight * base * zoom : size;
+  const h = img ? img.naturalHeight * base * zoom : fh;
   const clamp = (p: { x: number; y: number }, z = zoom) => {
     const ww = img ? img.naturalWidth * base * z : size;
-    const hh = img ? img.naturalHeight * base * z : size;
+    const hh = img ? img.naturalHeight * base * z : fh;
     const mx = Math.max(0, (ww - size) / 2);
-    const my = Math.max(0, (hh - size) / 2);
+    const my = Math.max(0, (hh - fh) / 2);
     return { x: Math.min(mx, Math.max(-mx, p.x)), y: Math.min(my, Math.max(-my, p.y)) };
   };
   const zoomTo = (z: number) => {
@@ -86,16 +87,17 @@ export function AvatarCropper({ file, onCancel, onDone, busy }: { file: File; on
     if (!img) return;
     // The part of the photo inside the frame, in the photo's own pixels.
     const scale = base * zoom;
-    const side = size / scale;
+    const sw = size / scale;
+    const sh = fh / scale;
     const cx = img.naturalWidth / 2 - pos.x / scale;
     const cy = img.naturalHeight / 2 - pos.y / scale;
     const c = document.createElement("canvas");
-    c.width = OUT;
-    c.height = OUT;
+    c.width = out;
+    c.height = Math.round(out / aspect);
     const ctx = c.getContext("2d")!;
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(img, cx - side / 2, cy - side / 2, side, side, 0, 0, OUT, OUT);
-    c.toBlob((b) => b && onDone(new File([b], "profile.jpg", { type: "image/jpeg" })), "image/jpeg", 0.9);
+    ctx.drawImage(img, cx - sw / 2, cy - sh / 2, sw, sh, 0, 0, c.width, c.height);
+    c.toBlob((b) => b && onDone(new File([b], round ? "profile.jpg" : "banner.jpg", { type: "image/jpeg" })), "image/jpeg", 0.88);
   };
 
   if (error) return <p className="p-2 text-sm text-red-600">{t("This photo can't be opened. Try another one (JPG or PNG).")}</p>;
@@ -106,7 +108,7 @@ export function AvatarCropper({ file, onCancel, onDone, busy }: { file: File; on
         <div
           ref={box}
           className="relative cursor-grab touch-none select-none overflow-hidden rounded-2xl bg-black active:cursor-grabbing"
-          style={{ width: size, height: size }}
+          style={{ width: size, height: fh }}
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
@@ -122,11 +124,11 @@ export function AvatarCropper({ file, onCancel, onDone, busy }: { file: File; on
               alt=""
               draggable={false}
               className="pointer-events-none absolute max-w-none"
-              style={{ width: w, height: h, left: size / 2 - w / 2 + pos.x, top: size / 2 - h / 2 + pos.y }}
+              style={{ width: w, height: h, left: size / 2 - w / 2 + pos.x, top: fh / 2 - h / 2 + pos.y }}
             />
           )}
-          {/* The circle that will be the photo; outside it is dimmed. */}
-          <div className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] ring-2 ring-white/80" />
+          {/* The circle that will be the photo (outside it is dimmed); a banner keeps the whole frame. */}
+          {round ? <div className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] ring-2 ring-white/80" /> : <div className="pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset ring-white/80" />}
         </div>
       </div>
       <div className="flex items-center gap-3 px-2">

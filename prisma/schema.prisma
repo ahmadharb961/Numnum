@@ -1273,6 +1273,8 @@ model Creator {
   displayName             String
   bio                     String?
   avatarUrl               String?
+  /// The wide picture at the top of the profile (2:1), placed by the creator.
+  bannerUrl               String?
   instagram               String?
   tiktok                  String?
   /// Followers they reported on other platforms (shown to admins when reviewing).

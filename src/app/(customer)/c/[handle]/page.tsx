@@ -5,7 +5,7 @@ import { prisma } from "@/server/db";
 import { getCurrentUser } from "@/server/auth";
 import { publicReelWhere } from "@/server/feed";
 import { creatorFavorites, creatorGridOrder, handleRedirect } from "@/server/creators";
-import { PageHeader } from "@/components/customer/page-header";
+import { BackButton } from "@/components/back-button";
 import { CreatorStats } from "@/components/creator/follow-creator";
 import { CreatorMoreMenu, CreatorProfileTabs } from "@/components/creator/creator-profile-tabs";
 import { ShareButton } from "@/components/customer/restaurant-profile";
@@ -45,20 +45,29 @@ export default async function CreatorProfilePage({ params }: { params: Promise<{
   const tt = social(c.tiktok, "https://www.tiktok.com/@");
   return (
     <main className="pb-nav">
-      <PageHeader
-        title={`@${c.handle}`}
-        right={
-          <div className="flex items-center gap-2">
-            <ShareButton title={`${c.displayName} (@${c.handle})`} message={t("{name} on numnum: food reels and favorite spots", { name: c.displayName })} path={`/c/${c.handle}`} className="grid h-11 w-11 place-items-center rounded-full bg-white shadow-md active:scale-90">
-              <Share className="h-5 w-5" />
-            </ShareButton>
-            <CreatorMoreMenu handle={c.handle} self={self} />
-          </div>
-        }
-      />
-      <div className="container-app max-w-3xl py-5">
+      {/* Banner (placed by the creator) with a soft curved edge; the top bar sits on it. */}
+      <div className="relative aspect-[2/1] max-h-[340px] w-full lg:mx-auto lg:max-w-3xl">
+        <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-brand-200 to-brand-400 [clip-path:ellipse(135%_100%_at_50%_0%)] lg:rounded-t-3xl" data-testid="creator-banner">
+          {c.bannerUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={c.bannerUrl} alt="" className="h-full w-full object-cover" />
+          )}
+          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/35 to-transparent" />
+        </div>
+        <div className="absolute inset-x-0 top-0 flex items-center gap-3 px-4" style={{ paddingTop: "calc(var(--safe-top) + 10px)" }}>
+          <BackButton fallback="/explore" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/95 text-ink shadow-md active:scale-90" />
+          <span className="min-w-0 flex-1 truncate text-lg font-extrabold text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.45)]" dir="ltr" data-testid="creator-topbar-handle">
+            @{c.handle}
+          </span>
+          <ShareButton title={`${c.displayName} (@${c.handle})`} message={t("{name} on numnum: food reels and favorite spots", { name: c.displayName })} path={`/c/${c.handle}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/95 text-ink shadow-md active:scale-90">
+            <Share className="h-5 w-5" />
+          </ShareButton>
+          <CreatorMoreMenu handle={c.handle} self={self} />
+        </div>
+      </div>
+      <div className="container-app max-w-3xl pb-5">
         <section className="flex flex-col items-center text-center" data-testid="creator-profile">
-          <span className="grid h-28 w-28 place-items-center overflow-hidden rounded-full bg-brand-50 text-brand-500 ring-4 ring-white shadow-md">
+          <span className="relative z-10 -mt-16 grid h-28 w-28 place-items-center overflow-hidden rounded-full bg-brand-50 text-brand-500 ring-4 ring-white shadow-md">
             {c.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={c.avatarUrl} alt="" className="h-full w-full object-cover" />

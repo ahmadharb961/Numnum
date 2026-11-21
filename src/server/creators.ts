@@ -53,9 +53,23 @@ export const applySchema = z.object({
   audienceSize: z.coerce.number().int().min(0).max(100_000_000).optional().nullable(),
   area: z.string().trim().max(80).optional().transform((v) => v || null),
   avatarAssetId: z.string().optional().nullable(),
+  bannerAssetId: z.string().optional().nullable(),
 });
 
 export const profileSchema = applySchema.omit({ handle: true }).extend({ handle: z.string().optional() });
+
+/** The banner the creator placed (full size, 2:1). */
+async function bannerUrl(userId: string, assetId: string | null | undefined) {
+  if (!assetId) return undefined;
+  const a = await prisma.mediaAsset.findFirst({ where: { id: assetId, uploadedById: userId, kind: "IMAGE" }, select: { url: true } });
+  return a?.url || undefined;
+}
+
+/** A profile photo and a banner are both required. */
+function requirePictures(avatar: string | null | undefined, banner: string | null | undefined) {
+  if (!avatar) throw new CreatorError("Add your profile photo", "avatar");
+  if (!banner) throw new CreatorError("Add a banner for the top of your profile", "banner");
+}
 
 async function avatarUrl(userId: string, assetId: string | null | undefined) {
   if (!assetId) return undefined;
@@ -134,8 +148,9 @@ export async function applyAsCreator(userId: string, raw: unknown) {
   const existing = await prisma.creator.findUnique({ where: { userId } });
   if (existing && existing.status !== "DECLINED") throw new CreatorError(existing.status === "PENDING" ? "Your application is being reviewed" : "You're already a creator");
   if (await handleTaken(input.handle, existing?.id ?? null)) throw new CreatorError("This username is taken", "handle");
-  const avatar = await avatarUrl(userId, input.avatarAssetId);
-  const data = { handle: input.handle, displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), status: "PENDING" as const, decisionNote: null, ...creatorSearchFields(input) };
+  const [avatar, banner] = await Promise.all([avatarUrl(userId, input.avatarAssetId), bannerUrl(userId, input.bannerAssetId)]);
+  requirePictures(avatar ?? existing?.avatarUrl, banner ?? existing?.bannerUrl);
+  const data = { handle: input.handle, displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), ...(banner ? { bannerUrl: banner } : {}), status: "PENDING" as const, decisionNote: null, ...creatorSearchFields(input) };
   const c = existing ? await prisma.creator.update({ where: { id: existing.id }, data }) : await prisma.creator.create({ data: { ...data, userId } });
   await notifyAdmins({ type: "creator_application", title: `New creator application: @${c.handle}`, link: "/admin/creators" });
   return c;
@@ -165,10 +180,11 @@ export async function updateCreatorProfile(userId: string, raw: unknown) {
   const input = profileSchema.parse(raw);
   const c = await prisma.creator.findUnique({ where: { userId } });
   if (!c || c.status !== "APPROVED") throw new CreatorError("Only approved creators can edit their profile");
-  const avatar = await avatarUrl(userId, input.avatarAssetId);
+  const [avatar, banner] = await Promise.all([avatarUrl(userId, input.avatarAssetId), bannerUrl(userId, input.bannerAssetId)]);
+  requirePictures(avatar ?? c.avatarUrl, banner ?? c.bannerUrl);
   // A new username first (it can be refused: taken, or changed less than 3 months ago).
   const handle = input.handle != null && input.handle.trim() && input.handle.trim().toLowerCase().replace(/^@/, "") !== c.handle ? (await changeCreatorHandle(c.id, input.handle)).handle : c.handle;
-  return prisma.creator.update({ where: { id: c.id }, data: { displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), ...creatorSearchFields({ ...input, handle }) } });
+  return prisma.creator.update({ where: { id: c.id }, data: { displayName: input.displayName, bio: input.bio, instagram: input.instagram, tiktok: input.tiktok, audienceSize: input.audienceSize ?? null, area: input.area, ...(avatar ? { avatarUrl: avatar } : {}), ...(banner ? { bannerUrl: banner } : {}), ...creatorSearchFields({ ...input, handle }) } });
 }
 
 /** The creator asks for the verified badge. */

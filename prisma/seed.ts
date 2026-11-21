@@ -265,7 +265,12 @@ async function waitForStreamReels() {
 async function ensureDemoCreator(pw: string) {
   const email = "mrfoodies@numnum.demo";
   const user = (await prisma.user.findUnique({ where: { email } })) ?? (await prisma.user.create({ data: { email, name: "Mr. Foodies", passwordHash: pw, roles: { create: { role: "CUSTOMER" } } } }));
-  if (await prisma.creator.findUnique({ where: { userId: user.id } })) return;
+  const existing = await prisma.creator.findUnique({ where: { userId: user.id } });
+  // A banner is required on every creator profile (added later): give the demo creator one.
+  if (existing) {
+    if (!existing.bannerUrl) await prisma.creator.update({ where: { id: existing.id }, data: { bannerUrl: "/demo/mr-foodies-banner.jpg" } });
+    return;
+  }
   await prisma.creator.create({
     data: {
       userId: user.id,
@@ -276,6 +281,7 @@ async function ensureDemoCreator(pw: string) {
       area: "Beirut",
       audienceSize: 25000,
       avatarUrl: "/demo/mr-foodies.jpg",
+      bannerUrl: "/demo/mr-foodies-banner.jpg",
       ...creatorSearchFields({ handle: "mr.foodies", displayName: "Mr. Foodies", bio: "Eating my way through Beirut, one reel at a time 🍔", area: "Beirut" }),
       status: "APPROVED",
       approvedAt: new Date(),

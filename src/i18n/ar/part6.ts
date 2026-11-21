@@ -386,4 +386,15 @@ export const AR6: Record<string, string> = {
   "{name}'s favorites": "مفضّلات {name}",
   "Too far": "بعيد جداً",
   "up to {max}": "حتى {max}",
+  // Creator banner
+  "Add your profile photo": "أضف صورتك الشخصية",
+  "Add a banner for the top of your profile": "أضف صورة غلاف لأعلى ملفك",
+  "Banner": "صورة الغلاف",
+  "Add a banner": "أضف صورة غلاف",
+  "Change": "تغيير",
+  "Your banner and a clear photo of you are required: they show on your profile and reels.": "صورة الغلاف وصورة واضحة لك مطلوبتان: تظهران على ملفك ومقاطعك.",
+  "Place your banner": "ضع صورة الغلاف",
+  "Add your banner and profile photo": "أضف صورة الغلاف وصورتك الشخصية",
+  "Add a banner to your profile": "أضف صورة غلاف إلى ملفك",
+  "They're required: the first thing people see on your profile.": "إنهما مطلوبتان: أول ما يراه الناس على ملفك.",
 };
