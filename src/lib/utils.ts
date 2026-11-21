@@ -2,8 +2,16 @@ export function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }
 
+/**
+ * Short counts: 950 → "950", 2,048 → "2K", 2,350 → "2.3K", 6,640 → "6.6K", 1,250,000 → "1.2M".
+ * Rounded down (never shows more than the real number), one decimal at most.
+ */
 export function compactNumber(n: number): string {
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  const v = Math.max(0, Math.floor(n));
+  if (v < 1000) return String(v);
+  const [div, unit] = v >= 1_000_000_000 ? [1_000_000_000, "B"] : v >= 1_000_000 ? [1_000_000, "M"] : [1000, "K"];
+  const x = Math.floor((v / div) * 10) / 10;
+  return `${x % 1 === 0 ? x.toFixed(0) : x.toFixed(1)}${unit}`;
 }
 
 // Arabic dates use Lebanese month names with Western digits ("30 تشرين الأول 2026").

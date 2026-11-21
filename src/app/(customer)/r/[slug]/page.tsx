@@ -4,11 +4,11 @@ import { restaurantBlockFor } from "@/server/blocks";
 import { notFound } from "next/navigation";
 import Link from "@/components/link";
 import { BackButton } from "@/components/back-button";
-import { BadgeCheck, BadgePercent, Bike, ChevronRight, Clapperboard, Clock, ConciergeBell, Globe, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, UtensilsCrossed } from "lucide-react";
+import { BadgeCheck, BadgePercent, Bike, Clapperboard, Clock, ConciergeBell, Globe, MapPin, Phone, PlayCircle, Share2, ShoppingBag, Star, Users } from "lucide-react";
 import { getPublicRestaurant } from "@/server/restaurant-public";
 import { ownerKey } from "@/server/engagement";
 import { prisma } from "@/server/db";
-import { FollowButton, ProfileTabs, SaveToggle, ShareButton } from "@/components/customer/restaurant-profile";
+import { FollowButton, FollowerCount, ProfileTabs, SaveToggle, ShareButton } from "@/components/customer/restaurant-profile";
 import { VerifiedBadge, Stars, Badge, EmptyState } from "@/components/ui/misc";
 import { DAYS, DAY_LABELS, isOpenAt, type OpeningHours } from "@/lib/hours";
 import { formatPhone, isLebaneseMobile } from "@/lib/phone";
@@ -74,13 +74,14 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
 
   const prep = r.avgPrepMinutes || 20;
   const card = "rounded-2xl bg-white shadow-[0_1px_2px_rgba(22,18,15,0.05),0_6px_20px_rgba(22,18,15,0.05)]";
-  const deliveryLine = !r.deliveryEnabled
+  // The green pill beside "Delivering to": time, distance and fee to the customer's spot.
+  const deliveryPill = !r.deliveryEnabled || !dq
     ? null
-    : !dq
-      ? null
-      : dq.deliverable
-        ? { ok: true, text: `${formatKm(dq.km, lang)} · ${dq.feeCents ? t("Delivery fee") + " " + formatMoney(dq.feeCents, r.currency) : t("free delivery")}` }
-        : { ok: false, text: dq.reason === "out_of_range" ? t("{km} away — delivers up to {max}", { km: formatKm(dq.km!, lang), max: formatKm(dq.maxKm, lang) }) + (r.pickupEnabled ? ` · ${t("pickup available")}` : "") : t("Delivery not set up yet") };
+    : dq.deliverable
+      ? { ok: true, top: t("{a}–{b} min", { a: prep + 15, b: prep + 25 }), sub: `${formatKm(dq.km, lang)} · ${dq.feeCents ? formatMoney(dq.feeCents, r.currency) : t("free delivery")}` }
+      : dq.reason === "out_of_range"
+        ? { ok: false, top: t("Too far"), sub: t("up to {max}", { max: formatKm(dq.maxKm, lang) }) }
+        : null;
 
   // WhatsApp: the number set in settings, else the restaurant phone when it's a mobile.
   const wa = social.whatsapp || (r.phone && isLebaneseMobile(r.phone) ? r.phone : null);
@@ -217,11 +218,12 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
     </section>
   );
 
-  const stats: { icon: React.ReactNode; value: string; label: string; href?: string }[] = [
+  const stats: { icon: React.ReactNode; value: React.ReactNode; label: string; href?: string; accent?: boolean }[] = [
     { icon: <Star className="h-6 w-6 fill-brand-500 text-brand-500" />, value: r.ratingCount ? r.ratingAvg.toFixed(1) : "–", label: r.ratingCount ? `(${t(r.ratingCount === 1 ? "{n} review" : "{n} reviews", { n: r.ratingCount })})` : t("New"), href: "#reviews" },
     { icon: <PlayCircle className="h-6 w-6 text-brand-500" />, value: compactNumber(r.totalReelViews), label: t("reel views"), href: "#reels" },
-    { icon: <ConciergeBell className="h-6 w-6 text-brand-500" />, value: String(r._count.menuItems), label: t("menu items"), href: "#menu" },
-    { icon: <Clapperboard className="h-6 w-6 text-brand-500" />, value: String(r._count.reels), label: t("reels"), href: "#reels" },
+    { icon: <ConciergeBell className="h-6 w-6 text-brand-500" />, value: compactNumber(r._count.menuItems), label: t("menu items"), href: "#menu" },
+    { icon: <Clapperboard className="h-6 w-6 text-brand-500" />, value: compactNumber(r._count.reels), label: t("reels"), href: "#reels" },
+    { icon: <Users className="h-6 w-6 text-brand-500" />, value: <FollowerCount restaurantId={r.id} initial={following} initialCount={r.followerCount} />, label: t("followers"), accent: true },
   ];
 
   return (
@@ -257,81 +259,82 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
             <div className="grid h-full place-items-center bg-brand-500 text-4xl font-black text-white">{r.displayName[0]}</div>
           )}
         </div>
-        <h1 className="mt-3 flex items-center gap-2 text-[28px] font-black leading-tight tracking-tight">
-          {r.displayName}
-          {r.verificationStatus === "APPROVED" && <VerifiedBadge className="[&_svg]:h-6 [&_svg]:w-6" />}
-        </h1>
-        <FollowButton restaurantId={r.id} initial={following} initialCount={r.followerCount} className="mt-2" />
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[15px] text-ink-muted">
-          {r.cuisine && (
-            <span className="inline-flex items-center gap-1.5">
-              <UtensilsCrossed className="h-4 w-4 text-brand-500" /> {r.cuisine}
-            </span>
-          )}
-          {(r.area || r.city) && (
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-4 w-4" /> {placeLabel(r.area, r.city)}
-            </span>
-          )}
-          {open !== null && <span className={`rounded-full px-3 py-0.5 text-sm font-bold ${open ? "bg-emerald-50 text-emerald-700" : "bg-black/5 text-ink-muted"}`}>{open ? t("Open now") : t("Closed now")}</span>}
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <h1 className="flex min-w-0 items-center gap-2 text-[28px] font-black leading-tight tracking-tight">
+            <span className="min-w-0 break-words">{r.displayName}</span>
+            {r.verificationStatus === "APPROVED" && <VerifiedBadge className="shrink-0 [&_svg]:h-6 [&_svg]:w-6" />}
+          </h1>
+          <FollowButton restaurantId={r.id} initial={following} initialCount={r.followerCount} showCount={false} large className="shrink-0" />
         </div>
-        {r.description && <p className="mt-2 line-clamp-2 text-[15px] text-ink-muted">{r.description}</p>}
+        {(r.cuisine || r.area || r.city) && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] text-ink-muted" data-testid="restaurant-meta">
+            {r.cuisine && <span>{r.cuisine}</span>}
+            {r.cuisine && (r.area || r.city) && <span aria-hidden>•</span>}
+            {(r.area || r.city) && (
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="h-4 w-4" /> {placeLabel(r.area, r.city)}
+              </span>
+            )}
+            {open === false && <span className="rounded-full bg-black/5 px-2.5 py-0.5 text-xs font-bold">{t("Closed now")}</span>}
+          </div>
+        )}
+        {r.description && <p className="mt-2 line-clamp-2 text-[15px] text-ink-soft">{r.description}</p>}
 
         {/* Stats */}
-        <div className="mt-4 grid grid-cols-4 divide-x divide-brand-100 rounded-2xl bg-brand-50/70 py-3.5 ring-1 ring-brand-100 rtl:divide-x-reverse">
-          {stats.map((st) => (
-            <a key={st.label} href={st.href} className="flex flex-col items-center gap-1 px-1 text-center">
-              {st.icon}
-              <span className="tabular text-2xl font-black leading-none">{st.value}</span>
-              <span className="text-xs text-ink-muted">{st.label}</span>
-            </a>
-          ))}
+        <div className="mt-4 grid grid-cols-5 divide-x divide-brand-100 rounded-2xl bg-brand-50/70 py-3.5 ring-1 ring-brand-100 rtl:divide-x-reverse" data-testid="restaurant-stats">
+          {stats.map((st) => {
+            const body = (
+              <>
+                {st.icon}
+                <span className="tabular text-xl font-black leading-none sm:text-2xl">{st.value}</span>
+                <span className={`text-[11px] leading-tight sm:text-xs ${st.accent ? "font-semibold text-brand-600" : "text-ink-muted"}`}>{st.label}</span>
+              </>
+            );
+            return st.href ? (
+              <a key={st.label} href={st.href} className="flex min-w-0 flex-col items-center gap-1 px-0.5 text-center">
+                {body}
+              </a>
+            ) : (
+              <div key={st.label} className="flex min-w-0 flex-col items-center gap-1 px-0.5 text-center">
+                {body}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Deliver to + order */}
+        {/* Pick up · Delivering to · time, distance and fee */}
         {(r.deliveryEnabled || r.pickupEnabled) && (
-          <div className={`mt-3 ${card} p-3`}>
-            <div className="flex items-center gap-3">
-              {r.deliveryEnabled ? <DeliverToButton label={loc?.label ?? null} /> : <span className="flex-1 font-semibold">{t("Pickup only")}</span>}
-              {r.orderingEnabled && (
-                <a href="#menu" className="flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-brand-500 px-5 font-bold text-white shadow-lg shadow-brand-500/30 active:scale-[0.98]">
-                  <Bike className="h-5 w-5" /> {t("Order now")}
-                </a>
-              )}
-            </div>
-            {deliveryLine && <p className={`mt-2 border-t border-black/5 pt-2 text-xs font-semibold ${deliveryLine.ok ? "text-emerald-700" : "text-amber-700"}`}>{deliveryLine.text}</p>}
+          <div className={`mt-3 ${card} flex items-center gap-2 p-3`} data-testid="restaurant-fulfillment">
+            {r.pickupEnabled && (
+              <div className={`flex shrink-0 items-center gap-2 ${r.deliveryEnabled ? "border-e border-black/5 pe-2" : "flex-1"}`}>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
+                  <ShoppingBag className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-extrabold leading-tight">{t("Pick up")}</span>
+                  <span className="block whitespace-nowrap text-xs text-ink-muted">{t("Ready in {n} min", { n: prep })}</span>
+                </span>
+              </div>
+            )}
+            {r.deliveryEnabled ? (
+              <>
+                <DeliverToButton label={loc?.label ?? null} compact />
+                {deliveryPill && (
+                  <span className={`shrink-0 rounded-xl px-2.5 py-1.5 text-end ${deliveryPill.ok ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`} data-testid="delivery-pill">
+                    <span className="flex items-center justify-end gap-1 text-sm font-extrabold leading-tight">
+                      <Bike className="h-4 w-4" /> {deliveryPill.top}
+                    </span>
+                    <span className="block whitespace-nowrap text-xs font-semibold">{deliveryPill.sub}</span>
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-sm font-semibold text-ink-muted">{t("Pickup only")}</span>
+            )}
           </div>
         )}
         {!r.orderingEnabled && <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{t("Not taking online orders right now")}</p>}
 
-        {/* Quick facts */}
-        <div className="mt-3 grid grid-cols-3 gap-2.5">
-          <div className={`${card} flex flex-col gap-1.5 p-3 sm:flex-row sm:items-center sm:gap-2.5`}>
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
-              <Bike className="h-5 w-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight">{t("Delivery")}</span>
-              <span className="block text-xs text-ink-muted">{r.deliveryEnabled ? t("{a}–{b} min", { a: prep + 10, b: prep + 20 }) : t("Not available")}</span>
-            </span>
-          </div>
-          <div className={`${card} flex flex-col gap-1.5 p-3 sm:flex-row sm:items-center sm:gap-2.5`}>
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
-              <ShoppingBag className="h-5 w-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight">{t("Pick up")}</span>
-              <span className="block text-xs text-ink-muted">{r.pickupEnabled ? t("Ready in {n} min", { n: prep }) : t("Not available")}</span>
-            </span>
-          </div>
-          <a href="#about" className={`${card} relative flex flex-col gap-1.5 p-3 sm:flex-row sm:items-center sm:gap-2.5`}>
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
-              <Clock className="h-5 w-5" />
-            </span>
-            <span className="min-w-0 flex-1 text-sm font-bold leading-tight">{t("Hours & Contact")}</span>
-            <ChevronRight className="absolute end-2 top-3 h-4 w-4 shrink-0 text-ink-muted rtl:-scale-x-100 sm:static" />
-          </a>
-        </div>
       </div>
 
       <div className="mt-4">
