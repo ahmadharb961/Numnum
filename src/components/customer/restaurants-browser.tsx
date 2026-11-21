@@ -18,7 +18,7 @@ type Filters = { area?: string; near?: boolean; category?: string };
  * "Delivers to me" filters at once on the phone (no trip to the server). The address bar follows,
  * so a shared link opens the same view.
  */
-export function RestaurantsBrowser({ restaurants, areas, categories, hasLocation, initial, header, footer }: { restaurants: BrowseRestaurant[]; areas: string[]; categories: Category[]; hasLocation: boolean; initial: Filters; header: React.ReactNode; footer: React.ReactNode }) {
+export function RestaurantsBrowser({ restaurants, areas, categories, hasLocation, initial, header, footer, banner }: { restaurants: BrowseRestaurant[]; areas: string[]; categories: Category[]; hasLocation: boolean; initial: Filters; header: React.ReactNode; footer: React.ReactNode; banner?: React.ReactNode }) {
   const t = useT();
   const [f, setF] = useState<Filters>(initial);
 
@@ -64,6 +64,7 @@ export function RestaurantsBrowser({ restaurants, areas, categories, hasLocation
           )}
         </div>
       </header>
+      {banner && <div className="container-wide pt-2">{banner}</div>}
       <section className="container-wide pt-2" aria-label={t("Food categories")}>
         <ScrollRow className="-mx-4 gap-1 px-4 pb-2 pt-1 lg:mx-0 lg:gap-2 lg:px-1">
           <Tile active={!f.category} label={t("All")} onClick={() => apply({ ...f, category: undefined })}>

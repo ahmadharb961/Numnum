@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { finishGroupAfterOrder } from "./group-panel";
 import Link from "@/components/link";
 import { useRouter } from "next/navigation";
 import { loadCheckoutInfo } from "./checkout-data";
@@ -205,6 +206,8 @@ export function Checkout() {
         localStorage.setItem(RECENT_KEY, JSON.stringify([{ ref: order.reference, t: order.trackingToken }, ...recent.filter((r) => r.ref !== order.reference)].slice(0, 20)));
         sessionStorage.removeItem("nn_idem");
       } catch {}
+      // A group order: everyone in the group sees it was placed.
+      finishGroupAfterOrder(order.reference);
       clear();
       router.replace(`/order/${order.reference}?t=${order.trackingToken}&placed=1`);
     } catch (e) {

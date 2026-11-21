@@ -5,6 +5,7 @@ import { topUpSearchText } from "./search-text";
 import { parseQuery, scoreFields, words, type Field, type Query } from "@/lib/search-match";
 import { quoteDelivery, type LatLng } from "@/lib/geo";
 import type { SearchParams } from "./search";
+import { getSettings } from "./settings";
 
 // Explore search, built to stay fast with tens of thousands of dishes, restaurants and reels:
 // matching runs in Postgres against pre-normalized, trigram-indexed text (searchName /
@@ -18,7 +19,7 @@ type Tab = "dishes" | "reels" | "restaurants" | "creators";
 
 export type ExploreDish = { id: string; name: string; description: string | null; priceCents: number; currency: string; ratingAvg: number; ratingCount: number; available: boolean; image: { url: string; thumbUrl: string | null } | null; restaurant: { slug: string; displayName: string; verificationStatus: string } };
 export type ExploreRestaurant = { id: string; slug: string; displayName: string; logoUrl: string | null; coverUrl: string | null; cuisine: string | null; area: string | null; city: string | null; verificationStatus: string; ratingAvg: number; ratingCount: number; deliveryEnabled: boolean; pickupEnabled: boolean; openingHours: unknown; avgPrepMinutes: number | null; delivery: { km: number | null; deliverable: boolean; feeCents: number | null } | null };
-export type ExploreReel = { id: string; posterUrl: string | null; views: number; label: string };
+export type ExploreReel = { id: string; posterUrl: string | null; views: number; label: string; priceCents: number; currency: string; restaurantName: string };
 export type ExploreCreator = { id: string; handle: string; displayName: string; avatarUrl: string | null; bio: string | null; area: string | null; verified: boolean; followerCount: number; reelCount: number };
 export type ExploreResult = {
   q: string;
@@ -87,13 +88,20 @@ function restaurantFilters(p: SearchParams) {
   return f;
 }
 
+/**
+ * A dish's price in US cents, whatever its menu currency: the price filter is in dollars, and a dish
+ * priced in LBP (whole pounds) must be found by its dollar value too.
+ */
+const usdCents = (lbpPerUsd: number) => Prisma.sql`(CASE WHEN m."currency" = 'LBP' THEN m."priceCents" * 100.0 / ${lbpPerUsd} ELSE m."priceCents" END)`;
+
 const categoryId = (slug: string) => Prisma.sql`(SELECT "id" FROM "food_categories" WHERE "slug" = ${slug})`;
 
 function dishWhere(p: SearchParams, query: Query, fuzzy: boolean) {
   const f = [Prisma.sql`m."archived" = false`, ...restaurantFilters(p)];
   if (p.category) f.push(Prisma.sql`m."foodCategoryId" = ${categoryId(p.category)}`);
-  if (p.minPrice !== undefined) f.push(Prisma.sql`m."priceCents" >= ${Math.round(p.minPrice * 100)}`);
-  if (p.maxPrice !== undefined) f.push(Prisma.sql`m."priceCents" <= ${Math.round(p.maxPrice * 100)}`);
+  const rate = p.lbpPerUsd && p.lbpPerUsd > 0 ? p.lbpPerUsd : 89_500;
+  if (p.minPrice !== undefined) f.push(Prisma.sql`${usdCents(rate)} >= ${Math.round(p.minPrice * 100)}`);
+  if (p.maxPrice !== undefined) f.push(Prisma.sql`${usdCents(rate)} <= ${Math.round(p.maxPrice * 100)}`);
   if (p.available) f.push(Prisma.sql`m."available" = true`);
   if (p.minItemRating) f.push(Prisma.sql`m."ratingAvg" >= ${p.minItemRating}`);
   if (query.length) f.push(matchSql('m."searchText"', query, fuzzy));
@@ -159,13 +167,30 @@ function restaurantRows(p: SearchParams, query: Query, fuzzy: boolean, limit: nu
 
 function reelRows(p: SearchParams, query: Query, fuzzy: boolean, offset: number) {
   return prisma.$queryRaw<ExploreReel[]>`
-    SELECT rl."id", rl."posterUrl", rl."viewCount" AS "views", m."name" AS "label"
+    SELECT rl."id", rl."posterUrl", rl."viewCount" AS "views", m."name" AS "label", m."priceCents", m."currency", r."displayName" AS "restaurantName"
     FROM "reels" rl
     JOIN "menu_items" m ON m."id" = rl."menuItemId"
     JOIN "restaurants" r ON r."id" = rl."restaurantId"
     WHERE ${reelWhere(p, query, fuzzy)}
     ORDER BY ${nameFirst('m."searchName"', query, fuzzy)} rl."viewCount" DESC, rl."publishedAt" DESC
     LIMIT ${PAGE} OFFSET ${offset}`;
+}
+
+/**
+ * Every matching reel's id, in the same order as the Reels tab (up to `limit`): opening a reel from
+ * the results plays exactly these, one after another.
+ */
+export async function exploreReelIds(p: SearchParams, limit: number) {
+  const params = { ...p, lbpPerUsd: p.lbpPerUsd ?? (await getSettings()).lbpPerUsd };
+  const query = parseQuery((params.q ?? "").trim().slice(0, 80));
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT rl."id" FROM "reels" rl
+    JOIN "menu_items" m ON m."id" = rl."menuItemId"
+    JOIN "restaurants" r ON r."id" = rl."restaurantId"
+    WHERE ${reelWhere(params, query, false)}
+    ORDER BY ${nameFirst('m."searchName"', query, false)} rl."viewCount" DESC, rl."publishedAt" DESC
+    LIMIT ${limit}`;
+  return rows.map((r) => r.id);
 }
 
 type CreatorRow = Omit<ExploreCreator, "verified"> & { verification: string };
@@ -270,8 +295,9 @@ async function run(p: SearchParams, tab: Tab, page: number, query: Query, fuzzy:
 // Popular searches repeat a lot; answers are kept for 20 s per exact request.
 const cache = new Map<string, { at: number; v: ExploreResult }>();
 
-export async function exploreSearch(p: SearchParams, loc: LatLng | null): Promise<ExploreResult> {
+export async function exploreSearch(pIn: SearchParams, loc: LatLng | null): Promise<ExploreResult> {
   topUpSearchText();
+  const p: SearchParams = { ...pIn, lbpPerUsd: pIn.lbpPerUsd ?? (await getSettings()).lbpPerUsd };
   const tab: Tab = p.type ?? "dishes";
   const page = Math.min(Math.max(1, p.page ?? 1), 40);
   const q = (p.q ?? "").trim().slice(0, 80);

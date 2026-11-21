@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { History, Loader2, Search, SlidersHorizontal, X } from "lucide-react";
+import { Flame, History, Loader2, Search, SlidersHorizontal, X } from "lucide-react";
+import Link from "@/components/link";
 import { cn } from "@/lib/utils";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -161,6 +162,10 @@ export function SearchControls({ facets, locationLabel }: { facets: Facets; loca
           <button onClick={() => setParams({ category: null })} className={cn("chip", !sp.get("category") && "chip-active")}>
             {t("All")}
           </button>
+          {/* NumOffers first: restaurants with offers and deals right now. */}
+          <Link href="/offers" prefetch className="chip shrink-0 border-brand-200 bg-brand-50 font-bold text-brand-700" data-testid="numoffers-chip">
+            <Flame className="h-4 w-4" /> NumOffers
+          </Link>
           {facets.categories.map((c) => (
             <button key={c.slug} onClick={() => setParams({ category: sp.get("category") === c.slug ? null : c.slug })} className={cn("chip", sp.get("category") === c.slug && "chip-active")}>
               {c.emoji} {localName(locale, c.name, c.nameAr)}

@@ -13,11 +13,14 @@ import { track } from "./track";
 import { preloadCheckout } from "./checkout-data";
 import { useEffect } from "react";
 import { useT } from "@/i18n/client";
+import { GroupPanel, StartGroupButton } from "./group-panel";
+import { useGroup } from "./group-store";
 
 export function CartView() {
   const t = useT();
   const { cart, ready, subtotalCents, updateQty, remove, clear } = useCart();
   const router = useRouter();
+  const group = useGroup();
   useEffect(() => {
     if (cart?.lines.length) track("cart_reviewed", { restaurantId: cart.restaurantId });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,12 +50,17 @@ export function CartView() {
           </button>
         )}
       </header>
+      {ready && group && (
+        <div className="container-app">
+          <GroupPanel cart={cart} />
+        </div>
+      )}
       {!ready ? (
         <div className="grid place-items-center py-20">
           <Spinner className="text-brand-500" />
         </div>
       ) : !cart || !cart.lines.length ? (
-        <EmptyState icon={<ShoppingBag />} title={t("Your cart is empty")} body={t("Find something delicious in the reels and tap Order.")} action={<Link href="/" className="chip chip-active">{t("Watch reels")}</Link>} />
+        group ? null : <EmptyState icon={<ShoppingBag />} title={t("Your cart is empty")} body={t("Find something delicious in the reels and tap Order.")} action={<Link href="/" className="chip chip-active">{t("Watch reels")}</Link>} />
       ) : (
         <div className="container-app">
           <ul className="space-y-2.5">
@@ -112,11 +120,15 @@ export function CartView() {
             </div>
             <p className="pt-1 text-xs text-ink-muted">{t("💵 Pay cash on delivery — no card needed.")}</p>
           </div>
-          <div className="sticky mt-4" style={{ bottom: "calc(var(--nav-h) + var(--safe-bottom) + 12px)" }}>
-            <Button size="lg" block onClick={() => router.push("/checkout")}>
-              {t("Continue to checkout · {total}", { total: formatMoney(subtotalCents, cart.currency) })}
-            </Button>
-          </div>
+          {!group && <StartGroupButton cart={cart} />}
+          {/* In a group, friends don't check out (the host does, with "Checkout for everyone" above). */}
+          {(!group || (group.isHost && group.mode === "checkout")) && (
+            <div className="sticky mt-4" style={{ bottom: "calc(var(--nav-h) + var(--safe-bottom) + 12px)" }}>
+              <Button size="lg" block onClick={() => router.push("/checkout")}>
+                {t("Continue to checkout · {total}", { total: formatMoney(subtotalCents, cart.currency) })}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </main>

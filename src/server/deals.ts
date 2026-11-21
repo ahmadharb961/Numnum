@@ -38,6 +38,19 @@ export async function liveDeals(restaurantIds: string[], opts: { cached?: boolea
   return loadLive(restaurantIds);
 }
 
+/** Every restaurant running a deal right now, with its deals (NumOffers). Shares the short cache. */
+export async function allLiveDeals(): Promise<Map<string, DealLike[]>> {
+  let cache = store.__nnDealCache;
+  if (!cache || Date.now() - cache.at > CACHE_MS) {
+    const byRestaurant = loadLive();
+    cache = store.__nnDealCache = { at: Date.now(), byRestaurant };
+    byRestaurant.catch(() => {
+      if (store.__nnDealCache?.byRestaurant === byRestaurant) store.__nnDealCache = null;
+    });
+  }
+  return cache.byRestaurant;
+}
+
 /** All live deals (or those of the given restaurants), grouped by restaurant. */
 async function loadLive(restaurantIds?: string[]): Promise<Map<string, DealLike[]>> {
   const out = new Map<string, DealLike[]>();

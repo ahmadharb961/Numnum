@@ -38,6 +38,8 @@ type Props = {
   excludeIds?: string[];
   backHref?: string;
   locationLabel?: string | null;
+  /** Fixed lists: what this list is (e.g. "$3 – $5 reels"), shown beside the back button with "3 / 6". */
+  title?: string;
 };
 
 /** Opens the connection to the video host (Cloudflare) while the page loads: saves several round
@@ -68,7 +70,7 @@ type FeedMemory = {
 const MEMORY_MS = 30 * 60_000;
 let feedMemory: FeedMemory | null = null;
 
-export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref, locationLabel = null }: Props) {
+export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex = 0, excludeIds = [], backHref, locationLabel = null, title }: Props) {
   const t = useT();
   const { requireLogin, askLogin, loggedIn } = useLoginGate();
   const router = useRouter();
@@ -445,6 +447,13 @@ export function ReelFeed({ initial, initialCursor, minViewMs, fixed, startIndex 
         <button onClick={() => goBack(router, backHref ?? "/")} data-testid="reel-back" className="absolute start-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur" style={{ top: "calc(var(--safe-top) + 12px)" }} aria-label={t("Back")}>
           <ChevronLeft className="rtl:-scale-x-100 h-6 w-6" />
         </button>
+      )}
+      {fixed && title && (
+        <div className="pointer-events-none absolute inset-x-0 z-20 flex justify-center px-16" style={{ top: "calc(var(--safe-top) + 18px)" }}>
+          <span className="max-w-full truncate rounded-full bg-black/45 px-3 py-1.5 text-[13px] font-bold backdrop-blur" data-testid="reel-list-title">
+            {title} · <span dir="ltr">{Math.min(active + 1, reels.length)} / {reels.length}</span>
+          </span>
+        </div>
       )}
       {!fixed && !backHref && (
         // One row, like TikTok: logo · For you / Following · location pin · sound (sound button below).

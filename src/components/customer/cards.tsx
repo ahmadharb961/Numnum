@@ -135,9 +135,9 @@ export function RestaurantCard({ r, delivery }: { delivery?: { km: number | null
   );
 }
 
-export function ReelThumb({ href, posterUrl, views, className, label }: { href: string; posterUrl: string | null; views: number; className?: string; label?: string }) {
+export function ReelThumb({ href, posterUrl, views, className, label, price, sub }: { href: string; posterUrl: string | null; views: number; className?: string; label?: string; price?: string; sub?: string }) {
   return (
-    <Link href={href} className={cn("relative block aspect-[9/16] overflow-hidden bg-black", className)}>
+    <Link href={href} className={cn("relative block aspect-[9/16] overflow-hidden bg-black", className)} data-testid="reel-thumb">
       {posterUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={posterUrl} alt={label ?? ""} className="h-full w-full object-cover" loading="lazy" />
@@ -146,10 +146,25 @@ export function ReelThumb({ href, posterUrl, views, className, label }: { href: 
           <Play className="h-6 w-6" />
         </div>
       )}
-      <span className="absolute bottom-1.5 start-1.5 inline-flex items-center gap-1 text-xs font-bold text-white text-shadow">
-        <Eye className="h-3.5 w-3.5" />
-        {compactNumber(views)}
-      </span>
+      {price ? (
+        // Dish, price and restaurant on the tile, so a budget search can be checked at a glance.
+        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-1.5 pb-1.5 pt-8 text-white text-shadow">
+          <span className="block truncate text-[12px] font-bold leading-tight">{label}</span>
+          <span className="flex items-center justify-between gap-1 text-[12px] leading-tight">
+            <span className="font-extrabold text-brand-300" data-testid="reel-thumb-price" dir="ltr">{price}</span>
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-white/85">
+              <Eye className="h-3 w-3" />
+              {compactNumber(views)}
+            </span>
+          </span>
+          {sub && <span className="block truncate text-[11px] text-white/80">{sub}</span>}
+        </span>
+      ) : (
+        <span className="absolute bottom-1.5 start-1.5 inline-flex items-center gap-1 text-xs font-bold text-white text-shadow">
+          <Eye className="h-3.5 w-3.5" />
+          {compactNumber(views)}
+        </span>
+      )}
     </Link>
   );
 }

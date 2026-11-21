@@ -8,6 +8,7 @@ import type { ExploreResult } from "@/server/explore-search";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/misc";
 import { DishCard, ReelThumb, RestaurantCard } from "./cards";
+import { formatMoney } from "@/lib/money";
 import { CreatorCard } from "@/components/creator/creator-card";
 import { rememberSearch } from "./search-controls";
 import { setCounts, setQuery, setSearching, useQuery } from "./search-state";
@@ -268,7 +269,8 @@ export function ExploreResults({ initial, categories }: { initial: ExploreResult
             (reels.length ? (
               <div className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-2xl lg:grid-cols-5 lg:gap-2">
                 {reels.map((r) => (
-                  <ReelThumb key={r.id} href={`/reel/${r.id}`} posterUrl={r.posterUrl} views={r.views} label={r.label} />
+                  // Opens a viewer that plays exactly these results; Back returns here, filters kept.
+                  <ReelThumb key={r.id} href={`/explore/reels/${r.id}?${requestKey(sp, q, "reels")}`} posterUrl={r.posterUrl} views={r.views} label={r.label} price={formatMoney(r.priceCents, r.currency)} sub={r.restaurantName} />
                 ))}
               </div>
             ) : (
