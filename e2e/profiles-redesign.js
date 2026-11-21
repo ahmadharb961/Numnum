@@ -38,6 +38,8 @@ const SHOTS = process.env.SHOTS || "/tmp";
     check((await p.getByTestId("follower-count").innerText()) === "2.3K", "2,350 followers shows as 2.3K", await p.getByTestId("follower-count").innerText());
     const ful = (await p.getByTestId("restaurant-fulfillment").innerText()).replace(/\s+/g, " ");
     check(/Pick up/.test(ful) && /Ready in \d+ min/.test(ful) && /Delivering to/.test(ful) && /Wata El Moussaitbeh/.test(ful), "one card: Pick up · Ready in N min | Delivering to <your spot>", ful);
+    const where = await p.getByTestId("deliver-to").evaluate((el) => { const s = el.querySelector("span span:last-child span"); return s ? s.getBoundingClientRect().width : 0; });
+    check(where >= 60, "the delivery spot's name has room to show (not squeezed by the other two)", where);
     const pill = (await p.getByTestId("delivery-pill").innerText().catch(() => "")).replace(/\s+/g, " ");
     check(/\d+–\d+ min/.test(pill) && /\d+(\.\d+)? ?(km|m)\b/.test(pill) && /\$/.test(pill), "and the green pill: time, distance and fee", pill);
     check((await p.getByText("Hours & Contact").count()) === 0 && (await p.getByRole("link", { name: /Order now/ }).count()) === 0, "the extra cards are gone (hours and contact are under About)");

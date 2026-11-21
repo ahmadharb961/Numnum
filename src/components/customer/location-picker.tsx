@@ -73,11 +73,11 @@ export function DeliverToButton({ label, compact }: { label: string | null; comp
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} className={cn("flex min-w-0 flex-1 items-center text-start", compact ? "gap-2" : "gap-3")} aria-label={t("Change delivery location")} data-testid="deliver-to">
-        <MapPin className={cn("shrink-0 text-brand-500", compact ? "h-6 w-6" : "h-7 w-7")} />
+      <button onClick={() => setOpen(true)} className={cn("flex min-w-0 flex-1 items-center text-start", compact ? "gap-1.5" : "gap-3")} aria-label={t("Change delivery location")} data-testid="deliver-to">
+        <MapPin className={cn("shrink-0 text-brand-500", compact ? "h-5 w-5" : "h-7 w-7")} />
         <span className="min-w-0">
-          <span className="block text-xs font-medium text-ink-muted">{label ? t("Delivering to") : t("Where should we deliver?")}</span>
-          <span className="flex items-center gap-1 font-bold">
+          <span className={cn("block truncate font-medium text-ink-muted", compact ? "text-[11px]" : "text-xs")}>{label ? t("Delivering to") : t("Where should we deliver?")}</span>
+          <span className={cn("flex items-center gap-1 font-bold", compact && "text-[13px]")}>
             <span className="truncate">{label ?? t("Set your delivery location")}</span>
             <ChevronDown className="h-4 w-4 shrink-0" />
           </span>

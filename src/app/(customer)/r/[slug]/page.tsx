@@ -304,15 +304,16 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
 
         {/* Pick up · Delivering to · time, distance and fee */}
         {(r.deliveryEnabled || r.pickupEnabled) && (
-          <div className={`mt-3 ${card} flex items-center gap-2 p-3`} data-testid="restaurant-fulfillment">
+          <div className={`mt-3 ${card} flex items-center gap-2 p-2.5`} data-testid="restaurant-fulfillment">
             {r.pickupEnabled && (
-              <div className={`flex shrink-0 items-center gap-2 ${r.deliveryEnabled ? "border-e border-black/5 pe-2" : "flex-1"}`}>
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
-                  <ShoppingBag className="h-5 w-5" />
+              <div className={`flex shrink-0 items-center gap-1.5 ${r.deliveryEnabled ? "border-e border-black/5 pe-2" : "flex-1"}`}>
+                {/* On narrow phones the icon gives its room to the delivery spot's name. */}
+                <span className={`${r.deliveryEnabled ? "hidden min-[400px]:grid" : "grid"} h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500`}>
+                  <ShoppingBag className="h-[18px] w-[18px]" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-extrabold leading-tight">{t("Pick up")}</span>
-                  <span className="block whitespace-nowrap text-xs text-ink-muted">{t("Ready in {n} min", { n: prep })}</span>
+                  <span className="block text-[13px] font-extrabold leading-tight">{t("Pick up")}</span>
+                  <span className="block whitespace-nowrap text-[11px] text-ink-muted">{t("Ready in {n} min", { n: prep })}</span>
                 </span>
               </div>
             )}
@@ -320,11 +321,11 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
               <>
                 <DeliverToButton label={loc?.label ?? null} compact />
                 {deliveryPill && (
-                  <span className={`shrink-0 rounded-xl px-2.5 py-1.5 text-end ${deliveryPill.ok ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`} data-testid="delivery-pill">
-                    <span className="flex items-center justify-end gap-1 text-sm font-extrabold leading-tight">
-                      <Bike className="h-4 w-4" /> {deliveryPill.top}
+                  <span className={`shrink-0 rounded-xl px-2 py-1 text-end ${deliveryPill.ok ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`} data-testid="delivery-pill">
+                    <span className="flex items-center justify-end gap-1 whitespace-nowrap text-[13px] font-extrabold leading-tight">
+                      <Bike className="h-3.5 w-3.5" /> {deliveryPill.top}
                     </span>
-                    <span className="block whitespace-nowrap text-xs font-semibold">{deliveryPill.sub}</span>
+                    <span className="block whitespace-nowrap text-[11px] font-semibold">{deliveryPill.sub}</span>
                   </span>
                 )}
               </>

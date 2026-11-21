@@ -16,7 +16,10 @@ let ip = 30;
   const foodies = await db.creator.findFirstOrThrow({ where: { handle: "mr.foodies" } });
   await db.creator.update({ where: { id: foodies.id }, data: { shareResults: false } });
   // An order placed from his reel (completed), so there's something to show.
-  const reel = await db.reel.findFirst({ where: { creatorId: foodies.id, visibility: "PUBLISHED" }, select: { id: true, restaurantId: true, restaurant: { select: { displayName: true } } } });
+  // His own reel for this test (a copy of a live restaurant reel), removed at the end.
+  const base = await db.reel.findFirstOrThrow({ where: { creatorId: null, visibility: "PUBLISHED", status: "READY", restaurant: { status: "ACTIVE" } }, orderBy: { viewCount: "desc" } });
+  const made = await db.reel.create({ data: { restaurantId: base.restaurantId, menuItemId: base.menuItemId, videoAssetId: base.videoAssetId, posterUrl: base.posterUrl, creatorId: foodies.id, tagStatus: "ACCEPTED", status: "READY", visibility: "PUBLISHED", publishedAt: new Date() } });
+  const reel = await db.reel.findUniqueOrThrow({ where: { id: made.id }, select: { id: true, restaurantId: true, restaurant: { select: { displayName: true } } } });
   const order = reel && (await db.order.findFirst({ where: { restaurantId: reel.restaurantId, status: "COMPLETED" }, orderBy: { createdAt: "desc" } }));
   const ev = order ? await db.analyticsEvent.create({ data: { type: "order_placed", restaurantId: reel.restaurantId, orderId: order.id, data: { reelIds: [reel.id] } } }) : null;
   const b = await chromium.launch();
@@ -52,7 +55,7 @@ let ip = 30;
     check((await db.creator.findUnique({ where: { id: foodies.id } })).shareResults, "“Show my results to restaurants” turned on");
     await m.getByTestId("share-results-send").click();
     const wa = decodeURIComponent((await m.getByTestId("share-whatsapp").getAttribute("href")) || "");
-    check(wa.includes(`/c/${foodies.handle}/results`) && /orders from my food reels/.test(wa), "“Send to a restaurant”: WhatsApp with his results link", wa.slice(0, 160));
+    check(wa.includes(`/c/${foodies.handle}/results`) && /orders? from my food reels/.test(wa), "“Send to a restaurant”: WhatsApp with his results link", wa.slice(0, 160));
     await m.context().close();
 
     console.log("\nWhat a restaurant sees");
@@ -78,14 +81,15 @@ let ip = 30;
     await m2.goto("/creator/insights", { waitUntil: "load" }); await settle(m2);
     await m2.getByTestId("share-results-toggle").click();
     for (let i = 0; i < 20 && (await db.creator.findUnique({ where: { id: foodies.id } })).shareResults; i++) await m2.waitForTimeout(250);
-    const status = (await v.goto(`/c/${foodies.handle}/results`)).status();
-    check(status === 404, "his results page is private again (404 for others)", status);
+    await v.goto(`/c/${foodies.handle}/results`, { waitUntil: "load" }); await settle(v);
+    check((await v.getByTestId("creator-results").count()) === 0 && /not found|couldn.t find|doesn.t exist/i.test(await v.locator("body").innerText()), "his results page is private again (others get “not found”)");
     await v.goto(`/c/${foodies.handle}`, { waitUntil: "load" }); await settle(v);
     check((await v.getByTestId("results-badge").count()) === 0, "and the badge is gone");
     await o.goto("/dashboard/find-creators", { waitUntil: "load" }); await settle(o);
     check((await o.locator("[data-testid=find-creator]").filter({ hasText: `@${foodies.handle}` }).count()) === 0, "and he's not in Find creators");
   } finally {
     if (ev) await db.analyticsEvent.delete({ where: { id: ev.id } }).catch(() => {});
+    await db.reel.delete({ where: { id: made.id } }).catch(() => {});
     await db.creator.update({ where: { id: foodies.id }, data: { shareResults: false } });
   }
   check(!errors.length, "no page errors", errors);
