@@ -67,7 +67,8 @@ export default async function CreatorProfilePage({ params }: { params: Promise<{
           <ShareButton title={`${c.displayName} (@${c.handle})`} message={t("{name} on numnum: food reels and favorite spots", { name: c.displayName })} path={`/c/${c.handle}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/95 text-ink shadow-md active:scale-90">
             <Share className="h-5 w-5" />
           </ShareButton>
-          <CreatorMoreMenu handle={c.handle} self={self} />
+          {/* Visitors only need Share; the creator's own "…" has Edit profile and Followers. */}
+          {self && <CreatorMoreMenu handle={c.handle} self />}
         </div>
       </div>
       <div className="container-app max-w-3xl pb-5">
