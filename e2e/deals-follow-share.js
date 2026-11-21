@@ -205,7 +205,7 @@ async function openReelOf(p, restaurantId) {
   const img = await fetch(og.replace(/^https?:\/\/[^/]+/, BASE));
   const buf = Buffer.from(await img.arrayBuffer());
   const meta = await require("sharp")(buf).metadata();
-  check(img.headers.get("content-type") === "image/jpeg" && meta.width === 1200 && meta.height === 630, "preview picture is a 1200×630 JPEG (what WhatsApp shows)", [img.headers.get("content-type"), meta.width, meta.height]);
+  check(img.headers.get("content-type") === "image/jpeg" && meta.width === 720 && meta.height === 1280, "preview picture is a vertical 720×1280 JPEG (WhatsApp shows it tall, like an Instagram reel)", [img.headers.get("content-type"), meta.width, meta.height]);
   require("fs").writeFileSync(`${SHOTS}/og-reel.jpg`, buf);
   for (const u of [`/og/restaurant/${bh.slug}.jpg`, `/og/item/${r2.menuItemId}.jpg`]) {
     const r = await fetch(BASE + u);
