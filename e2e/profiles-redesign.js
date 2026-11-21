@@ -39,7 +39,7 @@ const SHOTS = process.env.SHOTS || "/tmp";
     const ful = (await p.getByTestId("restaurant-fulfillment").innerText()).replace(/\s+/g, " ");
     check(/Pick up/.test(ful) && /Ready in \d+ min/.test(ful) && /Delivering to/.test(ful) && /Wata El Moussaitbeh/.test(ful), "one card: Pick up · Ready in N min | Delivering to <your spot>", ful);
     const pill = (await p.getByTestId("delivery-pill").innerText().catch(() => "")).replace(/\s+/g, " ");
-    check(/\d+–\d+ min/.test(pill) && /km/.test(pill) && /\$/.test(pill), "and the green pill: time, distance and fee", pill);
+    check(/\d+–\d+ min/.test(pill) && /\d+(\.\d+)? ?(km|m)\b/.test(pill) && /\$/.test(pill), "and the green pill: time, distance and fee", pill);
     check((await p.getByText("Hours & Contact").count()) === 0 && (await p.getByRole("link", { name: /Order now/ }).count()) === 0, "the extra cards are gone (hours and contact are under About)");
     await p.screenshot({ path: `${SHOTS}/restaurant-redesign.png`, fullPage: false });
 

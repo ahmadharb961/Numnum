@@ -1275,6 +1275,8 @@ model Creator {
   avatarUrl               String?
   /// The wide picture at the top of the profile (2:1), placed by the creator.
   bannerUrl               String?
+  /// The creator shows their results (orders from their reels) to restaurants: public results page.
+  shareResults            Boolean   @default(false)
   instagram               String?
   tiktok                  String?
   /// Followers they reported on other platforms (shown to admins when reviewing).

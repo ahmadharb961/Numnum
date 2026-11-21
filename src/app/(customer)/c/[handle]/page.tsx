@@ -9,6 +9,9 @@ import { BackButton } from "@/components/back-button";
 import { CreatorStats } from "@/components/creator/follow-creator";
 import { CreatorMoreMenu, CreatorProfileTabs } from "@/components/creator/creator-profile-tabs";
 import { ShareButton } from "@/components/customer/restaurant-profile";
+import { creatorResults } from "@/server/creator-results";
+import Link from "@/components/link";
+import { compactNumber } from "@/lib/utils";
 import { getT } from "@/i18n/server";
 
 const social = (v: string | null, base: string) => (!v ? null : /^https?:\/\//.test(v) ? v : `${base}${v.replace(/^@/, "")}`);
@@ -39,6 +42,8 @@ export default async function CreatorProfilePage({ params }: { params: Promise<{
     me ? prisma.creatorFollow.findUnique({ where: { userId_creatorId: { userId: me.id, creatorId: c.id } } }) : null,
     creatorFavorites(c.userId),
   ]);
+  // Shared results: a proof badge (orders their reels brought) linking to the results page.
+  const results = c.shareResults ? await creatorResults(c.id) : null;
   const self = me?.id === c.userId;
   const views = reels.reduce((s, r) => s + r.viewCount, 0);
   const ig = social(c.instagram, "https://instagram.com/");
@@ -106,6 +111,11 @@ export default async function CreatorProfilePage({ params }: { params: Promise<{
                 .filter(Boolean)
                 .flatMap((el, i) => (i ? [<span key={`sep${i}`} className="h-4 w-px bg-black/15" aria-hidden />, el] : [el]))}
             </div>
+          )}
+          {results && (
+            <Link href={`/c/${c.handle}/results`} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1.5 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 active:scale-95" data-testid="results-badge">
+              📈 {t(results.totals.completedOrders === 1 ? "1 order from their reels" : "{n} orders from their reels", { n: compactNumber(results.totals.completedOrders) })} · {t("See results")} ›
+            </Link>
           )}
           <CreatorStats creatorId={c.id} handle={c.handle} initialFollowing={!!follow} initialCount={c.followerCount} loggedIn={!!me} self={self} reels={reels.length} views={views} />
         </section>

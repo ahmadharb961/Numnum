@@ -5,7 +5,7 @@ import { preloadMap } from "@/components/map-picker";
 import Link from "@/components/link";
 import { useKeepLoaded } from "@/components/link-warmer";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink, BadgePercent, Clapperboard, Contact } from "lucide-react";
+import { BarChart3, Bell, LineChart, ClipboardList, CreditCard, Film, Image as ImageIcon, LayoutGrid, Menu, MessageSquareText, Settings, ShieldCheck, SlidersHorizontal, Upload, Users, X, LogOut, ExternalLink, BadgePercent, Clapperboard, Contact, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/actions/auth";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -30,7 +30,7 @@ export function DashboardNav({ restaurantName, slug, role, memberships, currentI
         { href: "/dashboard/menu/photos", label: "Photos", icon: ImageIcon, minRole: "MANAGER" },
       ],
     },
-    { title: "Content", items: [{ href: "/dashboard/reels", label: "Reels", icon: Film, minRole: "MANAGER" }, { href: "/dashboard/creator-reels", label: "Creator reels", icon: Clapperboard, minRole: "MANAGER", badge: creatorTags }, { href: "/dashboard/deals", label: "Deals", icon: BadgePercent, minRole: "MANAGER" }, { href: "/dashboard/reviews", label: "Reviews", icon: MessageSquareText }] },
+    { title: "Content", items: [{ href: "/dashboard/reels", label: "Reels", icon: Film, minRole: "MANAGER" }, { href: "/dashboard/creator-reels", label: "Creator reels", icon: Clapperboard, minRole: "MANAGER", badge: creatorTags }, { href: "/dashboard/find-creators", label: "Find creators", icon: Sparkles, minRole: "MANAGER" }, { href: "/dashboard/deals", label: "Deals", icon: BadgePercent, minRole: "MANAGER" }, { href: "/dashboard/reviews", label: "Reviews", icon: MessageSquareText }] },
     {
       title: "Account",
       items: [

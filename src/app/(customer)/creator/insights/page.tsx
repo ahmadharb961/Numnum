@@ -5,6 +5,10 @@ import { Eye, Heart, MousePointerClick, Send, ShoppingBag, Users } from "lucide-
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { creatorInsights, parseRange } from "@/server/insights";
+import { creatorResults, recentCreatorOrders } from "@/server/creator-results";
+import { ShareResultsCard } from "@/components/creator/share-results";
+import { formatDateTime } from "@/lib/utils";
+import { getLocale } from "@/i18n/server";
 import { PageHeader } from "@/components/customer/page-header";
 import { DailyChart } from "@/components/dashboard/daily-chart";
 import { formatMoney } from "@/lib/money";
@@ -20,11 +24,22 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function CreatorInsightsPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   const t = await getT();
   const me = await requireUser("/creator/insights");
-  const c = await prisma.creator.findUnique({ where: { userId: me.id }, select: { id: true, status: true } });
+  const c = await prisma.creator.findUnique({ where: { userId: me.id }, select: { id: true, status: true, handle: true, shareResults: true } });
   if (c?.status !== "APPROVED" && c?.status !== "SUSPENDED") redirect("/creator");
   const sp = await searchParams;
   const days = [7, 30, 90].includes(Number(sp.days)) ? Number(sp.days) : 30;
-  const ins = await creatorInsights(c.id, parseRange({ days: String(days) }));
+  const [ins, all, recent, lang] = await Promise.all([creatorInsights(c.id, parseRange({ days: String(days) })), creatorResults(c.id), recentCreatorOrders(c.id, 30), getLocale()]);
+  const STATUS: Record<string, { label: string; tone: string }> = {
+    COMPLETED: { label: "Completed", tone: "bg-emerald-50 text-emerald-700" },
+    PLACED: { label: "New", tone: "bg-sky-50 text-sky-700" },
+    ACCEPTED: { label: "Accepted", tone: "bg-sky-50 text-sky-700" },
+    PREPARING: { label: "Preparing", tone: "bg-sky-50 text-sky-700" },
+    OUT_FOR_DELIVERY: { label: "On the way", tone: "bg-sky-50 text-sky-700" },
+    READY_FOR_PICKUP: { label: "Ready for pickup", tone: "bg-sky-50 text-sky-700" },
+    REJECTED: { label: "Rejected", tone: "bg-black/5 text-ink-muted" },
+    CANCELED: { label: "Canceled", tone: "bg-black/5 text-ink-muted" },
+    FAILED: { label: "Not delivered", tone: "bg-black/5 text-ink-muted" },
+  };
   const tiles = [
     { icon: Eye, value: compactNumber(ins.totals.views), label: t("views"), sub: t("{n} people", { n: compactNumber(ins.totals.uniqueViewers) }), tone: "text-brand-600 bg-brand-50" },
     { icon: ShoppingBag, value: String(ins.totals.orders), label: t("orders from your reels"), sub: t("{n} completed", { n: ins.totals.completedOrders }), tone: "text-emerald-700 bg-emerald-50" },
@@ -37,6 +52,29 @@ export default async function CreatorInsightsPage({ searchParams }: { searchPara
     <div className="pb-nav">
       <PageHeader title="Insights" />
       <div className="container-app max-w-3xl space-y-5 py-5">
+        {/* All time: the track record restaurants care about. */}
+        <section className="card bg-gradient-to-br from-emerald-600 to-emerald-500 p-5 text-white" data-testid="creator-all-time">
+          <div className="text-xs font-bold uppercase tracking-wide text-white/80">{t("All time")}</div>
+          <div className="mt-1 flex flex-wrap items-end gap-x-6 gap-y-2">
+            <div>
+              <div className="text-4xl font-black tabular leading-none">{compactNumber(all.totals.completedOrders)}</div>
+              <div className="text-sm text-white/90">{t("completed orders from your reels")}</div>
+            </div>
+            <div>
+              <div className="text-2xl font-black tabular leading-none">{all.totals.ordersPer1000Views ?? "–"}</div>
+              <div className="text-sm text-white/90">{t("orders per 1,000 views")}</div>
+            </div>
+            <div>
+              <div className="text-2xl font-black tabular leading-none">{formatMoney(all.totals.salesUsdCents, "USD")}</div>
+              <div className="text-sm text-white/90">{t("food sales for restaurants")}</div>
+            </div>
+            <div>
+              <div className="text-2xl font-black tabular leading-none">{all.totals.restaurants}</div>
+              <div className="text-sm text-white/90">{t(all.totals.restaurants === 1 ? "restaurant" : "restaurants")}</div>
+            </div>
+          </div>
+        </section>
+        <ShareResultsCard handle={c.handle} initial={c.shareResults} completedOrders={all.totals.completedOrders} />
         <div className="flex gap-2">
           {[7, 30, 90].map((d) => (
             <Link prefetch key={d} href={`/creator/insights?days=${d}`} className={cn("chip h-9 text-sm", days === d && "chip-active")}>
@@ -88,6 +126,7 @@ export default async function CreatorInsightsPage({ searchParams }: { searchPara
                       <span>{t("{n} views", { n: compactNumber(r.views) })}</span>
                       <span>{t("{n} likes", { n: compactNumber(r.likes) })}</span>
                       {r.avgWatchSec != null && <span>{t("{n}s watched on average", { n: r.avgWatchSec })}</span>}
+                      {r.views > 0 && <span className="font-semibold text-emerald-700">{t("{n} orders per 1,000 views", { n: Math.round((r.orders / r.views) * 10_000) / 10 })}</span>}
                     </div>
                   </div>
                   <div className="text-end">
@@ -100,6 +139,54 @@ export default async function CreatorInsightsPage({ searchParams }: { searchPara
           ) : (
             <div className="card p-6 text-center text-ink-muted">{t("Your live reels' numbers show here.")}</div>
           )}
+        </section>
+        <section>
+          <h2 className="mb-2 px-1 text-sm font-extrabold uppercase tracking-wide text-ink-muted">{t("Restaurants (all time)")}</h2>
+          {all.restaurants.length ? (
+            <ul className="card divide-y divide-black/5" data-testid="creator-restaurant-stats">
+              {all.restaurants.map((r) => (
+                <li key={r.slug} className="flex items-center justify-between gap-3 p-3">
+                  <div className="min-w-0">
+                    <Link href={`/r/${r.slug}`} className="truncate font-bold">{r.name}</Link>
+                    <div className="text-xs text-ink-muted">{t("{r} reels · {v} views · {s} sales", { r: r.reels, v: compactNumber(r.views), s: formatMoney(r.salesUsdCents, "USD") })}</div>
+                  </div>
+                  <div className="text-end">
+                    <div className="text-xl font-black tabular text-emerald-700">{r.completed}</div>
+                    <div className="text-[11px] text-ink-muted">{t("completed")}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="card p-6 text-center text-ink-muted">{t("Restaurants you tag show here with the orders you brought them.")}</div>
+          )}
+        </section>
+        <section>
+          <h2 className="mb-2 px-1 text-sm font-extrabold uppercase tracking-wide text-ink-muted">{t("Latest orders from your reels")}</h2>
+          {recent.length ? (
+            <ul className="card divide-y divide-black/5" data-testid="creator-recent-orders">
+              {recent.map((o) => {
+                const st = STATUS[o.status] ?? { label: o.status, tone: "bg-black/5 text-ink-muted" };
+                return (
+                  <li key={o.id} className="flex items-center justify-between gap-3 p-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold">{o.dishes.join(", ")}</div>
+                      <div className="truncate text-xs text-ink-muted">
+                        {o.restaurantName} · {formatDateTime(o.createdAt, lang)}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-end">
+                      <div className="text-sm font-bold tabular">{formatMoney(o.totalCents, o.currency)}</div>
+                      <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${st.tone}`}>{t(st.label)}</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="card p-6 text-center text-ink-muted">{t("Each order placed from your reels shows here.")}</div>
+          )}
+          <p className="mt-2 px-1 text-xs text-ink-muted">{t("Counted by numnum from orders placed from your reels. Customers' details stay private.")}</p>
         </section>
       </div>
     </div>

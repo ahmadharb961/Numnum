@@ -1,0 +1,1 @@
+ALTER TABLE "creators" ADD COLUMN "shareResults" BOOLEAN NOT NULL DEFAULT false;
