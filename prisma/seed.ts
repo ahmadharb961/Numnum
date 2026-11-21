@@ -308,6 +308,7 @@ async function seedDemo(adminId: string) {
   if (!firstRun) for (const c of created) await prisma.restaurant.update({ where: { id: c.r.id }, data: { openingHours: ALWAYS_OPEN } });
   await prisma.platformSetting.upsert({ where: { key: "demo_media_version" }, create: { key: "demo_media_version", value: DEMO_MEDIA_VERSION }, update: { value: DEMO_MEDIA_VERSION } });
   await ensureDemoCreator(pw);
+  await ensureDemoOffers();
   if (!firstRun || created[0]?.r.slug !== "burger-house") {
     rmSync(tmp, { recursive: true, force: true });
     await waitForStreamReels();
@@ -443,3 +444,21 @@ main().catch(async (e) => {
   await prisma.$disconnect();
   process.exit(1);
 });
+
+/**
+ * Two demo offers, so NumOffers has something to show: 20% off the whole menu at Shawarma Station
+ * and free delivery at Pizza Forno. Created once (a restaurant that ever had a deal is left as it is,
+ * so ending them from the dashboard sticks).
+ */
+async function ensureDemoOffers() {
+  const offers = [
+    { slug: "shawarma-station", data: { kind: "PERCENT_OFF" as const, percent: 20 } },
+    { slug: "pizza-forno", data: { kind: "FREE_DELIVERY" as const } },
+  ];
+  for (const o of offers) {
+    const r = await prisma.restaurant.findUnique({ where: { slug: o.slug }, select: { id: true } });
+    if (!r || (await prisma.deal.count({ where: { restaurantId: r.id } }))) continue;
+    await prisma.deal.create({ data: { restaurantId: r.id, ...o.data } });
+    console.log(`Demo offer at ${o.slug}`);
+  }
+}
