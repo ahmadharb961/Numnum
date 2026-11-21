@@ -44,6 +44,7 @@ model User {
   orders         Order[]
   addresses      CustomerAddress[]
   pushSubs       PushSubscription[]
+  appDevices     AppDevice[]
   sessions       Session[]
   staff          RestaurantStaff[]
   itemReviews    ItemReview[]
@@ -95,6 +96,22 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+/// A phone with the numnum store app (App Store / Google Play), counted when the app opens (at most
+/// once a day). The id is random, made and kept on the phone; uninstalling and reinstalling makes a new one.
+model AppDevice {
+  id          String   @id
+  platform    String /// "ios" | "android"
+  /// The account last logged in on it (kept after logout).
+  userId      String?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([platform, lastSeenAt])
+  @@index([userId])
+  @@map("app_devices")
 }
 
 model CustomerAddress {

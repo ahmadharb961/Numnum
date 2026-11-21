@@ -2,9 +2,11 @@ import Link from "@/components/link";
 import { prisma } from "@/server/db";
 import { getSettings } from "@/server/settings";
 import { suspiciousRestaurants } from "@/server/analytics";
+import { appStats } from "@/server/app-devices";
 import { DashPage, Section } from "@/components/dashboard/page";
 import { StatCard } from "@/components/ui/misc";
 import { formatMoney } from "@/lib/money";
+import { formatDate } from "@/lib/utils";
 import { compactNumber } from "@/lib/utils";
 
 export const metadata = { title: "Overview" };
@@ -12,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminOverview() {
   const settings = await getSettings();
-  const [restaurants, active, verified, items, reels, views, orders30, completed, commissionable, accrued, invoiced, paid, openInvoices, overdue, suspicious] = await Promise.all([
+  const [restaurants, active, verified, items, reels, views, orders30, completed, commissionable, accrued, invoiced, paid, openInvoices, overdue, suspicious, apps] = await Promise.all([
     prisma.restaurant.count(),
     prisma.restaurant.count({ where: { status: "ACTIVE" } }),
     prisma.restaurant.count({ where: { verificationStatus: "APPROVED" } }),
@@ -28,6 +30,7 @@ export default async function AdminOverview() {
     prisma.invoice.findMany({ where: { status: { notIn: ["PAID", "DRAFT"] } }, select: { totalDueCents: true, paidCents: true } }),
     prisma.invoice.count({ where: { status: "OVERDUE" } }),
     suspiciousRestaurants(settings.suspiciousRejectRate),
+    appStats(),
   ]);
   const receivable = openInvoices.reduce((s, i) => s + Math.max(0, i.totalDueCents - i.paidCents), 0);
   return (
@@ -40,6 +43,16 @@ export default async function AdminOverview() {
         <StatCard label="Reel views" value={compactNumber(views._sum.viewCount ?? 0)} sub="qualified" />
         <StatCard label="Orders (30 days)" value={compactNumber(orders30)} />
       </div>
+      <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-muted">Store apps</h2>
+      <div className="mb-2 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="app-stats">
+        <StatCard label="Android app installs" value={compactNumber(apps.android.installs)} sub={`${apps.android.active} active · ${apps.android.newThisWeek} new this week`} />
+        <StatCard label="iPhone app installs" value={compactNumber(apps.ios.installs)} sub={`${apps.ios.active} active · ${apps.ios.newThisWeek} new this week`} />
+        <StatCard label="App notifications on" value={compactNumber(apps.android.notifications + apps.ios.notifications)} sub={`${apps.android.notifications} Android · ${apps.ios.notifications} iPhone`} />
+        <StatCard label="Logged-in app users" value={compactNumber(apps.loggedIn)} sub={`last ${apps.activeDays} days`} />
+      </div>
+      <p className="mb-5 text-xs text-ink-muted">
+        Phones that opened the numnum app{apps.since ? ` since ${formatDate(apps.since)}` : " (counting starts with the next app open)"}. Active = opened in the last {apps.activeDays} days. A reinstall counts again. Store download totals are in Google Play Console and App Store Connect.
+      </p>
       <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-muted">Commercial outcomes</h2>
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Completed orders" value={compactNumber(completed)} sub="cash collected by restaurants" />

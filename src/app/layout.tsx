@@ -7,6 +7,7 @@ import { CartProvider } from "@/components/customer/cart";
 import { ServiceWorker } from "@/components/sw-register";
 import { NavHistory } from "@/components/back-button";
 import { LinkWarmer } from "@/components/link-warmer";
+import { AppOpenPing } from "@/components/app-open-ping";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { TypingWatcher } from "@/components/typing-watcher";
 import { InstallPromptListener } from "@/components/install-guide";
@@ -75,6 +76,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <PullToRefresh />
         <TypingWatcher />
         <InstallPromptListener />
+        <AppOpenPing />
         </AppLinksProvider>
         </I18nProvider>
       </body>
