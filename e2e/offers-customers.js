@@ -31,6 +31,7 @@ const SHOTS = process.env.SHOTS || "/tmp";
     check(chips[0]?.trim() === "All" && /NumOffers/.test(chips[1] || ""), "Explore: NumOffers is the first category, right after All", chips.slice(0, 3));
     await p.getByTestId("numoffers-chip").click();
     await p.waitForURL(/\/offers$/); await settle(p);
+    await p.locator("[data-testid=offer-restaurant]").first().waitFor({ timeout: 10000 }).catch(() => {}); // the list has streamed in
     const offers = await p.locator("[data-testid=offer-restaurant]").allInnerTexts();
     check(offers.length === withDeals.length, `lists every restaurant with a live offer (${withDeals.length})`, offers.length);
     const bhOffer = p.locator("[data-testid=offer-restaurant]").filter({ hasText: "Burger House" });

@@ -10,18 +10,24 @@ import { useT } from "@/i18n/client";
 export function Sheet({ open, onClose, title, children, className, full }: { open: boolean; onClose: () => void; title?: string; children: React.ReactNode; className?: string; full?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const t = useT();
+  // The latest onClose, without making the effect below run again: callers pass a new function on
+  // every render, and re-running it moved focus off a text field after each letter typed (the
+  // phone's keyboard closed).
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close.current();
     window.addEventListener("keydown", onKey);
-    ref.current?.focus();
+    // Focus the sheet once, as it opens, unless a field inside it already took focus (autoFocus).
+    if (!ref.current?.contains(document.activeElement)) ref.current?.focus();
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open || typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={title ? t(title) : undefined}>

@@ -32,7 +32,11 @@ const settle = (p) => p.waitForFunction(() => !document.querySelector('div[hidde
   await p.goto("/explore", { waitUntil: "load" }); await settle(p);
   await p.locator("button, a").filter({ hasText: /^Reels/ }).first().click();
   await p.getByRole("button", { name: /Filter/ }).first().click();
-  await p.getByPlaceholder("Min").fill("3");
+  await p.getByPlaceholder("Min").click();
+  await p.getByPlaceholder("Min").pressSequentially("3", { delay: 60 });
+  await p.getByPlaceholder("Max").click();
+  await p.getByPlaceholder("Max").pressSequentially("5.5", { delay: 60 });
+  check((await p.getByPlaceholder("Max").inputValue()) === "5.5", "typing a price key by key stays in the field", await p.getByPlaceholder("Max").inputValue());
   await p.getByPlaceholder("Max").fill("5");
   await p.getByRole("button", { name: /Show|Apply|results/i }).last().click();
   await p.waitForURL(/minPrice=3/);
