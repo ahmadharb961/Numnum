@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
+import { publicReelWhere } from "./feed";
 import { audit } from "./audit";
 import { enqueue } from "./jobs";
 import { notifyAdmins, notifyRestaurant, notifyUser } from "./notifications";
@@ -582,4 +583,14 @@ export async function celebrateFirstCreatorOrders(reelIds: string[]) {
   } catch (e) {
     console.error("celebrateFirstCreatorOrders", e);
   }
+}
+
+/** The reels a creator saved (newest first), shown on their profile as Favorites. */
+export async function creatorFavorites(userId: string, take = 120) {
+  const saves = await prisma.savedItem.findMany({ where: { ownerKey: `u:${userId}`, type: "REEL" }, orderBy: { createdAt: "desc" }, take, select: { refId: true } });
+  if (!saves.length) return [];
+  const ids = saves.map((x) => x.refId);
+  const rows = await prisma.reel.findMany({ where: { ...publicReelWhere, id: { in: ids } }, select: { id: true, posterUrl: true, viewCount: true, menuItem: { select: { name: true } } } });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids.map((id) => byId.get(id)).filter((r): r is NonNullable<typeof r> => !!r);
 }

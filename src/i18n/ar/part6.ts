@@ -376,4 +376,14 @@ export const AR6: Record<string, string> = {
   "One order can have up to {n} different items. Ask someone to remove a few.": "يمكن أن يحتوي الطلب الواحد على {n} صنفاً مختلفاً كحد أقصى. اطلب من أحدهم إزالة بعضها.",
   "1 restaurant with offers and deals now": "مطعم واحد لديه عروض وتخفيضات الآن",
   "1 restaurant has offers right now. The discount is applied automatically at checkout.": "مطعم واحد لديه عروض الآن. يُطبَّق الخصم تلقائياً عند الدفع.",
+  // Creator page favorites, restaurant delivery pill
+  "Favorites": "المفضّلة",
+  "No favorites yet.": "لا مفضّلات بعد.",
+  "Reels you save show here, so your followers see your favorite food.": "تظهر هنا المقاطع التي تحفظها، ليرى متابعوك أكلاتك المفضّلة.",
+  "Everyone can see the reels you save here.": "يمكن للجميع رؤية المقاطع التي تحفظها هنا.",
+  "Copy profile link": "نسخ رابط الملف",
+  "{name} on numnum: food reels and favorite spots": "{name} على numnum: مقاطع طعام وأماكن مفضّلة",
+  "{name}'s favorites": "مفضّلات {name}",
+  "Too far": "بعيد جداً",
+  "up to {max}": "حتى {max}",
 };
