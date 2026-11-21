@@ -260,10 +260,21 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
           )}
         </div>
         <div className="mt-3 flex items-start justify-between gap-3">
-          {/* The tick follows the last word, even when a long name wraps onto two lines. */}
+          {/* The tick is glued to the last word: never alone on a line of its own. */}
           <h1 className="min-w-0 break-words text-[28px] font-black leading-tight tracking-tight">
-            {r.displayName}
-            {r.verificationStatus === "APPROVED" && <VerifiedBadge className="ms-1.5 inline-flex align-[-3px] [&_svg]:h-6 [&_svg]:w-6" />}
+            {(() => {
+              const words = r.displayName.trim().split(/\s+/);
+              const last = words.pop() ?? "";
+              return (
+                <>
+                  {words.length > 0 && `${words.join(" ")} `}
+                  <span className="whitespace-nowrap">
+                    {last}
+                    {r.verificationStatus === "APPROVED" && <VerifiedBadge className="ms-1.5 inline-flex align-[-3px] [&_svg]:h-6 [&_svg]:w-6" />}
+                  </span>
+                </>
+              );
+            })()}
           </h1>
           <FollowButton restaurantId={r.id} initial={following} initialCount={r.followerCount} showCount={false} large className="shrink-0" />
         </div>

@@ -50,6 +50,16 @@ const SHOTS = process.env.SHOTS || "/tmp";
     check(/\d+–\d+ min/.test(pill) && /\d+(\.\d+)? ?(km|m)\b/.test(pill) && /\$/.test(pill), "and the green pill: time, distance and fee", pill);
     check((await p.getByText("Hours & Contact").count()) === 0 && (await p.getByRole("link", { name: /Order now/ }).count()) === 0, "the extra cards are gone (hours and contact are under About)");
     await p.screenshot({ path: `${SHOTS}/restaurant-redesign.png`, fullPage: false });
+    // A name that just fills the line (Manousheh Corner on a phone): the tick stays with the last word.
+    await p.goto("/r/manousheh-corner", { waitUntil: "load" }); await settle(p);
+    const tick = await p.evaluate(() => {
+      const h = document.querySelector("h1");
+      const b = h?.querySelector("svg")?.getBoundingClientRect();
+      const hr = h?.getBoundingClientRect();
+      return b && hr ? { alone: b.left - hr.left < 30, lines: Math.round(hr.height / parseFloat(getComputedStyle(h).lineHeight)) } : null;
+    });
+    check(tick && !tick.alone, "the blue tick is never alone on its own line (it stays with the last word)", tick);
+    await p.screenshot({ path: `${SHOTS}/manousheh-name.png`, clip: { x: 0, y: 260, width: 390, height: 140 } });
 
     console.log("\nCreator page");
     // Mr. Foodies saves two reels: his Favorites.
