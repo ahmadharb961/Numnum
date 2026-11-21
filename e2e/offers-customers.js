@@ -15,7 +15,7 @@ const SHOTS = process.env.SHOTS || "/tmp";
   const bh = await db.restaurant.findFirstOrThrow({ where: { slug: "burger-house" } });
   const burger = await db.menuItem.findFirstOrThrow({ where: { restaurantId: bh.id, name: "Double Smash Burger" } });
   await db.deal.updateMany({ where: { restaurantId: bh.id, endedAt: null }, data: { endedAt: new Date() } });
-  const deal = await db.deal.create({ data: { restaurantId: bh.id, kind: "PERCENT_OFF", percent: 20, menuItemId: burger.id } });
+  const deal = await db.deal.create({ data: { restaurantId: bh.id, kind: "PERCENT_OFF", percent: 20, menuItemId: burger.id, startsAt: new Date(Date.now() - 60_000) } });
   const withDeals = await db.deal.findMany({ where: { endedAt: null, startsAt: { lte: new Date() }, OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }], restaurant: { status: "ACTIVE", restrictPromotion: false } }, distinct: ["restaurantId"], select: { restaurantId: true } });
   const b = await chromium.launch();
   const errors = [];
