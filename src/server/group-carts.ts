@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
-import { prisma } from "./db";
+import { prisma, type Tx } from "./db";
 import { MAX_LINES } from "./orders";
 
 // Group ordering: the host shares a link, friends add their meals under their name, and the host
@@ -10,7 +10,7 @@ import { MAX_LINES } from "./orders";
 // the server when the host places it.
 
 export const GROUP_HOURS = 24;
-export const MAX_MEMBERS = 15;
+export const MAX_MEMBERS = 25;
 const MAX_MEMBER_LINES = 20;
 const CODE_CHARS = "abcdefghjkmnpqrstuvwxyz23456789"; // no 0/o, 1/l/i: easy to read out
 
@@ -50,13 +50,31 @@ function newCode() {
 
 type Viewer = { device: string; userId: string | null };
 
+const groupInclude = { restaurant: { select: { id: true, slug: true, displayName: true, currency: true, logoUrl: true, status: true } }, members: { orderBy: { createdAt: "asc" as const } } };
+
 async function load(code: string) {
-  const g = await prisma.groupCart.findUnique({
-    where: { code: code.toLowerCase() },
-    include: { restaurant: { select: { id: true, slug: true, displayName: true, currency: true, logoUrl: true, status: true } }, members: { orderBy: { createdAt: "asc" } } },
-  });
+  const g = await prisma.groupCart.findUnique({ where: { code: code.toLowerCase() }, include: groupInclude });
   if (!g) throw new GroupError("This group order link isn't valid", 404);
   return g;
+}
+type Loaded = Awaited<ReturnType<typeof load>>;
+
+/**
+ * Changes to a group take turns (the group's row is locked for the moment it takes): with many
+ * people joining and adding at once, each change sees the latest group. Nobody slips in past the
+ * size limit, and an item sent just as the host checks out is either in the order or refused,
+ * never saved but left out.
+ */
+function changeGroup<T>(code: string, fn: (tx: Tx, g: Loaded) => Promise<T>) {
+  return prisma.$transaction(
+    async (tx) => {
+      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM group_carts WHERE code = ${code.toLowerCase()} FOR UPDATE`;
+      if (!rows.length) throw new GroupError("This group order link isn't valid", 404);
+      const g = await tx.groupCart.findUniqueOrThrow({ where: { id: rows[0].id }, include: groupInclude });
+      return fn(tx, g);
+    },
+    { maxWait: 15_000, timeout: 15_000 },
+  );
 }
 
 const isHostOf = (g: { hostDevice: string; hostUserId: string | null }, v: Viewer) => g.hostDevice === v.device || (!!v.userId && g.hostUserId === v.userId);
@@ -109,28 +127,30 @@ export async function createGroup(v: Viewer, input: { restaurantId: string; name
 /** A friend joins with their name (joining again from the same phone just updates the name). */
 export async function joinGroup(code: string, v: Viewer, rawName: string) {
   const name = nameSchema.parse(rawName);
-  const g = await load(code);
-  if (!live(g)) throw new GroupError(g.status === "ORDERED" ? "This group order was already placed" : "This group order has ended", 410);
-  const me = g.members.find((m) => m.deviceKey === v.device);
-  if (me) {
-    await prisma.groupCartMember.update({ where: { id: me.id }, data: { name, userId: v.userId ?? me.userId } });
-    return;
-  }
-  if (g.status !== "OPEN") throw new GroupError("The host is placing the order now. Ask them to reopen it to add your meal.", 409);
-  if (g.members.length >= MAX_MEMBERS) throw new GroupError("A group order can have up to {n} people", 400, { n: MAX_MEMBERS });
-  await prisma.groupCartMember.create({ data: { groupCartId: g.id, name, deviceKey: v.device, userId: v.userId, lines: [] } });
+  await changeGroup(code, async (tx, g) => {
+    if (!live(g)) throw new GroupError(g.status === "ORDERED" ? "This group order was already placed" : "This group order has ended", 410);
+    // Joining again (a double tap, a second visit) just updates the name.
+    const me = g.members.find((m) => m.deviceKey === v.device);
+    if (me) {
+      await tx.groupCartMember.update({ where: { id: me.id }, data: { name, userId: v.userId ?? me.userId } });
+      return;
+    }
+    if (g.status !== "OPEN") throw new GroupError("The host is placing the order now. Ask them to reopen it to add your meal.", 409);
+    if (g.members.length >= MAX_MEMBERS) throw new GroupError("A group order can have up to {n} people", 400, { n: MAX_MEMBERS });
+    await tx.groupCartMember.create({ data: { groupCartId: g.id, name, deviceKey: v.device, userId: v.userId, lines: [] } });
+  });
 }
 
 /** A member's own items (sent as they change their cart). */
 export async function setMyLines(code: string, v: Viewer, rawLines: unknown) {
   const lines = linesSchema.parse(rawLines);
-  const g = await load(code);
-  const me = g.members.find((m) => m.deviceKey === v.device);
-  if (!me) throw new GroupError("Join the group first", 403);
-  if (!live(g)) throw new GroupError("This group order has ended", 410);
-  if (g.status !== "OPEN") throw new GroupError("The host is placing the order now. Your changes weren't added.", 409);
-  if (lines.some((l) => !l.menuItemId)) throw new GroupError("Invalid item");
-  await prisma.groupCartMember.update({ where: { id: me.id }, data: { lines: lines as Prisma.InputJsonValue } });
+  await changeGroup(code, async (tx, g) => {
+    const me = g.members.find((m) => m.deviceKey === v.device);
+    if (!me) throw new GroupError("Join the group first", 403);
+    if (!live(g)) throw new GroupError("This group order has ended", 410);
+    if (g.status !== "OPEN") throw new GroupError("The host is placing the order now. Your changes weren't added.", 409);
+    await tx.groupCartMember.update({ where: { id: me.id }, data: { lines: lines as Prisma.InputJsonValue } });
+  });
 }
 
 async function hostGroup(code: string, v: Viewer) {
@@ -144,22 +164,25 @@ async function hostGroup(code: string, v: Viewer) {
  * items as one cart (a friend's items carry "For <name>" so the restaurant can pack per person).
  */
 export async function lockGroup(code: string, v: Viewer) {
-  const g = await hostGroup(code, v);
-  if (!live(g)) throw new GroupError("This group order has ended", 410);
-  const lines = g.members.flatMap((m) =>
-    (m.lines as GroupLine[]).map((l) => ({ ...l, note: m.isHost ? l.note : [`For ${m.name}`, l.note].filter(Boolean).join(" · ").slice(0, 300) })),
-  );
-  if (!lines.length) throw new GroupError("Nobody has added anything yet");
-  if (lines.length > MAX_LINES) throw new GroupError("One order can have up to {n} different items. Ask someone to remove a few.", 400, { n: MAX_LINES });
-  await prisma.groupCart.update({ where: { id: g.id }, data: { status: "LOCKED" } });
-  return { lines, restaurant: { id: g.restaurant.id, name: g.restaurant.displayName, slug: g.restaurant.slug, currency: g.restaurant.currency } };
+  return changeGroup(code, async (tx, g) => {
+    if (!isHostOf(g, v)) throw new GroupError("Only the person who started the group can do this", 403);
+    if (!live(g)) throw new GroupError("This group order has ended", 410);
+    const lines = g.members.flatMap((m) =>
+      (m.lines as GroupLine[]).map((l) => ({ ...l, note: m.isHost ? l.note : [`For ${m.name}`, l.note].filter(Boolean).join(" · ").slice(0, 300) })),
+    );
+    if (!lines.length) throw new GroupError("Nobody has added anything yet");
+    if (lines.length > MAX_LINES) throw new GroupError("One order can have up to {n} different items. Ask someone to remove a few.", 400, { n: MAX_LINES });
+    await tx.groupCart.update({ where: { id: g.id }, data: { status: "LOCKED" } });
+    return { lines, restaurant: { id: g.restaurant.id, name: g.restaurant.displayName, slug: g.restaurant.slug, currency: g.restaurant.currency } };
+  });
 }
 
 /** Back from checkout without ordering: friends can change their items again. */
 export async function unlockGroup(code: string, v: Viewer) {
-  const g = await hostGroup(code, v);
-  if (g.status !== "LOCKED") return;
-  await prisma.groupCart.update({ where: { id: g.id }, data: { status: "OPEN" } });
+  await changeGroup(code, async (tx, g) => {
+    if (!isHostOf(g, v)) throw new GroupError("Only the person who started the group can do this", 403);
+    if (g.status === "LOCKED") await tx.groupCart.update({ where: { id: g.id }, data: { status: "OPEN" } });
+  });
 }
 
 /** The order was placed: everyone sees it, and the group closes. */

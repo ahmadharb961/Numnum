@@ -93,6 +93,42 @@ describe("group ordering", () => {
   });
 });
 
+describe("group ordering with many people at once", () => {
+  beforeEach(resetDb);
+
+  it("24 join at the same moment (some tapping twice): all in, nobody twice, no errors; the 26th is refused", async () => {
+    const f = await makeRestaurant();
+    const host = { device: "dev-host-many-0000001", userId: null };
+    const code = await createGroup(host, { restaurantId: f.restaurant.id, name: "Host", lines: [line(f.burger.id, "Double Smash Burger", 750)] });
+    const friends = Array.from({ length: 24 }, (_, i) => ({ device: `dev-friend-many-${String(i).padStart(4, "0")}`, userId: null }));
+    // Every friend joins, and every third one taps Join twice at once.
+    const joins = friends.flatMap((v, i) => (i % 3 === 0 ? [joinGroup(code, v, `Friend ${i}`), joinGroup(code, v, `Friend ${i}`)] : [joinGroup(code, v, `Friend ${i}`)]));
+    const res = await Promise.allSettled(joins);
+    expect(res.filter((r) => r.status === "rejected").map((r) => String((r as PromiseRejectedResult).reason))).toEqual([]);
+    const s = await groupState(code, host);
+    expect(s.members).toHaveLength(25);
+    expect(new Set(s.members.map((m) => m.name)).size).toBe(25);
+    await expect(joinGroup(code, { device: "dev-one-too-many-0001", userId: null }, "Late")).rejects.toThrow(/up to/);
+  });
+
+  it("everyone adds at once while the host checks out: every saved item is in the order, the rest are refused", async () => {
+    const f = await makeRestaurant();
+    const host = { device: "dev-host-race-0000001", userId: null };
+    const code = await createGroup(host, { restaurantId: f.restaurant.id, name: "Host", lines: [line(f.burger.id, "Double Smash Burger", 750)] });
+    const friends = Array.from({ length: 19 }, (_, i) => ({ device: `dev-friend-race-${String(i).padStart(4, "0")}`, userId: null }));
+    await Promise.all(friends.map((v, i) => joinGroup(code, v, `F${i}`)));
+    const adds = friends.map((v) => setMyLines(code, v, [line(f.fries.id, "French Fries", 300, 1)]).then(() => "saved", (e) => String(e)));
+    const lock = lockGroup(code, host);
+    const [results, locked] = await Promise.all([Promise.all(adds), lock]);
+    expect(results.every((r) => r === "saved" || /placing the order/.test(r))).toBe(true);
+    // Nothing saved but left out: every friend whose item was saved has it in the locked order.
+    const saved = results.filter((r) => r === "saved").length;
+    expect(locked.lines.filter((l) => l.note?.startsWith("For F")).length).toBe(saved);
+    const inDb = (await groupState(code, host)).members.filter((m) => !m.isHost && m.lines.length).length;
+    expect(inDb).toBe(saved);
+  });
+});
+
 describe("restaurant customers (Dashboard → Customers)", () => {
   beforeEach(resetDb);
 
